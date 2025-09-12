@@ -9,6 +9,7 @@ function NavigationBar() {
     { path: '/', label: 'Rotations', icon: '🏐' },
     { path: '/teams', label: 'Teams', icon: '👥' },
     { path: '/statistics', label: 'Stats', icon: '📊' },
+    { path: '/in-game-stats', label: 'In-Game Stats', icon: '⚡' },
     { path: '/analytics', label: 'Analytics', icon: '📈' },
   ]
 
