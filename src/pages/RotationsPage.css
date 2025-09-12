@@ -1,0 +1,17 @@
+.rotations-layout {
+  display: grid;
+  gap: 2rem;
+}
+
+/* Tablet and larger screens - sticky config panel */
+@media (min-width: 1024px) {
+  .rotations-layout {
+    grid-template-columns: 1fr 2fr;
+    align-items: start;
+  }
+  
+  .rotations-layout .page-section:first-child {
+    position: sticky;
+    top: 100px;
+  }
+}

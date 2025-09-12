@@ -1,0 +1,198 @@
+.rotation-display {
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.display-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.display-header h2 {
+  margin: 0 0 15px 0;
+  color: #1976d2;
+  font-size: 2.2em;
+}
+
+.legend {
+  display: flex;
+  justify-content: center;
+  gap: 30px;
+  flex-wrap: wrap;
+}
+
+.legend-item {
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 0.9em;
+}
+
+.legend-item.serving {
+  background: #e8f5e8;
+  color: #2e7d32;
+  border: 2px solid #4caf50;
+}
+
+.legend-item.rally {
+  background: #fff3e0;
+  color: #f57c00;
+  border: 2px solid #ff9800;
+}
+
+.rotations-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 40px;
+}
+
+.rotation-block {
+  background: white;
+  border-radius: 16px;
+  padding: 25px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+  border: 2px solid #f0f0f0;
+}
+
+.rotation-header {
+  text-align: center;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 3px solid #1976d2;
+}
+
+.rotation-header h3 {
+  margin: 0 0 10px 0;
+  color: #1976d2;
+  font-size: 1.8em;
+}
+
+.rotation-teams {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 15px;
+}
+
+.team-label {
+  padding: 6px 14px;
+  border-radius: 15px;
+  font-weight: bold;
+  font-size: 0.9em;
+}
+
+.team-label.team-a {
+  background: #e3f2fd;
+  color: #1976d2;
+  border: 2px solid #2196f3;
+}
+
+.team-label.team-b {
+  background: #fff3e0;
+  color: #f57c00;
+  border: 2px solid #ff9800;
+}
+
+.vs {
+  font-weight: bold;
+  color: #666;
+  font-size: 1.1em;
+}
+
+.courts-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  align-items: start;
+}
+
+.team-courts {
+  display: flex;
+  justify-content: center;
+}
+
+.formation-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+  align-items: center;
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  .rotation-display {
+    padding: 15px;
+  }
+  
+  .display-header h2 {
+    font-size: 1.8em;
+  }
+  
+  .legend {
+    gap: 15px;
+  }
+  
+  .legend-item {
+    font-size: 0.8em;
+    padding: 6px 12px;
+  }
+  
+  .rotations-grid {
+    gap: 25px;
+  }
+  
+  .rotation-block {
+    padding: 15px;
+  }
+  
+  .rotation-header h3 {
+    font-size: 1.5em;
+  }
+  
+  .courts-container {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  
+  .formation-pair {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  
+  .rotation-teams {
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+
+/* Tablet optimizations */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .courts-container {
+    gap: 20px;
+  }
+  
+  .formation-pair {
+    gap: 10px;
+  }
+}
+
+/* Large screen optimizations */
+@media (min-width: 1200px) {
+  .rotations-grid {
+    gap: 50px;
+  }
+  
+  .rotation-block {
+    padding: 30px;
+  }
+  
+  .courts-container {
+    gap: 40px;
+  }
+  
+  .formation-pair {
+    gap: 20px;
+  }
+}

@@ -1,0 +1,344 @@
+.rotation-map-viewer {
+  width: 100%;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+/* Compact Legend Section */
+.rotation-legend {
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #555;
+}
+
+.legend-item.serving {
+  color: #28a745;
+}
+
+.legend-item.rally {
+  color: #fd7e14;
+}
+
+/* Navigation Controls */
+.rotation-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  padding: 1rem;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.rotation-btn {
+  padding: 0.75rem 1.5rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.rotation-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.rotation-btn:active {
+  transform: translateY(0);
+}
+
+.rotation-indicators {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.rotation-dot {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid #dee2e6;
+  background: white;
+  color: #6c757d;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rotation-dot:hover {
+  border-color: #667eea;
+  color: #667eea;
+  transform: scale(1.1);
+}
+
+.rotation-dot.active {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-color: transparent;
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+/* Main Courts Container */
+.courts-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+
+.formation-section {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e0e6ed;
+}
+
+.formation-title {
+  text-align: center;
+  margin: 0 0 1rem 0;
+  font-size: 1.3rem;
+  font-weight: 600;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid #e0e6ed;
+}
+
+.formation-title.serving {
+  color: #28a745;
+  border-bottom-color: #28a745;
+}
+
+.formation-title.rally {
+  color: #fd7e14;
+  border-bottom-color: #fd7e14;
+}
+
+/* Unified Court Styles */
+.unified-volleyball-court {
+  width: 100%;
+  max-width: 400px;
+  margin: 0 auto;
+  aspect-ratio: 3/4;
+}
+
+.unified-court {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: #fff3cd;
+  border: 3px solid #333;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.unified-court-background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.unified-net-line {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: #333;
+  transform: translateY(-50%);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Removed attack lines to eliminate grey lines between players */
+
+.unified-player-position {
+  position: absolute;
+  z-index: 10;
+}
+
+.unified-player-circle {
+  width: 45px;
+  height: 45px;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid;
+  position: relative;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.unified-player-circle:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.unified-player-circle.team-a {
+  background: #dc3545;
+  border-color: #b02a37;
+  color: white;
+}
+
+.unified-player-circle.team-b {
+  background: #0d6efd;
+  border-color: #0a5bb5;
+  color: white;
+}
+
+.unified-player-name {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-align: center;
+  line-height: 0.9;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.unified-position-number {
+  font-size: 0.6rem;
+  font-weight: 500;
+  opacity: 0.8;
+}
+
+.server-indicator {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: #ffc107;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  animation: pulse 2s infinite;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+/* Mobile optimizations for unified court */
+@media (max-width: 768px) {
+  .unified-player-circle {
+    width: 35px;
+    height: 35px;
+  }
+  
+  .unified-player-name {
+    font-size: 0.6rem;
+  }
+  
+  .unified-position-number {
+    font-size: 0.5rem;
+  }
+  
+  .server-indicator {
+    width: 14px;
+    height: 14px;
+    font-size: 0.6rem;
+    top: -6px;
+    right: -6px;
+  }
+}
+
+/* Rotation info section removed for compact design */
+
+/* Mobile Optimizations */
+@media (max-width: 768px) {
+  .rotation-map-viewer {
+    padding: 0.5rem;
+  }
+
+  .courts-container {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .rotation-controls {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .rotation-legend {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .rotation-btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.8rem;
+  }
+
+  .rotation-dot {
+    width: 35px;
+    height: 35px;
+    font-size: 0.9rem;
+  }
+
+  .formation-title {
+    font-size: 1.1rem;
+  }
+
+  .team-label {
+    font-size: 0.9rem;
+  }
+}
+
+/* iPad Optimizations */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .rotation-map-viewer {
+    width: 100%;
+    padding: 1rem;
+  }
+  
+  .courts-container {
+    gap: 1.5rem;
+    width: 100%;
+  }
+  
+  .formation-section {
+    padding: 1.25rem;
+    width: 100%;
+  }
+  
+  .unified-volleyball-court {
+    max-width: none;
+    width: 100%;
+  }
+}
+
+/* iPad - Always side-by-side for both orientations */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .courts-container {
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+  }
+}
