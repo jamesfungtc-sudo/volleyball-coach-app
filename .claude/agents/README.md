@@ -103,6 +103,75 @@ This directory contains specialized Claude Code agents tailored for developing a
 
 ---
 
+### 6. **architect-review** 🏗️ ⭐ (BEST FOR LOGIC & PURPOSE ANALYSIS)
+**Use for:** Understanding system design rationale, architectural decisions, and logical reasoning
+
+**Capabilities:**
+- Clean Architecture and Domain-Driven Design (DDD) analysis
+- Microservices and distributed systems evaluation
+- SOLID principles and design pattern assessment
+- Service boundaries and bounded context analysis
+- **Evaluates if code implementation matches intended business purpose**
+- Identifies architectural violations and anti-patterns
+- Assesses scalability and maintainability implications
+- Reviews configuration and infrastructure decisions
+
+**When to use:**
+- **Analyzing OldTool files to understand system design rationale**
+- Understanding why architectural decisions were made
+- Evaluating if current implementation serves business needs
+- Reviewing service boundaries and domain logic
+- Assessing technical debt and refactoring opportunities
+- Planning system evolution and migrations
+
+---
+
+### 7. **business-analyst** 💼 ⭐ (BEST FOR USER VALUE ANALYSIS)
+**Use for:** Understanding user value, business impact, and strategic purpose
+
+**Capabilities:**
+- **Connects technical features to business outcomes and user value**
+- KPI framework development and success metrics
+- Customer and market analytics
+- Data storytelling and executive insights
+- ROI analysis and business impact assessment
+- **Evaluates "why does this feature exist?" and "what value does it provide?"**
+- Strategic recommendations based on business objectives
+- Financial modeling and customer lifecycle analysis
+
+**When to use:**
+- **Analyzing OldTool to understand coaching workflow value**
+- Understanding what problems the app solves for users
+- Evaluating feature priorities based on user impact
+- Assessing if implementation delivers intended value
+- Planning roadmap based on business outcomes
+- Identifying gaps between user needs and current features
+
+---
+
+### 8. **code-reviewer** 🔍
+**Use for:** Comprehensive code quality, security, and multi-language analysis
+
+**Capabilities:**
+- AI-powered code analysis with modern tools
+- Security vulnerability detection (OWASP Top 10)
+- Performance optimization and scalability review
+- Configuration and infrastructure review
+- **Multi-language support (JavaScript, Python, Java, Go, etc.)**
+- Database query optimization
+- Test coverage and code quality metrics
+- Production reliability and error handling
+
+**When to use:**
+- **Reviewing OldTool code files (RTF, JSON) for technical quality**
+- Security audits and vulnerability assessment
+- Performance bottleneck identification
+- Code quality and maintainability review
+- Legacy code analysis before migration
+- Production deployment readiness checks
+
+---
+
 ## How to Use These Agents
 
 ### In Claude Code CLI
@@ -116,6 +185,40 @@ This directory contains specialized Claude Code agents tailored for developing a
 @test-automator Write tests for the volleyball rotation calculations
 @performance-engineer Optimize the court rendering for 24 simultaneous courts
 @data-scientist Create a heatmap visualization for attack positions
+
+# NEW: Analysis agents for understanding OldTool
+@architect-review Analyze the OldTool system design and explain the logical reasoning behind its architecture
+@business-analyst Review OldTool and explain what user value it provides for volleyball coaches
+@code-reviewer Review the OldTool code for quality, security, and migration considerations
+```
+
+### Recommended Workflow for Analyzing OldTool
+
+For comprehensive understanding of your OldTool system, use this sequence:
+
+1. **Start with business-analyst** - Understand WHAT user value it provides and WHY it exists
+2. **Then use architect-review** - Understand HOW the system is designed and the logical reasoning
+3. **Finally use code-reviewer** - Understand technical quality and migration considerations
+
+Example:
+```bash
+# Step 1: Understand user value and purpose
+@business-analyst Review the files in OldTool/ directory and explain:
+- What problems does this app solve for volleyball coaches?
+- What is the core user value and workflow?
+- What features are most critical for users?
+
+# Step 2: Understand architectural design and logic
+@architect-review Analyze the OldTool/ files and explain:
+- What is the system architecture and design rationale?
+- How do the components work together?
+- What are the key design decisions and why were they made?
+
+# Step 3: Understand technical implementation
+@code-reviewer Review the OldTool/ code files and assess:
+- Code quality and technical patterns used
+- Security considerations and potential vulnerabilities
+- What needs attention when migrating to the new React app?
 ```
 
 ### Best Practices
