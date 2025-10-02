@@ -17,18 +17,24 @@ A professional volleyball coaching application for analyzing team rotations, for
 - ⚡ **PWA Functionality** - Works offline with service worker
 - 🎨 **Visual Team Differentiation** - Team A (red) vs Team B (blue) color coding
 - 🏟️ **Realistic Court Layout** - Teams face each other across the net with proper positioning
+- 📝 **InGame Stats (Phase 1 & 2)** - Point-by-point recording with conditional action types and live scoring
 
-### 🚧 **Planned Features (Coming Soon Pages)**
-- 📊 **Team Statistics** - Performance analytics and metrics
-- 📈 **Advanced Analytics** - Rotation efficiency analysis
+### 🚧 **In Development**
+- 📊 **InGame Stats (Phase 3)** - Statistics dashboard with charts and analytics
+- 🗄️ **Database Integration (Phase 4)** - Supabase backend with real-time sync
+
+### 🚧 **Planned Features**
 - 👥 **Team Management** - Player profiles and roster management
+- 📈 **Advanced Analytics** - Rotation efficiency analysis
 
 ## 🏗️ Technical Architecture
 
 ### **Frontend Stack**
-- **React 18** - Modern functional components with hooks
+- **React 19** - Modern functional components with hooks
+- **TypeScript** - Type-safe development for InGame Stats feature
 - **React Router** - HashRouter for GitHub Pages compatibility
-- **Vite** - Fast build tool and development server
+- **Vite 7** - Fast build tool and development server
+- **Zod** - Runtime validation for forms
 - **CSS3** - Responsive grid layouts and flexbox
 - **PWA** - Service worker for offline functionality
 
@@ -43,13 +49,32 @@ src/
 │   │   └── components/
 │   │       ├── RotationMapViewer.jsx  # Main rotation interface
 │   │       └── TeamConfigPanel.jsx    # Team setup form
+│   ├── inGameStats/                   # NEW: InGame Stats feature
+│   │   ├── components/
+│   │   │   ├── PointEntryForm.tsx     # 5-step point entry workflow
+│   │   │   ├── PointByPointList.tsx   # 3-column point display
+│   │   │   ├── WinLossToggle.tsx      # Win/Loss selector
+│   │   │   ├── SegmentedControl.tsx   # Action type selector
+│   │   │   ├── ConditionalDropdown.tsx # Subcategory/location selector
+│   │   │   └── PlayerSelector.tsx     # Player selection
+│   │   ├── context/
+│   │   │   └── MatchContext.tsx       # Match state management
+│   │   └── utils/
+│   │       ├── formHelpers.ts         # Conditional logic helpers
+│   │       └── formValidation.ts      # Zod validation schemas
 │   └── shared/
 │       └── components/
 │           └── AdvancedVolleyballCourt.jsx # Court visualization
-├── pages/                             # Route components
+├── pages/
+│   ├── RotationsPage.jsx              # Rotation viewer
+│   └── StatsPage.tsx                  # NEW: InGame stats (TypeScript)
+├── types/
+│   └── inGameStats.types.ts           # TypeScript definitions
+├── constants/
+│   └── actionTypes.ts                 # Win/Loss action types structure
 ├── utils/
-│   └── volleyballSystems.js          # Core volleyball logic
-└── App.jsx                           # Main app with routing
+│   └── volleyballSystems.js           # Core volleyball logic
+└── App.jsx                            # Main app with routing
 ```
 
 ### **Core Volleyball Logic** 
@@ -91,18 +116,48 @@ All volleyball rules and rotation calculations are centralized in `src/utils/vol
 git clone https://github.com/jamesfungtc-sudo/volleyball-coach-app.git
 cd volleyball-coach-app
 
+# Install Node.js 22+ (if needed)
+# Install nvm first: curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+nvm install 22
+nvm use 22
+
 # Install dependencies
 npm install
 
 # Start development server
 npm run dev
-# → http://localhost:5173
+# → Local: http://localhost:5173/volleyball-coach-app/
 
 # Build for production
 npm run build
 
 # Preview production build
 npm run preview
+```
+
+### **Testing Locally vs Live**
+
+**Option 1: Local Development (Recommended for testing)**
+```bash
+# Start dev server
+npm run dev
+
+# Open in browser
+# → http://localhost:5173/volleyball-coach-app/
+
+# Test your changes, fix bugs
+# Changes appear instantly with hot reload
+```
+
+**Option 2: Live Production (After testing locally)**
+```bash
+# Commit and push to deploy
+git add .
+git commit -m "Your changes"
+git push
+
+# Wait 3-5 minutes for GitHub Actions deployment
+# View live at: https://jamesfungtc-sudo.github.io/volleyball-coach-app/
 ```
 
 ### **Git Configuration**
@@ -185,27 +240,48 @@ git push https://jamesfungtc-sudo:YOUR_GITHUB_TOKEN@github.com/jamesfungtc-sudo/
 
 ## 📊 Performance Metrics
 
-- **Bundle Size**: ~245KB total (optimized)
+- **Bundle Size**: ~257KB total (with TypeScript InGame Stats)
 - **Load Time**: <2 seconds on good connection
 - **Lighthouse Score**: PWA optimized
 - **Offline Capability**: Service worker enabled
+- **Node.js Required**: v20.19+ or v22.12+ (v22.20.0 recommended)
 
-## 🔮 Future Enhancements
+## 🔮 InGame Stats Development Roadmap
 
-### **Phase 1: Statistics**
-- Player performance tracking
+### **✅ Phase 1: Foundation (Complete)**
+- TypeScript type definitions
+- ACTION_TYPES constant with exact OldTool structure
+- Match state management with Context API
+- Form validation with Zod
+
+### **✅ Phase 2: Point Entry UI (Complete)**
+- 5-step point entry workflow
+- Conditional rendering (Win/Loss → Category → Subcategory → Location/Tempo → Player)
+- Point-by-point list with 3-column layout
+- Live scoring and undo functionality
+- iPad-optimized touch targets
+
+### **🚧 Phase 3: Statistics Dashboard (In Progress)**
+- Summary statistics (3 key metrics)
+- 8 analytical charts (Chart.js):
+  - Hit vs Ace Ratio (Home & Opponent)
+  - Attack K/D Efficiency (Home & Opponent)
+  - Kill Zones by Player (Home & Opponent)
+  - Attack Positions (Home & Opponent)
+- View toggle between point list and statistics
+
+### **🚧 Phase 4: Database Integration (Planned)**
+- Supabase/PostgreSQL backend
+- Real-time point synchronization
+- Offline-first with IndexedDB
+- Match history and data persistence
+
+### **🔮 Future Enhancements**
+- Player performance tracking across matches
 - Rotation effectiveness metrics
-- Match analysis tools
-
-### **Phase 2: Advanced Analytics**
 - Heat maps for player positions
-- Success rate analysis by formation
 - Export data to CSV/PDF
-
-### **Phase 3: Team Management**
-- Player profiles and stats
 - Multiple team support
-- Save/load configurations
 
 ## 📝 Development History
 
@@ -216,11 +292,20 @@ git push https://jamesfungtc-sudo:YOUR_GITHUB_TOKEN@github.com/jamesfungtc-sudo/
 4. **GitHub Pages Migration** - Moved from Netlify for unlimited bandwidth
 5. **Mobile Optimization** - iPad/iPhone responsive design
 6. **Team Positioning** - Correct volleyball court orientation
+7. **TypeScript Migration** - Added TypeScript for InGame Stats feature
+8. **InGame Stats Phase 1 & 2** - Point entry system with conditional logic (2025-10-02)
+
+### **Technical Documentation**
+- **[IMPLEMENTATION_PLAN_InGameStats.md](IMPLEMENTATION_PLAN_InGameStats.md)** - Complete implementation plan for InGame Stats feature
+- **[QUICK_START_InGameStats.md](QUICK_START_InGameStats.md)** - Quick reference for developers
+- **[ARCHITECTURE_DIAGRAM_InGameStats.md](ARCHITECTURE_DIAGRAM_InGameStats.md)** - Visual system architecture
+- **[MANUAL_TESTING_CHECKLIST.md](MANUAL_TESTING_CHECKLIST.md)** - 60+ test cases for quality assurance
+- **[OldTool/](OldTool/)** - Original Retool app analysis and documentation
 
 ### **Technical Debt**
-- Coming soon pages need full implementation
-- Consider adding unit tests for volleyball logic
-- Potential migration to TypeScript for better type safety
+- Unit tests needed for InGame Stats components and utilities
+- Phase 3 (Statistics Dashboard) implementation pending
+- Phase 4 (Database integration) design complete, implementation pending
 
 ---
 

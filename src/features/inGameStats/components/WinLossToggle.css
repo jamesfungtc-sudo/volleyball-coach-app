@@ -1,0 +1,82 @@
+.win-loss-toggle {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.toggle-btn {
+  flex: 1;
+  padding: 16px 24px;
+  font-size: 18px;
+  font-weight: 600;
+  border: 2px solid #d1d5db;
+  border-radius: 8px;
+  background-color: #ffffff;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-height: 60px;
+  touch-action: manipulation;
+}
+
+.toggle-btn.win-btn {
+  border-color: #93c5fd;
+}
+
+.toggle-btn.loss-btn {
+  border-color: #fca5a5;
+}
+
+.toggle-btn:hover:not(:disabled) {
+  background-color: #f9fafb;
+}
+
+.toggle-btn.win-btn:hover:not(:disabled) {
+  border-color: #60a5fa;
+  background-color: #eff6ff;
+}
+
+.toggle-btn.loss-btn:hover:not(:disabled) {
+  border-color: #f87171;
+  background-color: #fef2f2;
+}
+
+.toggle-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.toggle-btn.active {
+  font-weight: 700;
+  border-width: 3px;
+}
+
+.toggle-btn.win-btn.active {
+  background-color: #dbeafe;
+  border-color: #2563eb;
+  color: #1e40af;
+}
+
+.toggle-btn.loss-btn.active {
+  background-color: #fee2e2;
+  border-color: #dc2626;
+  color: #991b1b;
+}
+
+.toggle-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Accessibility */
+.toggle-btn:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Tablet optimization */
+@media (min-width: 768px) {
+  .toggle-btn {
+    min-height: 70px;
+    font-size: 20px;
+  }
+}

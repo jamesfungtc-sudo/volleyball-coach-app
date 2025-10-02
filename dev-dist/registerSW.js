@@ -1,0 +1,1 @@
+if('serviceWorker' in navigator) navigator.serviceWorker.register('/volleyball-coach-app/dev-sw.js?dev-sw', { scope: '/volleyball-coach-app/', type: 'classic' })
