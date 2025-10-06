@@ -26,6 +26,55 @@ interface APIError {
 }
 
 // ============================================================================
+// Data Normalization Helpers
+// ============================================================================
+
+/**
+ * Normalize point data from Google Sheets format to our PointData format
+ * Handles both old format (score: {home, opponent}) and new format (home_score, opponent_score)
+ */
+function normalizePointData(point: any): PointData {
+  return {
+    point_number: point.point_number,
+    winning_team: point.winning_team,
+    action_type: point.action_type,
+    action: point.action,
+    locationTempo: point.locationTempo || null,
+    home_player: point.home_player || '',
+    opponent_player: point.opponent_player || '',
+    // Handle both formats
+    home_score: point.home_score !== undefined ? point.home_score : point.score?.home || 0,
+    opponent_score: point.opponent_score !== undefined ? point.opponent_score : point.score?.opponent || 0
+  };
+}
+
+/**
+ * Normalize match data from Google Sheets
+ */
+function normalizeMatchData(rawMatch: any): MatchData {
+  const sets = rawMatch.sets?.map((set: any) => ({
+    set_number: set.set_number,
+    points: set.points?.map(normalizePointData) || []
+  })) || [];
+
+  return {
+    id: rawMatch.id,
+    match_date: rawMatch.gameDate || rawMatch.match_date,
+    home_team: {
+      id: typeof rawMatch.homeTeam === 'string' ? rawMatch.homeTeam : rawMatch.home_team?.id,
+      name: typeof rawMatch.homeTeam === 'string' ? 'Home Team' : rawMatch.home_team?.name,
+      players: []
+    },
+    opponent_team: {
+      id: typeof rawMatch.opponentTeam === 'string' ? rawMatch.opponentTeam : rawMatch.opponent_team?.id,
+      name: typeof rawMatch.opponentTeam === 'string' ? 'Opponent Team' : rawMatch.opponent_team?.name,
+      players: []
+    },
+    sets
+  };
+}
+
+// ============================================================================
 // GET Operations (Read)
 // ============================================================================
 
@@ -56,13 +105,14 @@ export async function getMatch(matchId: string): Promise<MatchData | null> {
 
   try {
     const response = await fetch(`${API_URL}?action=getMatch&matchId=${matchId}`);
-    const data: APIResponse<MatchData> = await response.json();
+    const data: APIResponse<any> = await response.json();
 
     if (data.status !== 200) {
       throw new Error((data.data as unknown as APIError).error);
     }
 
-    return data.data;
+    // Normalize the data to match our PointData structure
+    return normalizeMatchData(data.data);
   } catch (error) {
     console.error('Failed to get match:', error);
     throw error;
@@ -80,13 +130,14 @@ export async function getAllMatches(): Promise<MatchData[]> {
 
   try {
     const response = await fetch(`${API_URL}?action=getAllMatches`);
-    const data: APIResponse<MatchData[]> = await response.json();
+    const data: APIResponse<any[]> = await response.json();
 
     if (data.status !== 200) {
       throw new Error((data.data as unknown as APIError).error);
     }
 
-    return data.data;
+    // Normalize all match data
+    return data.data.map(normalizeMatchData);
   } catch (error) {
     console.error('Failed to get matches:', error);
     throw error;
