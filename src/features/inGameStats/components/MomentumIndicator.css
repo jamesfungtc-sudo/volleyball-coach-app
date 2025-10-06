@@ -1,0 +1,124 @@
+.momentum-indicator {
+  background: white;
+  border-radius: 8px;
+  padding: 16px 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
+}
+
+.momentum-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.momentum-title {
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #374151;
+  margin: 0;
+}
+
+.current-run {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.home-run {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.opponent-run {
+  background: #fed7aa;
+  color: #c2410c;
+}
+
+.run-team {
+  font-weight: 700;
+}
+
+.run-count {
+  font-weight: 600;
+}
+
+.last-points {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.last-points-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+.points-strip {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.point-indicator {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: help;
+  transition: transform 0.2s;
+}
+
+.point-indicator:hover {
+  transform: scale(1.1);
+}
+
+.point-indicator.home {
+  background: #3b82f6;
+  color: white;
+}
+
+.point-indicator.opponent {
+  background: #f59e0b;
+  color: white;
+}
+
+/* iPad optimization */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .momentum-indicator {
+    padding: 18px 24px;
+    margin-bottom: 24px;
+  }
+
+  .momentum-title {
+    font-size: 15px;
+  }
+
+  .current-run {
+    padding: 6px 14px;
+    font-size: 14px;
+  }
+
+  .last-points-label {
+    font-size: 13px;
+  }
+
+  .point-indicator {
+    width: 36px;
+    height: 36px;
+    font-size: 14px;
+  }
+}

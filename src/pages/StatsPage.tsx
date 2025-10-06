@@ -3,6 +3,7 @@ import PageLayout from '../components/layout/PageLayout';
 import { MatchProvider, useMatch } from '../features/inGameStats/context/MatchContext';
 import { PointEntryForm } from '../features/inGameStats/components/PointEntryForm';
 import { PointByPointList } from '../features/inGameStats/components/PointByPointList';
+import { StatsDashboard } from '../features/inGameStats/components/StatsDashboard';
 import type { MatchData } from '../types/inGameStats.types';
 import './StatsPage.css';
 
@@ -39,12 +40,23 @@ function createMockMatch(): MatchData {
     },
     sets: [
       {
-        id: 'set-1',
-        match_id: 'match-1',
         set_number: 1,
-        home_score: 0,
-        opponent_score: 0,
-        is_completed: false,
+        points: []
+      },
+      {
+        set_number: 2,
+        points: []
+      },
+      {
+        set_number: 3,
+        points: []
+      },
+      {
+        set_number: 4,
+        points: []
+      },
+      {
+        set_number: 5,
         points: []
       }
     ]
@@ -89,7 +101,13 @@ function ViewToggle() {
  */
 function StatsPageContent() {
   const [viewMode, setViewMode] = useState<'list' | 'stats'>('list');
-  const { currentSetData, dispatch } = useMatch();
+  const { currentSetData, dispatch, state } = useMatch();
+
+  const currentSet = state.currentSet;
+
+  const handleSetChange = (setNumber: number) => {
+    dispatch({ type: 'SET_CURRENT_SET', payload: setNumber });
+  };
 
   const handleUndo = () => {
     dispatch({ type: 'UNDO_LAST_POINT' });
@@ -100,12 +118,21 @@ function StatsPageContent() {
       {/* Set Tabs and View Toggle */}
       <div className="tabs-container">
         <div className="set-tabs">
-          <button className="set-tab active">Set 1</button>
-          <button className="set-tab">Set 2</button>
-          <button className="set-tab">Set 3</button>
-          <button className="set-tab">Set 4</button>
-          <button className="set-tab">Set 5</button>
-          <button className="set-tab">Total</button>
+          {[1, 2, 3, 4, 5].map((setNum) => (
+            <button
+              key={setNum}
+              className={`set-tab ${currentSet === setNum ? 'active' : ''}`}
+              onClick={() => handleSetChange(setNum)}
+            >
+              Set {setNum}
+            </button>
+          ))}
+          <button
+            className={`set-tab ${currentSet === 'Total' ? 'active' : ''}`}
+            onClick={() => handleSetChange('Total' as any)}
+          >
+            Total
+          </button>
         </div>
 
         <ViewToggle />
@@ -123,10 +150,7 @@ function StatsPageContent() {
         {/* Statistics Dashboard View */}
         {viewMode === 'stats' && (
           <div className="stats-view">
-            <div className="coming-soon">
-              <h3>Statistics Dashboard</h3>
-              <p>Phase 3: Charts and analytics coming soon...</p>
-            </div>
+            <StatsDashboard />
           </div>
         )}
       </div>

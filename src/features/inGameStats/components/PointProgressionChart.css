@@ -1,0 +1,121 @@
+.point-progression-chart {
+  background: white;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.chart-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 8px 0;
+}
+
+.chart-legend {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
+  font-size: 11px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #6b7280;
+}
+
+.legend-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+}
+
+.legend-color.home {
+  background: #3b82f6;
+}
+
+.legend-color.opponent {
+  background: #ef4444;
+}
+
+.chart-svg {
+  display: block;
+  overflow: visible;
+}
+
+.zero-line {
+  stroke: #d1d5db;
+  stroke-width: 0.5;
+  stroke-dasharray: 2, 2;
+}
+
+.area-fill {
+  fill: #3b82f6;
+  opacity: 0.1;
+}
+
+.line-stroke {
+  fill: none;
+  stroke: #3b82f6;
+  stroke-width: 0.8;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.point-home {
+  fill: #3b82f6;
+}
+
+.point-opponent {
+  fill: #ef4444;
+}
+
+.point-tie {
+  fill: #9ca3af;
+}
+
+.axis-label {
+  font-size: 3px;
+  fill: #9ca3af;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.chart-footer {
+  margin-top: 8px;
+  text-align: center;
+}
+
+.footer-label {
+  font-size: 10px;
+  color: #9ca3af;
+}
+
+.chart-empty {
+  padding: 40px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+/* iPad optimizations */
+@media (max-width: 1024px) {
+  .point-progression-chart {
+    padding: 12px;
+  }
+
+  .chart-title {
+    font-size: 13px;
+  }
+
+  .chart-legend {
+    font-size: 10px;
+    gap: 12px;
+  }
+
+  .legend-color {
+    width: 10px;
+    height: 10px;
+  }
+}

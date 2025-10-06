@@ -26,7 +26,10 @@
       "Bash(export NVM_DIR=\"$HOME/.nvm\")",
       "Bash([ -s \"$NVM_DIR/nvm.sh\" ])",
       "Bash(. \"$NVM_DIR/nvm.sh\")",
-      "Bash(nvm use:*)"
+      "Bash(nvm use:*)",
+      "Bash(git config:*)",
+      "Bash(ls:*)",
+      "Bash(/dev/null)"
     ],
     "deny": [],
     "ask": []

@@ -1,37 +1,19 @@
-// Point data structure
+// Point data structure (matches OldTool Retool format)
 export interface PointData {
-  id: string;
-  set_id: string;
   point_number: number;
   winning_team: 'home' | 'opponent';
+  action_type: string;              // "Att.", "Ser.", "Blo.", etc.
+  action: string;                    // "Hard Spike", "Ace (On floor)", etc.
+  locationTempo: string | null;      // "OH (Line)", "MB (A)", etc.
+  home_player: string;               // Player name (not ID)
+  opponent_player: string;           // Opponent name (not ID)
   home_score: number;
   opponent_score: number;
-  recorded_at: string;
-
-  // Action details
-  action_type: string;
-  action_category: string;
-  location_tempo: string | null;
-
-  // Players
-  home_player_id: string | null;
-  opponent_player_id: string | null;
-  home_player_name?: string;
-  opponent_player_name?: string;
-  opponent_player_jersey?: number;
-
-  // Metadata
-  notes?: string;
 }
 
-// Set data
+// Set data (matches OldTool Retool format)
 export interface SetData {
-  id: string;
-  match_id: string;
   set_number: number;
-  home_score: number;
-  opponent_score: number;
-  is_completed: boolean;
   points: PointData[];
 }
 
@@ -129,17 +111,11 @@ export interface ActionType {
   categories: Record<string, ActionTypeCategory>;
 }
 
-// New Point Input Data
-export interface NewPointInput {
-  setId: string;
-  pointNumber: number;
-  winningTeam: 'home' | 'opponent';
-  homeScore: number;
-  opponentScore: number;
-  actionType: string;
-  actionCategory: string;
-  locationTempo: string | null;
-  homePlayerId: string | null;
-  opponentPlayerId: string | null;
-  notes?: string;
+// Google Sheets storage format
+export interface GoogleSheetsRow {
+  Id: string;                        // Match ID
+  Data: string;                      // JSON.stringify(SetData[])
+  HomeTeam: string;                  // Team name
+  OpponentTeam: string;              // Opponent name
+  GameDate: string;                  // "2025-10-01"
 }

@@ -54,9 +54,7 @@ function matchReducer(state: MatchState, action: MatchAction): MatchState {
         if (set.set_number === state.currentSet) {
           return {
             ...set,
-            points: [...set.points, action.payload],
-            home_score: action.payload.home_score,
-            opponent_score: action.payload.opponent_score
+            points: [...set.points, action.payload]
           };
         }
         return set;
@@ -77,12 +75,9 @@ function matchReducer(state: MatchState, action: MatchAction): MatchState {
       const updatedSets = state.match.sets.map((set) => {
         if (set.set_number === state.currentSet && set.points.length > 0) {
           const points = set.points.slice(0, -1);
-          const lastPoint = points[points.length - 1];
           return {
             ...set,
-            points,
-            home_score: lastPoint?.home_score || 0,
-            opponent_score: lastPoint?.opponent_score || 0
+            points
           };
         }
         return set;

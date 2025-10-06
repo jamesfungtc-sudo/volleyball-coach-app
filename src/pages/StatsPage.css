@@ -61,10 +61,11 @@
   }
 }
 
+/* Score Display - Optimized for iPad viewing */
 .score-display {
   display: flex;
-  align-items: center;
-  gap: 15px;
+  align-items: flex-end; /* Aligns score baselines horizontally */
+  gap: 16px; /* Increased for better breathing room */
 }
 
 .team-score {
@@ -74,31 +75,87 @@
   gap: 4px;
 }
 
+/* FIX: Reverse the opponent score display order */
+.opponent-score {
+  flex-direction: column-reverse; /* Renders team-name above score */
+}
+
 .team-name {
-  font-size: 12px;
+  font-size: 13px; /* Slightly increased for iPad readability */
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.8px; /* Improved letter spacing */
+  line-height: 1.2;
+  white-space: nowrap; /* Prevents name wrapping */
 }
 
 .home-score .team-name {
-  color: #dc2626;
+  color: #dc2626; /* Red for home team */
 }
 
 .opponent-score .team-name {
-  color: #2563eb;
+  color: #2563eb; /* Blue for opponent team */
 }
 
 .score {
-  font-size: 32px;
-  font-weight: bold;
-  color: #333;
+  font-size: 36px; /* Increased from 32px for better visibility */
+  font-weight: 700; /* Slightly bolder */
+  color: #1f2937; /* Darker for better contrast */
+  line-height: 1;
+  min-width: 40px; /* Ensures consistent width for single/double digits */
+  text-align: center;
 }
 
 .score-separator {
-  font-size: 24px;
-  color: #999;
-  font-weight: bold;
+  font-size: 28px; /* Increased from 24px */
+  color: #9ca3af; /* Softer gray */
+  font-weight: 600;
+  align-self: center; /* Vertically centers with scores */
+  padding-bottom: 4px; /* Fine-tune vertical alignment */
+}
+
+/* iPad Score Display Optimizations */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .score-display {
+    gap: 20px;
+  }
+
+  .team-name {
+    font-size: 14px;
+    letter-spacing: 1px;
+  }
+
+  .score {
+    font-size: 42px; /* Larger for iPad */
+    min-width: 50px;
+  }
+
+  .score-separator {
+    font-size: 32px;
+    padding-bottom: 6px;
+  }
+}
+
+/* Mobile Score Display */
+@media (max-width: 767px) {
+  .score-display {
+    gap: 12px;
+  }
+
+  .team-name {
+    font-size: 11px;
+    letter-spacing: 0.5px;
+  }
+
+  .score {
+    font-size: 28px;
+    min-width: 32px;
+  }
+
+  .score-separator {
+    font-size: 22px;
+    padding-bottom: 2px;
+  }
 }
 
 /* Quick Stats */
@@ -625,16 +682,16 @@
   justify-content: space-between;
   align-items: center;
   gap: 24px;
-  margin-bottom: 20px;
-  padding: 4px 15px 0 15px;
+  margin-bottom: 0;
+  padding: 6px 15px 6px 15px;
   background: white;
-  border-bottom: 1px solid #e5e7eb;
+  border: 1px solid #e5e7eb;
   box-sizing: border-box;
 }
 
 @media (min-width: 768px) and (max-width: 1024px) {
   .tabs-container {
-    padding: 6px 20px 0 20px;
+    padding: 6px 20px 6px 20px;
     gap: 32px;
     box-sizing: border-box;
   }
@@ -651,28 +708,29 @@
 
 .set-tab {
   position: relative;
-  padding: 10px 18px;
+  padding: 10px 16px;
   background-color: transparent;
   border: none;
   font-size: 15px;
   font-weight: 500;
   color: #6b7280;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: color 0.2s ease;
   white-space: nowrap;
   height: 40px;
   display: flex;
   align-items: center;
   box-sizing: border-box;
+  outline: none;
 }
 
 .set-tab::after {
   content: '';
   position: absolute;
-  bottom: -9px;
+  bottom: 0;
   left: 0;
   right: 0;
-  height: 3px;
+  height: 2px;
   background-color: transparent;
   transition: background-color 0.2s ease;
 }
@@ -681,8 +739,9 @@
   color: #1f2937;
 }
 
-.set-tab:hover::after {
-  background-color: #d1d5db;
+.set-tab:focus {
+  outline: none;
+  border: none;
 }
 
 .set-tab.active {
@@ -691,7 +750,7 @@
 }
 
 .set-tab.active::after {
-  background-color: #1f2937;
+  background-color: #3b82f6;
 }
 
 /* iPad Set Tabs */
@@ -701,14 +760,15 @@
   }
 
   .set-tab {
-    padding: 12px 22px;
+    padding: 12px 20px;
     font-size: 16px;
     height: 44px;
     box-sizing: border-box;
   }
 
   .set-tab::after {
-    bottom: -11px;
+    bottom: 0;
+    height: 3px;
   }
 }
 

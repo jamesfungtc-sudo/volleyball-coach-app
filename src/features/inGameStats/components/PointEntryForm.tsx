@@ -140,11 +140,17 @@ export function PointEntryForm() {
       ? opponentTeam?.players || []
       : [];
 
-  // Category options for segmented control
-  const categoryOptions: SegmentedControlOption[] = categories.map((cat) => ({
-    key: cat,
-    label: cat
-  }));
+  // Category options - always show 5 buttons (placeholder when no Win/Loss selected)
+  const categoryOptions: SegmentedControlOption[] =
+    categories.length > 0
+      ? categories.map((cat) => ({ key: cat, label: cat }))
+      : [
+          { key: 'placeholder-1', label: '—', disabled: true },
+          { key: 'placeholder-2', label: '—', disabled: true },
+          { key: 'placeholder-3', label: '—', disabled: true },
+          { key: 'placeholder-4', label: '—', disabled: true },
+          { key: 'placeholder-5', label: '—', disabled: true }
+        ];
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -161,34 +167,25 @@ export function PointEntryForm() {
       return;
     }
 
-    // Create new point
+    // Create new point (simplified structure matching OldTool)
     const newPoint = {
-      id: `point-${Date.now()}`,
-      set_id: 'current-set',
       point_number: currentSetData.length + 1,
       winning_team: state.winLoss === 'Win' ? ('home' as const) : ('opponent' as const),
+      action_type: state.category || '',
+      action: state.subcategory || '',
+      locationTempo: state.locationTempo,
+      home_player:
+        playerTeam === 'home'
+          ? homeTeam?.players.find((p) => p.id === state.player)?.name || ''
+          : '',
+      opponent_player:
+        playerTeam === 'opponent'
+          ? opponentTeam?.players.find((p) => p.id === state.player)?.name || ''
+          : '',
       home_score:
         state.winLoss === 'Win' ? currentScore.home + 1 : currentScore.home,
       opponent_score:
-        state.winLoss === 'Loss' ? currentScore.opponent + 1 : currentScore.opponent,
-      recorded_at: new Date().toISOString(),
-      action_type: state.category || '',
-      action_category: state.subcategory || '',
-      location_tempo: state.locationTempo,
-      home_player_id: playerTeam === 'home' ? state.player : null,
-      opponent_player_id: playerTeam === 'opponent' ? state.player : null,
-      home_player_name:
-        playerTeam === 'home'
-          ? homeTeam?.players.find((p) => p.id === state.player)?.name
-          : undefined,
-      opponent_player_name:
-        playerTeam === 'opponent'
-          ? opponentTeam?.players.find((p) => p.id === state.player)?.name
-          : undefined,
-      opponent_player_jersey:
-        playerTeam === 'opponent'
-          ? opponentTeam?.players.find((p) => p.id === state.player)?.jersey_number
-          : undefined
+        state.winLoss === 'Loss' ? currentScore.opponent + 1 : currentScore.opponent
     };
 
     // Add point to context
@@ -208,60 +205,59 @@ export function PointEntryForm() {
         onChange={(value) => dispatch({ type: 'SET_WIN_LOSS', payload: value })}
       />
 
-      {/* Step 2: Category Selection */}
-      {state.winLoss && (
-        <div className="form-section">
-          <label className="section-label">Action Type</label>
-          <SegmentedControl
-            options={categoryOptions}
-            value={state.category}
-            onChange={(value) => dispatch({ type: 'SET_CATEGORY', payload: value })}
-            ariaLabel="Select action type"
-          />
-        </div>
-      )}
+      {/* Step 2: Category Selection - Always visible after Win/Loss */}
+      <div className="form-section">
+        <label className="section-label">Action Type</label>
+        <SegmentedControl
+          options={categoryOptions}
+          value={state.category}
+          onChange={(value) => dispatch({ type: 'SET_CATEGORY', payload: value })}
+          ariaLabel="Select action type"
+          disabled={!state.winLoss}
+        />
+      </div>
 
-      {/* Step 3 & 4: Subcategory and Location/Tempo in same row */}
-      {state.category && (
-        <div className="form-row">
+      {/* Step 3 & 4: Subcategory and Location/Tempo in same row - Always visible */}
+      <div className="form-row">
+        <ConditionalDropdown
+          label="Action"
+          options={subcategories}
+          value={state.subcategory}
+          onChange={(value) => dispatch({ type: 'SET_SUBCATEGORY', payload: value })}
+          show={true}
+          required={true}
+          placeholder="Select action..."
+          error={state.errors.subcategory}
+          disabled={!state.category}
+        />
+
+        {/* Only Location/Tempo is conditionally shown */}
+        {showLocationTempo && locationTempoOptions ? (
           <ConditionalDropdown
-            label="Action"
-            options={subcategories}
-            value={state.subcategory}
-            onChange={(value) => dispatch({ type: 'SET_SUBCATEGORY', payload: value })}
+            label="Location/Tempo"
+            options={locationTempoOptions}
+            value={state.locationTempo}
+            onChange={(value) => dispatch({ type: 'SET_LOCATION_TEMPO', payload: value })}
             show={true}
             required={true}
-            placeholder="Select action..."
-            error={state.errors.subcategory}
+            placeholder="Select location/tempo..."
+            error={state.errors.locationTempo}
+            disabled={!state.subcategory}
           />
+        ) : (
+          <div></div>
+        )}
+      </div>
 
-          {state.subcategory && showLocationTempo && locationTempoOptions ? (
-            <ConditionalDropdown
-              label="Location/Tempo"
-              options={locationTempoOptions}
-              value={state.locationTempo}
-              onChange={(value) => dispatch({ type: 'SET_LOCATION_TEMPO', payload: value })}
-              show={true}
-              required={true}
-              placeholder="Select location/tempo..."
-              error={state.errors.locationTempo}
-            />
-          ) : (
-            <div></div>
-          )}
-        </div>
-      )}
-
-      {/* Step 5: Player Selection */}
-      {state.subcategory && (
-        <PlayerSelector
-          players={availablePlayers}
-          value={state.player}
-          onChange={(value) => dispatch({ type: 'SET_PLAYER', payload: value })}
-          teamType={playerTeam || undefined}
-          error={state.errors.player}
-        />
-      )}
+      {/* Step 5: Player Selection - Always visible */}
+      <PlayerSelector
+        players={availablePlayers}
+        value={state.player}
+        onChange={(value) => dispatch({ type: 'SET_PLAYER', payload: value })}
+        teamType={playerTeam || undefined}
+        error={state.errors.player}
+        disabled={!state.subcategory}
+      />
 
       {/* Submit Button */}
       <button

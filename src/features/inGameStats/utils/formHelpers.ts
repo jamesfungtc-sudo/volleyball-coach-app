@@ -128,10 +128,10 @@ export function resetCategoryDependentFields(
  */
 export function formatActionText(
   actionType: string,
-  actionCategory: string,
+  action: string,
   locationTempo: string | null
 ): string {
-  let text = `${actionType}${actionCategory}`;
+  let text = `${actionType}${action}`;
   if (locationTempo) {
     text += ` (${locationTempo})`;
   }

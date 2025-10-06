@@ -1,0 +1,85 @@
+.scoring-runs-chart {
+  background: white;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.runs-bars-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.run-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.run-label {
+  min-width: 80px;
+  font-size: 10px;
+  color: #6b7280;
+  text-align: right;
+}
+
+.run-points {
+  font-weight: 500;
+}
+
+.run-bar-track {
+  flex: 1;
+  height: 24px;
+  background: #f3f4f6;
+  border-radius: 4px;
+  position: relative;
+  overflow: hidden;
+}
+
+.run-bar {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 8px;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+  min-width: 50px;
+}
+
+.run-bar.home {
+  background: linear-gradient(90deg, #3b82f6 0%, #60a5fa 100%);
+}
+
+.run-bar.opponent {
+  background: linear-gradient(90deg, #ef4444 0%, #f87171 100%);
+}
+
+.run-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: white;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* iPad optimizations */
+@media (max-width: 1024px) {
+  .scoring-runs-chart {
+    padding: 12px;
+  }
+
+  .run-label {
+    min-width: 70px;
+    font-size: 9px;
+  }
+
+  .run-bar-track {
+    height: 20px;
+  }
+
+  .run-count {
+    font-size: 10px;
+  }
+}
