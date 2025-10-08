@@ -29,7 +29,8 @@
       "Bash(nvm use:*)",
       "Bash(git config:*)",
       "Bash(ls:*)",
-      "Bash(/dev/null)"
+      "Bash(/dev/null)",
+      "Bash(npm install:*)"
     ],
     "deny": [],
     "ask": []

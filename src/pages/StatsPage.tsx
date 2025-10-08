@@ -1,9 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import PageLayout from '../components/layout/PageLayout';
 import { MatchProvider, useMatch } from '../features/inGameStats/context/MatchContext';
 import { PointEntryForm } from '../features/inGameStats/components/PointEntryForm';
 import { PointByPointList } from '../features/inGameStats/components/PointByPointList';
 import { StatsDashboard } from '../features/inGameStats/components/StatsDashboard';
+import { getMatch } from '../services/googleSheetsAPI';
 import type { MatchData } from '../types/inGameStats.types';
 import './StatsPage.css';
 
@@ -191,14 +193,71 @@ function GameHeader() {
 
 /**
  * StatsPage - Main page component
- * Provides match context and wraps the content
+ * Loads match from URL params and provides match context
  */
 export default function StatsPage() {
-  const mockMatch = useMemo(() => createMockMatch(), []);
+  const { matchId } = useParams();
+  const navigate = useNavigate();
+  const [match, setMatch] = useState<MatchData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadMatch() {
+      if (!matchId || matchId === 'new') {
+        // New match - use mock data
+        setMatch(createMockMatch());
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const data = await getMatch(matchId);
+        if (data) {
+          setMatch(data);
+        } else {
+          setError('Match not found');
+        }
+      } catch (err) {
+        console.error('Failed to load match:', err);
+        setError('Failed to load match');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadMatch();
+  }, [matchId]);
+
+  if (loading) {
+    return (
+      <div className="stats-page-loading">
+        <div className="spinner"></div>
+        <p>Loading match...</p>
+      </div>
+    );
+  }
+
+  if (error || !match) {
+    return (
+      <div className="stats-page-error">
+        <p>{error || 'Match not found'}</p>
+        <button onClick={() => navigate('/in-game-stats')} className="btn-back">
+          Back to Matches
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <MatchProvider initialMatch={mockMatch}>
+    <MatchProvider initialMatch={match}>
       <div className="stats-page">
+        <div className="stats-page-header">
+          <button onClick={() => navigate('/in-game-stats')} className="btn-back-arrow">
+            ← Matches
+          </button>
+        </div>
         <GameHeader />
         <StatsPageContent />
       </div>

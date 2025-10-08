@@ -26,7 +26,7 @@ const SHEET_ID = '1SAdTpnh_uhOK0BKpM8PU5nyrqm8BqR3ZfUpXQIIYIGo';
 // Sheet names (tabs in your Google Sheet)
 const SHEETS = {
   IN_GAME_TRENDS: 'InGameTrends',
-  TEAMS: 'Teams',
+  TEAMS: 'TeamInfo',
   PLAYERS: 'Players',
   MATCHES: 'Matches'
 };
