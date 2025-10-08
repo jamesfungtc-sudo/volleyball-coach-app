@@ -16,7 +16,8 @@ import {
   resetCategoryDependentFields
 } from '../utils/formHelpers';
 import { validatePointEntry, getValidationErrors } from '../utils/formValidation';
-import { useMatch } from '../context/MatchContext';
+import { useMatch, useTeamRosters } from '../context/MatchContext';
+import { saveMatch, updateMatch } from '../../../services/googleSheetsAPI';
 import './PointEntryForm.css';
 
 type PointEntryAction =
@@ -115,15 +116,19 @@ const initialState: PointEntryState = {
  */
 export function PointEntryForm() {
   const [state, dispatch] = useReducer(pointEntryReducer, initialState);
-  const { dispatch: matchDispatch, currentScore, homeTeam, opponentTeam, currentSetData } = useMatch();
+  const { dispatch: matchDispatch, currentScore, homeTeam, opponentTeam, currentSetData, state: matchState } = useMatch();
+  const { homeRoster, opponentRoster } = useTeamRosters();
+  const [isSaving, setIsSaving] = React.useState(false);
+  const [saveError, setSaveError] = React.useState<string | null>(null);
 
   // Check if form is complete
+  // Only depend on the specific fields that affect form completion, not the entire state
   useEffect(() => {
     const complete = isFormComplete(state);
     if (complete !== state.isValid) {
       dispatch({ type: 'SET_ERRORS', payload: {} });
     }
-  }, [state]);
+  }, [state.winLoss, state.category, state.subcategory, state.locationTempo, state.player, state.isValid]);
 
   // Get available options based on current state
   const categories = getAvailableCategories(state.winLoss);
@@ -132,12 +137,13 @@ export function PointEntryForm() {
   const showLocationTempo = shouldDisplayLocationTempo(state.winLoss, state.category);
 
   // Get players for current team context
+  // Use roster data from Google Sheets if available, otherwise fall back to match data
   const playerTeam = getPlayerTeam(state.winLoss, state.category);
   const availablePlayers =
     playerTeam === 'home'
-      ? homeTeam?.players || []
+      ? (homeRoster.length > 0 ? homeRoster : homeTeam?.players || [])
       : playerTeam === 'opponent'
-      ? opponentTeam?.players || []
+      ? (opponentRoster.length > 0 ? opponentRoster : opponentTeam?.players || [])
       : [];
 
   // Category options - always show 5 buttons (placeholder when no Win/Loss selected)
@@ -168,31 +174,102 @@ export function PointEntryForm() {
     }
 
     // Create new point (simplified structure matching OldTool)
+    // Store player ID (not name) - will be looked up from roster when displaying
     const newPoint = {
       point_number: currentSetData.length + 1,
       winning_team: state.winLoss === 'Win' ? ('home' as const) : ('opponent' as const),
       action_type: state.category || '',
       action: state.subcategory || '',
       locationTempo: state.locationTempo,
-      home_player:
-        playerTeam === 'home'
-          ? homeTeam?.players.find((p) => p.id === state.player)?.name || ''
-          : '',
-      opponent_player:
-        playerTeam === 'opponent'
-          ? opponentTeam?.players.find((p) => p.id === state.player)?.name || ''
-          : '',
+      home_player: playerTeam === 'home' ? state.player || '' : '',
+      opponent_player: playerTeam === 'opponent' ? state.player || '' : '',
       home_score:
         state.winLoss === 'Win' ? currentScore.home + 1 : currentScore.home,
       opponent_score:
         state.winLoss === 'Loss' ? currentScore.opponent + 1 : currentScore.opponent
     };
 
-    // Add point to context
+    // Add point to context (updates UI immediately)
     matchDispatch({ type: 'ADD_POINT', payload: newPoint });
 
     // Reset form
     dispatch({ type: 'RESET_FORM' });
+  };
+
+  const handleSave = async () => {
+    const match = matchState.match;
+    if (!match) {
+      console.error('No match data available');
+      return;
+    }
+
+    const isNewMatch = match.id.startsWith('new-match-');
+
+    try {
+      setIsSaving(true);
+      setSaveError(null);
+
+      if (isNewMatch) {
+        // For new matches, save the entire match
+        console.log('=== SAVING NEW MATCH ===');
+        console.log('Match data:', JSON.stringify(match, null, 2));
+
+        // Convert to Google Sheets format (camelCase field names)
+        const payload = {
+          gameDate: match.match_date,
+          homeTeam: match.home_team.id,  // Google Sheets expects team ID
+          opponentTeam: match.opponent_team.id,  // Google Sheets expects team ID
+          sets: match.sets
+        };
+
+        console.log('Payload being sent:', JSON.stringify(payload, null, 2));
+
+        const result = await saveMatch(payload);
+
+        console.log('Save result:', result);
+
+        // Update match ID in context
+        matchDispatch({
+          type: 'SET_MATCH',
+          payload: { ...match, id: result.matchId }
+        });
+
+        console.log('✅ Match saved successfully with ID:', result.matchId);
+        setSaveError(null);
+      } else {
+        // For existing matches, update the whole match
+        console.log('=== UPDATING EXISTING MATCH ===');
+        console.log('Match ID:', match.id);
+        console.log('Sets data:', JSON.stringify(match.sets, null, 2));
+
+        // Convert to Google Sheets format
+        const payload = {
+          gameDate: match.match_date,
+          homeTeam: match.home_team.id,
+          opponentTeam: match.opponent_team.id,
+          sets: match.sets
+        };
+
+        await updateMatch(match.id, payload);
+
+        console.log('✅ Match updated successfully');
+        setSaveError(null);
+      }
+    } catch (error: any) {
+      console.error('❌ Failed to save match');
+      console.error('Error type:', typeof error);
+      console.error('Error object:', error);
+      console.error('Error message:', error?.message);
+      console.error('Error stack:', error?.stack);
+
+      if (error?.response) {
+        console.error('API Response:', error.response);
+      }
+
+      setSaveError(`Failed to save: ${error?.message || 'Unknown error'}`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -267,6 +344,23 @@ export function PointEntryForm() {
       >
         Add Point
       </button>
+
+      {/* Save Button */}
+      <button
+        type="button"
+        className="save-btn"
+        onClick={handleSave}
+        disabled={isSaving || currentSetData.length === 0}
+      >
+        {isSaving ? 'Saving...' : 'Save to Google Sheets'}
+      </button>
+
+      {/* Save status */}
+      {saveError && (
+        <div className="save-status error">
+          ⚠️ {saveError}
+        </div>
+      )}
 
       {/* Form validation errors */}
       {Object.keys(state.errors).length > 0 && (

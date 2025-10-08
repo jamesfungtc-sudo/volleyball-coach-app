@@ -169,21 +169,42 @@ export async function getTeams(): Promise<any[]> {
 }
 
 /**
- * Get players for a team
+ * Player type from Google Sheets PlayerInfo
  */
-export async function getPlayers(teamId?: string): Promise<any[]> {
+export interface Player {
+  id: string;
+  name: string;
+  jerseyNumber: number | string;
+  position: string;
+  teamId: string;
+}
+
+/**
+ * Raw player data from Google Sheets
+ */
+interface RawPlayerData {
+  Id: string;
+  PreferredName: string;
+  FirstName: string;
+  LastName: string;
+  MainPosition: string;
+  SecondaryPosition: string;
+  TeamId: string;
+  JerseyNumber: number | string;
+}
+
+/**
+ * Get all players
+ */
+export async function getPlayers(): Promise<RawPlayerData[]> {
   if (!API_URL) {
     console.warn('API URL not configured');
     return [];
   }
 
   try {
-    const url = teamId
-      ? `${API_URL}?action=getPlayers&teamId=${teamId}`
-      : `${API_URL}?action=getPlayers`;
-
-    const response = await fetch(url);
-    const data: APIResponse<any[]> = await response.json();
+    const response = await fetch(`${API_URL}?action=getPlayers`);
+    const data: APIResponse<RawPlayerData[]> = await response.json();
 
     if (data.status !== 200) {
       throw new Error((data.data as unknown as APIError).error);
@@ -192,6 +213,34 @@ export async function getPlayers(teamId?: string): Promise<any[]> {
     return data.data;
   } catch (error) {
     console.error('Failed to get players:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get players for a specific team, formatted for UI display
+ */
+export async function getPlayersByTeam(teamId: string): Promise<Player[]> {
+  if (!API_URL) {
+    console.warn('API URL not configured');
+    return [];
+  }
+
+  try {
+    const allPlayers = await getPlayers();
+
+    return allPlayers
+      .filter(p => p.TeamId === teamId)
+      .map(p => ({
+        id: p.Id,
+        name: p.PreferredName || `#${p.JerseyNumber}`,
+        jerseyNumber: p.JerseyNumber,
+        position: p.MainPosition || 'Unknown',
+        teamId: p.TeamId
+      }))
+      .filter(p => p.name && p.jerseyNumber !== 'null'); // Filter out incomplete player data
+  } catch (error) {
+    console.error('Failed to get players by team:', error);
     throw error;
   }
 }
@@ -210,17 +259,13 @@ export async function saveMatch(matchData: Partial<MatchData>): Promise<{ matchI
   }
 
   try {
-    const response = await fetch(API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        action: 'saveMatch',
-        data: matchData
-      })
+    // Use GET with URL parameters to avoid CORS issues with POST
+    const params = new URLSearchParams({
+      action: 'saveMatch',
+      data: JSON.stringify(matchData)
     });
 
+    const response = await fetch(`${API_URL}?${params}`);
     const data: APIResponse<{ success: boolean; matchId: string }> = await response.json();
 
     if (data.status !== 200) {
@@ -244,18 +289,14 @@ export async function updateMatch(matchId: string, matchData: Partial<MatchData>
   }
 
   try {
-    const response = await fetch(API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        action: 'updateMatch',
-        matchId,
-        data: matchData
-      })
+    // Use GET with URL parameters to avoid CORS issues with POST
+    const params = new URLSearchParams({
+      action: 'updateMatch',
+      matchId,
+      data: JSON.stringify(matchData)
     });
 
+    const response = await fetch(`${API_URL}?${params}`);
     const data: APIResponse<{ success: boolean }> = await response.json();
 
     if (data.status !== 200) {

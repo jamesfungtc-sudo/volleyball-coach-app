@@ -6,17 +6,21 @@ import type {
   PlayerData,
   InGameStatsUIState
 } from '../../../types/inGameStats.types';
+import type { Player } from '../../../services/googleSheetsAPI';
 
 // Context State
 interface MatchState {
   match: MatchData | null;
   currentSet: number;
   uiState: InGameStatsUIState;
+  homeRoster: Player[];
+  opponentRoster: Player[];
 }
 
 // Context Actions
 type MatchAction =
   | { type: 'SET_MATCH'; payload: MatchData }
+  | { type: 'SET_ROSTERS'; payload: { homeRoster: Player[]; opponentRoster: Player[] } }
   | { type: 'ADD_POINT'; payload: PointData }
   | { type: 'UNDO_LAST_POINT' }
   | { type: 'SET_CURRENT_SET'; payload: number | 'Total' }
@@ -33,6 +37,9 @@ interface MatchContextValue {
   homeTeam: TeamData | null;
   opponentTeam: TeamData | null;
   currentScore: { home: number; opponent: number };
+  // Team rosters
+  homeRoster: Player[];
+  opponentRoster: Player[];
 }
 
 // Create Context
@@ -45,6 +52,13 @@ function matchReducer(state: MatchState, action: MatchAction): MatchState {
       return {
         ...state,
         match: action.payload
+      };
+
+    case 'SET_ROSTERS':
+      return {
+        ...state,
+        homeRoster: action.payload.homeRoster,
+        opponentRoster: action.payload.opponentRoster
       };
 
     case 'ADD_POINT': {
@@ -139,19 +153,33 @@ const initialState: MatchState = {
     viewMode: 'list',
     isLoading: false,
     error: null
-  }
+  },
+  homeRoster: [],
+  opponentRoster: []
 };
 
 // Provider Component
 interface MatchProviderProps {
   children: ReactNode;
   initialMatch?: MatchData;
+  initialHomeRoster?: Player[];
+  initialOpponentRoster?: Player[];
 }
 
-export function MatchProvider({ children, initialMatch }: MatchProviderProps) {
+export function MatchProvider({
+  children,
+  initialMatch,
+  initialHomeRoster = [],
+  initialOpponentRoster = []
+}: MatchProviderProps) {
   const [state, dispatch] = useReducer(
     matchReducer,
-    initialMatch ? { ...initialState, match: initialMatch } : initialState
+    {
+      ...initialState,
+      match: initialMatch || null,
+      homeRoster: initialHomeRoster,
+      opponentRoster: initialOpponentRoster
+    }
   );
 
   // Computed values
@@ -181,7 +209,9 @@ export function MatchProvider({ children, initialMatch }: MatchProviderProps) {
     currentSetData,
     homeTeam,
     opponentTeam,
-    currentScore
+    currentScore,
+    homeRoster: state.homeRoster,
+    opponentRoster: state.opponentRoster
   };
 
   return <MatchContext.Provider value={value}>{children}</MatchContext.Provider>;
@@ -225,4 +255,9 @@ export function useCurrentScore() {
 export function useUIState() {
   const { state } = useMatch();
   return state.uiState;
+}
+
+export function useTeamRosters() {
+  const { homeRoster, opponentRoster } = useMatch();
+  return { homeRoster, opponentRoster };
 }

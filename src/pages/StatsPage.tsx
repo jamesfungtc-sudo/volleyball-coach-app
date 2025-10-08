@@ -1,11 +1,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import PageLayout from '../components/layout/PageLayout';
 import { MatchProvider, useMatch } from '../features/inGameStats/context/MatchContext';
 import { PointEntryForm } from '../features/inGameStats/components/PointEntryForm';
 import { PointByPointList } from '../features/inGameStats/components/PointByPointList';
 import { StatsDashboard } from '../features/inGameStats/components/StatsDashboard';
-import { getMatch } from '../services/googleSheetsAPI';
+import { getMatch, getPlayersByTeam, getTeams, type Player } from '../services/googleSheetsAPI';
 import type { MatchData } from '../types/inGameStats.types';
 import './StatsPage.css';
 
@@ -197,16 +197,86 @@ function GameHeader() {
  */
 export default function StatsPage() {
   const { matchId } = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [match, setMatch] = useState<MatchData | null>(null);
+  const [homeRoster, setHomeRoster] = useState<Player[]>([]);
+  const [opponentRoster, setOpponentRoster] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadMatch() {
-      if (!matchId || matchId === 'new') {
-        // New match - use mock data
-        setMatch(createMockMatch());
+      // New match with team selection from URL params
+      if (matchId === 'new') {
+        const homeTeamId = searchParams.get('homeTeam');
+        const opponentTeamId = searchParams.get('opponentTeam');
+        const matchDate = searchParams.get('date') || new Date().toISOString().split('T')[0];
+
+        if (!homeTeamId || !opponentTeamId) {
+          setError('Missing team selection');
+          setLoading(false);
+          return;
+        }
+
+        try {
+          setLoading(true);
+
+          // Load teams and players
+          const [teams, homePlayers, opponentPlayers] = await Promise.all([
+            getTeams(),
+            getPlayersByTeam(homeTeamId),
+            getPlayersByTeam(opponentTeamId)
+          ]);
+
+          const homeTeam = teams.find(t => t.Id === homeTeamId);
+          const opponentTeam = teams.find(t => t.Id === opponentTeamId);
+
+          if (!homeTeam || !opponentTeam) {
+            setError('Teams not found');
+            setLoading(false);
+            return;
+          }
+
+          // Create new match with selected teams
+          const newMatch: MatchData = {
+            id: 'new-match-' + Date.now(),
+            match_date: matchDate,
+            home_team: {
+              id: homeTeam.Id,
+              name: homeTeam.Name,
+              players: []
+            },
+            opponent_team: {
+              id: opponentTeam.Id,
+              name: opponentTeam.Name,
+              players: []
+            },
+            sets: [
+              { set_number: 1, points: [] },
+              { set_number: 2, points: [] },
+              { set_number: 3, points: [] },
+              { set_number: 4, points: [] },
+              { set_number: 5, points: [] }
+            ]
+          };
+
+          setMatch(newMatch);
+          setHomeRoster(homePlayers);
+          setOpponentRoster(opponentPlayers);
+          setLoading(false);
+          return;
+        } catch (err) {
+          console.error('Failed to create new match:', err);
+          setError('Failed to create new match');
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Existing match - load from Google Sheets
+      if (!matchId) {
+        setError('No match ID provided');
         setLoading(false);
         return;
       }
@@ -216,6 +286,15 @@ export default function StatsPage() {
         const data = await getMatch(matchId);
         if (data) {
           setMatch(data);
+
+          // Load players for both teams
+          const [home, opponent] = await Promise.all([
+            getPlayersByTeam(data.home_team.id),
+            getPlayersByTeam(data.opponent_team.id)
+          ]);
+
+          setHomeRoster(home);
+          setOpponentRoster(opponent);
         } else {
           setError('Match not found');
         }
@@ -228,7 +307,7 @@ export default function StatsPage() {
     }
 
     loadMatch();
-  }, [matchId]);
+  }, [matchId, searchParams]);
 
   if (loading) {
     return (
@@ -251,7 +330,11 @@ export default function StatsPage() {
   }
 
   return (
-    <MatchProvider initialMatch={match}>
+    <MatchProvider
+      initialMatch={match}
+      initialHomeRoster={homeRoster}
+      initialOpponentRoster={opponentRoster}
+    >
       <div className="stats-page">
         <div className="stats-page-header">
           <button onClick={() => navigate('/in-game-stats')} className="btn-back-arrow">

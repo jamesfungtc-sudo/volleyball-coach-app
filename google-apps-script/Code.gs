@@ -56,6 +56,16 @@ function doGet(e) {
       case 'getPlayers':
         return getPlayers(e.parameter.teamId);
 
+      case 'saveMatch':
+        // Parse JSON data from URL parameter
+        const saveData = JSON.parse(e.parameter.data || '{}');
+        return saveMatch(saveData);
+
+      case 'updateMatch':
+        // Parse JSON data from URL parameter
+        const updateData = JSON.parse(e.parameter.data || '{}');
+        return updateMatch(e.parameter.matchId, updateData);
+
       case 'health':
         return createResponse({ status: 'ok', timestamp: new Date() });
 
@@ -377,7 +387,7 @@ function undoLastPoint(matchId, setNumber) {
 // ============================================================================
 
 /**
- * Create JSON response with CORS headers
+ * Create JSON response
  */
 function createResponse(data, status = 200) {
   const response = {

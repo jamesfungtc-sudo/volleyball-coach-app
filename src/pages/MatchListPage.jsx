@@ -37,7 +37,7 @@ export default function MatchListPage() {
   }
 
   function createNewMatch() {
-    navigate('/in-game-stats/new');
+    navigate('/in-game-stats/setup');
   }
 
   // Calculate match status from sets

@@ -77,6 +77,38 @@
   outline-offset: 2px;
 }
 
+.save-btn {
+  width: 100%;
+  padding: 14px 24px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #ffffff;
+  background-color: #059669;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 12px;
+  touch-action: manipulation;
+}
+
+.save-btn:hover:not(:disabled) {
+  background-color: #047857;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.save-btn:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.save-btn:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 .form-errors {
   margin-top: 16px;
   padding: 12px 16px;
@@ -93,6 +125,26 @@
 
 .error-item:last-child {
   margin-bottom: 0;
+}
+
+.save-status {
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 14px;
+  text-align: center;
+}
+
+.save-status.error {
+  background-color: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fbbf24;
+}
+
+.save-status.success {
+  background-color: #d1fae5;
+  color: #065f46;
+  border: 1px solid #10b981;
 }
 
 /* Tablet optimization */

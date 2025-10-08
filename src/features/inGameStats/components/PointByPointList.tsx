@@ -1,7 +1,7 @@
 import React from 'react';
 import type { PointData } from '../../../types/inGameStats.types';
 import { formatActionText } from '../utils/formHelpers';
-import { useMatch } from '../context/MatchContext';
+import { useMatch, useTeamRosters } from '../context/MatchContext';
 import './PointByPointList.css';
 
 interface PointByPointListProps {
@@ -12,25 +12,35 @@ interface PointByPointListProps {
 /**
  * Format home team action for display
  */
-function formatHomeAction(point: PointData, opponentJersey?: number): string {
+function formatHomeAction(
+  point: PointData,
+  homePlayerName?: string,
+  opponentPlayerName?: string,
+  opponentJersey?: number
+): string {
   if (point.winning_team !== 'home') return '';
 
   // Pattern: Opponent error gave home a point
   if (point.action_type === 'Op. E.') {
     const jerseyNumber = opponentJersey || '?';
-    const playerName = point.opponent_player || 'Unknown';
+    const playerName = opponentPlayerName || 'Unknown';
     return `[${jerseyNumber} ${playerName}] ${point.action}`;
   }
 
   // Pattern: Home player scored
-  const playerName = point.home_player || 'Unknown';
+  const playerName = homePlayerName || 'Unknown';
   return `${playerName} ${formatActionText(point.action_type, point.action, point.locationTempo)}`;
 }
 
 /**
  * Format opponent team action for display
  */
-function formatOpponentAction(point: PointData, opponentJersey?: number): string {
+function formatOpponentAction(
+  point: PointData,
+  homePlayerName?: string,
+  opponentPlayerName?: string,
+  opponentJersey?: number
+): string {
   if (point.winning_team !== 'opponent') return '';
 
   // Pattern: Home error gave opponent a point
@@ -39,26 +49,39 @@ function formatOpponentAction(point: PointData, opponentJersey?: number): string
     point.action_type === 'Ser. E.' ||
     (point.action_type === 'Other' && point.winning_team === 'opponent')
   ) {
-    const playerName = point.home_player || 'Unknown';
+    const playerName = homePlayerName || 'Unknown';
     return `${playerName} ${formatActionText(point.action_type, point.action, point.locationTempo)}`;
   }
 
   // Pattern: Opponent player scored
   const jerseyNumber = opponentJersey || '?';
-  const playerName = point.opponent_player || 'Unknown';
+  const playerName = opponentPlayerName || 'Unknown';
   return `[${jerseyNumber} ${playerName}] ${formatActionText(point.action_type, point.action, point.locationTempo)}`;
 }
 
 /**
  * PointRow - Single point display
  */
-function PointRow({ point, opponentTeamPlayers }: { point: PointData; opponentTeamPlayers: any[] }) {
-  // Look up opponent jersey number from roster
-  const opponentPlayer = opponentTeamPlayers.find(p => p.name === point.opponent_player);
-  const opponentJersey = opponentPlayer?.jersey_number;
+function PointRow({
+  point,
+  homeRoster,
+  opponentRoster
+}: {
+  point: PointData;
+  homeRoster: any[];
+  opponentRoster: any[];
+}) {
+  // Look up player names and jersey numbers from rosters
+  // Players are stored as IDs in point data
+  const homePlayer = homeRoster.find(p => p.id === point.home_player);
+  const opponentPlayer = opponentRoster.find(p => p.id === point.opponent_player);
 
-  const homeAction = formatHomeAction(point, opponentJersey);
-  const opponentAction = formatOpponentAction(point, opponentJersey);
+  const homePlayerName = homePlayer?.name;
+  const opponentPlayerName = opponentPlayer?.name;
+  const opponentJersey = opponentPlayer?.jerseyNumber || opponentPlayer?.jersey_number;
+
+  const homeAction = formatHomeAction(point, homePlayerName, opponentPlayerName, opponentJersey);
+  const opponentAction = formatOpponentAction(point, homePlayerName, opponentPlayerName, opponentJersey);
 
   return (
     <div className="point-row">
@@ -78,7 +101,7 @@ function PointRow({ point, opponentTeamPlayers }: { point: PointData; opponentTe
  * 3-column layout: Score | Home Action | Opponent Action
  */
 export function PointByPointList({ points, onUndo }: PointByPointListProps) {
-  const { opponentTeam } = useMatch();
+  const { homeRoster, opponentRoster } = useTeamRosters();
 
   // Reverse order for display (newest first)
   const reversedPoints = [...points].reverse();
@@ -110,7 +133,8 @@ export function PointByPointList({ points, onUndo }: PointByPointListProps) {
               <PointRow
                 key={`point-${point.point_number}-${index}`}
                 point={point}
-                opponentTeamPlayers={opponentTeam?.players || []}
+                homeRoster={homeRoster}
+                opponentRoster={opponentRoster}
               />
             ))}
           </div>
