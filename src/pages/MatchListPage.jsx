@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getAllMatches } from '../services/googleSheetsAPI';
+import { getAllMatches, getTeams } from '../services/googleSheetsAPI';
 import './MatchListPage.css';
 
 /**
@@ -10,26 +10,70 @@ import './MatchListPage.css';
 export default function MatchListPage() {
   const navigate = useNavigate();
   const [matches, setMatches] = useState([]);
+  const [teams, setTeams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Load matches on mount
+  // Load matches and teams on mount
   useEffect(() => {
-    loadMatches();
+    loadData();
   }, []);
 
-  async function loadMatches() {
+  async function loadData() {
     try {
       setLoading(true);
       setError(null);
-      const data = await getAllMatches();
-      setMatches(data);
+      const [matchesData, teamsData] = await Promise.all([
+        getAllMatches(),
+        getTeams()
+      ]);
+      console.log('Loaded teams:', teamsData);
+      console.log('First team structure:', teamsData[0]);
+      console.log('Loaded matches:', matchesData);
+      console.log('First match structure:', matchesData[0]);
+      setMatches(matchesData);
+      setTeams(teamsData);
     } catch (err) {
-      console.error('Failed to load matches:', err);
+      console.error('Failed to load data:', err);
       setError('Failed to load matches. Check your connection.');
     } finally {
       setLoading(false);
     }
+  }
+
+  // Get team name by ID or from nested object (handles both old and new format)
+  function getTeamName(teamData) {
+    console.log('Getting team name for:', teamData);
+
+    // If it's an object with id property (old format), look up by ID
+    if (teamData && typeof teamData === 'object' && teamData.id) {
+      const team = teams.find(t => t.Id === teamData.id);
+      console.log('Found team by object.id:', team);
+      return team?.Name || teamData.name || `Unknown Team (${teamData.id})`;
+    }
+
+    // If it's a team ID string (new format)
+    if (typeof teamData === 'string') {
+      const team = teams.find(t => t.Id === teamData);
+      console.log('Found team by ID:', team);
+      return team?.Name || `Unknown Team (${teamData})`;
+    }
+
+    return 'Unknown Team';
+  }
+
+  // Get match date from various formats
+  function getMatchDate(match) {
+    // New format: gameDate as string
+    if (match.gameDate) return match.gameDate;
+
+    // Old format: match_date as string or date object
+    if (match.match_date) {
+      if (typeof match.match_date === 'string') return match.match_date;
+      if (match.match_date instanceof Date) return match.match_date.toISOString();
+    }
+
+    return null;
   }
 
   function openMatch(matchId) {
@@ -111,7 +155,7 @@ export default function MatchListPage() {
       <div className="match-list-page">
         <div className="match-list-error">
           <p>{error}</p>
-          <button onClick={loadMatches} className="btn-retry">
+          <button onClick={loadData} className="btn-retry">
             Retry
           </button>
         </div>
@@ -151,7 +195,7 @@ export default function MatchListPage() {
                 </div>
 
                 <div className="match-card-teams">
-                  {match.home_team?.name || 'Home Team'} vs {match.opponent_team?.name || 'Opponent'}
+                  {getTeamName(match.homeTeam || match.home_team)} vs {getTeamName(match.opponentTeam || match.opponent_team)}
                 </div>
 
                 <div className="match-card-info">
@@ -162,7 +206,7 @@ export default function MatchListPage() {
                     </>
                   ) : (
                     <>
-                      <span className="match-date">{formatDate(match.match_date)}</span>
+                      <span className="match-date">{formatDate(getMatchDate(match))}</span>
                       {isCompleted && (
                         <span className="match-score">{getCurrentScore(match.sets)}</span>
                       )}

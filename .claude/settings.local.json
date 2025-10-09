@@ -30,7 +30,8 @@
       "Bash(git config:*)",
       "Bash(ls:*)",
       "Bash(/dev/null)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(echo:*)"
     ],
     "deny": [],
     "ask": []
