@@ -153,11 +153,12 @@ export function calculatePlayerKDStats(
 ): PlayerKDStats[] {
   const playerStats = new Map<string, PlayerKDStats>();
 
-  // Initialize stats for all players
+  // Initialize stats for all players using player ID (or name for old data)
   [...homePlayers, ...opponentPlayers].forEach((player) => {
     const team = homePlayers.includes(player) ? 'home' : 'opponent';
-    playerStats.set(player.name, {
-      player: player.name,
+    const playerId = player.id || player.name; // Use ID if available, fallback to name
+    playerStats.set(playerId, {
+      player: playerId,
       kills: 0,
       errors: 0,
       attempts: 0,
@@ -190,7 +191,7 @@ export function calculatePlayerKDStats(
         if (point.action_type === 'Op. Att.' && !isHomeWin) {
           stats.kills++;
           stats.attempts++;
-        } else if (point.action_type === 'Op. E.' && !isHomeWin && point.action.includes('Hit')) {
+        } else if (point.action_type === 'Op. E.' && isHomeWin && point.action.includes('Hit')) {
           stats.errors++;
           stats.attempts++;
         }
@@ -358,6 +359,76 @@ export function calculateErrorBreakdown(points: PointData[]): ErrorBreakdownData
       total: opponentErrors.attackErrors + opponentErrors.serviceErrors + opponentErrors.otherErrors
     }
   ];
+}
+
+/**
+ * Player attack and ace contribution data
+ */
+export interface PlayerAttackContribution {
+  playerId: string;
+  team: 'home' | 'opponent';
+  attacks: number;  // Total attack attempts (kills + errors)
+  aces: number;     // Aces
+}
+
+/**
+ * Calculate player attack and ace contributions for Hit vs Ace Ratio chart
+ */
+export function calculatePlayerAttackContributions(points: PointData[]): PlayerAttackContribution[] {
+  const playerStats = new Map<string, PlayerAttackContribution>();
+
+  points.forEach((point) => {
+    const isHomeWin = point.winning_team === 'home';
+
+    // Home team player
+    if (point.home_player) {
+      if (!playerStats.has(point.home_player)) {
+        playerStats.set(point.home_player, {
+          playerId: point.home_player,
+          team: 'home',
+          attacks: 0,
+          aces: 0
+        });
+      }
+      const stats = playerStats.get(point.home_player)!;
+
+      // Count attacks (kills + errors)
+      if (point.action_type === 'Att.' || point.action_type === 'Sp. E.') {
+        stats.attacks++;
+      }
+
+      // Count aces
+      if (point.action_type === 'Ser.' && isHomeWin) {
+        stats.aces++;
+      }
+    }
+
+    // Opponent team player
+    if (point.opponent_player) {
+      if (!playerStats.has(point.opponent_player)) {
+        playerStats.set(point.opponent_player, {
+          playerId: point.opponent_player,
+          team: 'opponent',
+          attacks: 0,
+          aces: 0
+        });
+      }
+      const stats = playerStats.get(point.opponent_player)!;
+
+      // Count attacks (kills + errors)
+      if (point.action_type === 'Op. Att.' || (point.action_type === 'Op. E.' && point.action.includes('Hit'))) {
+        stats.attacks++;
+      }
+
+      // Count aces
+      if (point.action_type === 'Op. Ace' && !isHomeWin) {
+        stats.aces++;
+      }
+    }
+  });
+
+  // Return only players with activity
+  return Array.from(playerStats.values()).filter(s => s.attacks > 0 || s.aces > 0);
 }
 
 /**

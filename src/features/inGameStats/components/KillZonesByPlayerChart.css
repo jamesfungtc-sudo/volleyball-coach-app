@@ -1,0 +1,59 @@
+.kill-zones-by-player-chart {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.kill-zones-by-player-chart .chart-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 16px 0;
+  color: #1f2937;
+  text-align: center;
+}
+
+.kill-zones-by-player-chart .empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 300px;
+  font-size: 14px;
+  color: #9ca3af;
+  font-style: italic;
+}
+
+/* Custom tooltip */
+.kill-zones-by-player-chart .custom-tooltip {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.kill-zones-by-player-chart .custom-tooltip .tooltip-location {
+  font-weight: 600;
+  font-size: 13px;
+  color: #1f2937;
+  margin: 0 0 8px 0;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 6px;
+}
+
+.kill-zones-by-player-chart .custom-tooltip .tooltip-stat {
+  font-size: 12px;
+  margin: 4px 0;
+  font-weight: 500;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .kill-zones-by-player-chart {
+    padding: 16px;
+  }
+
+  .kill-zones-by-player-chart .chart-title {
+    font-size: 16px;
+  }
+}
