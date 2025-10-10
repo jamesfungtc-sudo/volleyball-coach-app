@@ -91,11 +91,11 @@ export const DEFAULT_TEAM_CONFIG = {
   teamA: {
     players: {
       S: "Yennie",
-      "OH (w.s)": "Yan", 
-      MB: "Evelyn",
-      Oppo: "Elly",
-      OH: "Alice",
-      "MB (w.s)": "Miley",
+      "OH (w.s)": "Alice",
+      MB: "Elly",
+      Oppo: "Toby",
+      OH: "Amei",
+      "MB (w.s)": "Venus",
       L: "Ding"
     },
     system: "5-1 (OH>S)",
@@ -103,13 +103,13 @@ export const DEFAULT_TEAM_CONFIG = {
   },
   teamB: {
     players: {
-      S: "Zoe",
-      "OH (w.s)": "OH",
-      MB: "MB", 
-      Oppo: "Goi",
-      OH: "Rhea",
-      "MB (w.s)": "Katie",
-      L: "Venessa"
+      S: "",
+      "OH (w.s)": "",
+      MB: "",
+      Oppo: "",
+      OH: "",
+      "MB (w.s)": "",
+      L: ""
     },
     system: "5-1 (OH>S)",
     startingP1: "MB (w.s)"
