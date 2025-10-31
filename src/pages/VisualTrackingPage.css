@@ -1,0 +1,335 @@
+/* ============================================
+   VISUAL TRACKING PAGE - LANDSCAPE LAYOUT
+   ============================================
+   - Landscape orientation only
+   - No scrolling (100vh height)
+   - 2-column grid: 40% court / 60% panel (matches prototype)
+   ============================================ */
+
+.visual-tracking-page {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: #f5f5f5;
+}
+
+/* ============================================
+   HEADER
+   ============================================ */
+
+.visual-tracking-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 24px;
+  background: #ffffff;
+  border-bottom: 2px solid #e0e0e0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  height: 60px;
+  flex-shrink: 0;
+}
+
+.visual-tracking-header .btn-back-arrow {
+  padding: 8px 16px;
+  background: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.visual-tracking-header .btn-back-arrow:hover {
+  background: #e0e0e0;
+  border-color: #ccc;
+}
+
+.header-info {
+  flex: 1;
+  text-align: center;
+}
+
+.header-info h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #333;
+}
+
+.match-info {
+  margin: 4px 0 0 0;
+  font-size: 13px;
+  color: #666;
+}
+
+.header-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.btn-icon {
+  width: 40px;
+  height: 40px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #ffffff;
+  font-size: 18px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-icon:hover {
+  background: #f5f5f5;
+  border-color: #ccc;
+}
+
+/* ============================================
+   MAIN CONTENT - 2 COLUMN GRID
+   ============================================ */
+
+.visual-tracking-content {
+  display: grid;
+  grid-template-columns: 40% 60%;
+  gap: 20px;
+  padding: 20px;
+  height: calc(100vh - 60px);
+  overflow: hidden;
+}
+
+/* ============================================
+   LEFT COLUMN - COURT SECTION
+   ============================================ */
+
+.court-section {
+  background: #1f2937;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  pointer-events: none; /* Prevent clicking on the grey background */
+}
+
+/* ============================================
+   RIGHT COLUMN - PANEL SECTION
+   ============================================ */
+
+.panel-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  overflow: hidden;
+}
+
+.stats-panel {
+  flex: 1;
+  background: #ffffff;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  overflow-y: auto;
+}
+
+.controls-panel {
+  flex-shrink: 0;
+  background: #ffffff;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  min-height: 280px;
+  max-height: 320px;
+}
+
+/* ============================================
+   PLACEHOLDER STYLING (temporary)
+   ============================================ */
+
+.court-placeholder,
+.panel-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+  text-align: center;
+  padding: 20px;
+}
+
+.placeholder-content h2,
+.panel-placeholder h3 {
+  margin: 0 0 16px 0;
+  color: #333;
+  font-size: 18px;
+}
+
+.placeholder-content p {
+  margin: 0 0 20px 0;
+  font-size: 14px;
+  color: #666;
+}
+
+.placeholder-specs {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.placeholder-specs li {
+  padding: 4px 0;
+  color: #555;
+}
+
+.placeholder-specs li::before {
+  content: "• ";
+  color: #2196F3;
+  font-weight: bold;
+  margin-right: 8px;
+}
+
+/* ============================================
+   ORIENTATION WARNING - PORTRAIT MODE
+   ============================================ */
+
+.orientation-warning {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: #1976D2;
+  color: #ffffff;
+  z-index: 9999;
+  align-items: center;
+  justify-content: center;
+}
+
+.warning-content {
+  text-align: center;
+  padding: 40px;
+}
+
+.warning-content h2 {
+  margin: 0 0 16px 0;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.warning-content p {
+  margin: 0 0 32px 0;
+  font-size: 18px;
+  opacity: 0.9;
+}
+
+.rotate-icon {
+  font-size: 64px;
+  animation: rotate-pulse 2s ease-in-out infinite;
+}
+
+@keyframes rotate-pulse {
+  0%, 100% {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(90deg) scale(1.1);
+  }
+}
+
+/* Show warning in portrait mode */
+@media (orientation: portrait) {
+  .orientation-warning {
+    display: flex;
+  }
+
+  .visual-tracking-content {
+    display: none;
+  }
+}
+
+/* ============================================
+   RESPONSIVE - SMALLER LANDSCAPE SCREENS
+   ============================================ */
+
+@media (max-width: 1024px) and (orientation: landscape) {
+  .visual-tracking-content {
+    grid-template-columns: 40% 60%;
+    gap: 16px;
+    padding: 16px;
+  }
+
+  .stats-panel,
+  .controls-panel {
+    padding: 16px;
+  }
+
+  .visual-tracking-header {
+    padding: 10px 16px;
+    height: 50px;
+  }
+
+  .header-info h1 {
+    font-size: 18px;
+  }
+
+  .match-info {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 768px) and (orientation: landscape) {
+  .visual-tracking-content {
+    grid-template-columns: 40% 60%;
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .header-info h1 {
+    font-size: 16px;
+  }
+
+  .controls-panel {
+    min-height: 240px;
+    max-height: 280px;
+  }
+}
+
+/* ============================================
+   PRINT STYLES (hide UI, show only court)
+   ============================================ */
+
+@media print {
+  .visual-tracking-header,
+  .panel-section {
+    display: none;
+  }
+
+  .visual-tracking-content {
+    grid-template-columns: 1fr;
+    padding: 0;
+  }
+
+  .court-section {
+    border: none;
+    box-shadow: none;
+    height: 100vh;
+  }
+}

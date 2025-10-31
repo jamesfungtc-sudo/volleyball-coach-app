@@ -2,11 +2,14 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import PageLayout from '../components/layout/PageLayout';
 import { MatchProvider, useMatch } from '../features/inGameStats/context/MatchContext';
+import { OpponentTrackingProvider } from '../features/inGameStats/context/OpponentTrackingContext';
+import { OpponentTrackingModule } from '../features/inGameStats/components/OpponentTracking/OpponentTrackingModule';
 import { PointEntryForm } from '../features/inGameStats/components/PointEntryForm';
 import { PointByPointList } from '../features/inGameStats/components/PointByPointList';
 import { StatsDashboard } from '../features/inGameStats/components/StatsDashboard';
 import { getMatch, getPlayersByTeam, getTeams, type Player } from '../services/googleSheetsAPI';
 import type { MatchData } from '../types/inGameStats.types';
+import type { OpponentPlayer } from '../features/inGameStats/types/opponentTracking.types';
 import './StatsPage.css';
 
 /**
@@ -103,7 +106,7 @@ function ViewToggle() {
  */
 function StatsPageContent() {
   const [viewMode, setViewMode] = useState<'list' | 'stats'>('list');
-  const { currentSetData, dispatch, state } = useMatch();
+  const { currentSetData, dispatch, state, opponentRoster } = useMatch();
 
   const currentSet = state.currentSet;
 
@@ -114,6 +117,14 @@ function StatsPageContent() {
   const handleUndo = () => {
     dispatch({ type: 'UNDO_LAST_POINT' });
   };
+
+  // Convert opponent roster to OpponentPlayer format
+  const opponentPlayers: OpponentPlayer[] = opponentRoster.map(player => ({
+    id: player.Id,
+    name: player.Name,
+    number: player['Jersey Number']?.toString() || '',
+    role: player.Position as any
+  }));
 
   return (
     <ViewModeContext.Provider value={{ viewMode, setViewMode }}>
@@ -143,10 +154,18 @@ function StatsPageContent() {
       <div className="stats-page-content">
         {/* Point Entry & List View */}
         {viewMode === 'list' && (
-          <div className="list-view">
-            <PointEntryForm />
-            <PointByPointList points={currentSetData} onUndo={handleUndo} />
-          </div>
+          <OpponentTrackingProvider>
+            <div className="list-view">
+              {/* Opponent Tracking Module - Always visible at top */}
+              <OpponentTrackingModule
+                opponentPlayers={opponentPlayers}
+                disabled={false}
+              />
+
+              <PointEntryForm />
+              <PointByPointList points={currentSetData} onUndo={handleUndo} />
+            </div>
+          </OpponentTrackingProvider>
         )}
 
         {/* Statistics Dashboard View */}
@@ -339,6 +358,23 @@ export default function StatsPage() {
         <div className="stats-page-header">
           <button onClick={() => navigate('/in-game-stats')} className="btn-back-arrow">
             ← Matches
+          </button>
+          <button
+            onClick={() => navigate(`/in-game-stats/${matchId}/visual`)}
+            className="btn-visual-tracking"
+            style={{
+              marginLeft: '12px',
+              padding: '8px 16px',
+              background: '#2563eb',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              fontSize: '14px',
+              fontWeight: '600',
+              cursor: 'pointer'
+            }}
+          >
+            📊 Visual Tracking
           </button>
         </div>
         <GameHeader />

@@ -1,0 +1,42 @@
+/* ============================================
+   VOLLEYBALL COURT SVG STYLES
+   ============================================ */
+
+.volleyball-court {
+  display: block;
+  width: auto;
+  height: 100%;
+  max-width: 100%;
+  aspect-ratio: 420 / 800; /* Maintain 1:2 aspect ratio */
+  border-radius: 12px;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  touch-action: none; /* Prevent default touch behaviors like scrolling */
+  cursor: default;
+  pointer-events: auto; /* Enable clicking only on the SVG itself */
+}
+
+.volleyball-court.drawing-mode {
+  cursor: crosshair;
+}
+
+/* Smooth transitions for interactive elements */
+.volleyball-court line,
+.volleyball-court rect,
+.volleyball-court circle,
+.volleyball-court text {
+  transition: opacity 0.2s ease;
+}
+
+/* Court labels - subtle fade when drawing */
+.volleyball-court.drawing-mode text {
+  opacity: 0.3;
+}
+
+/* Prevent text selection during drawing */
+.volleyball-court text {
+  user-select: none;
+  -webkit-user-select: none;
+  pointer-events: none;
+}
