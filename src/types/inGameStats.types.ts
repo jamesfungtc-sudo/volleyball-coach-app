@@ -1,3 +1,5 @@
+import { OpponentAttempt } from '../features/inGameStats/types/opponentTracking.types';
+
 // Point data structure (matches OldTool Retool format)
 export interface PointData {
   point_number: number;
@@ -9,6 +11,9 @@ export interface PointData {
   opponent_player: string;           // Opponent name (not ID)
   home_score: number;
   opponent_score: number;
+
+  // NEW: Opponent tracking data (optional, defaults to [])
+  opponent_attempts?: OpponentAttempt[];
 }
 
 // Set data (matches OldTool Retool format)

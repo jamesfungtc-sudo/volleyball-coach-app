@@ -31,7 +31,11 @@
       "Bash(ls:*)",
       "Bash(/dev/null)",
       "Bash(npm install:*)",
-      "Bash(echo:*)"
+      "Bash(echo:*)",
+      "Bash(node:*)",
+      "Bash(find:*)",
+      "Bash(nvm install:*)",
+      "Bash(npm run build:*)"
     ],
     "deny": [],
     "ask": []

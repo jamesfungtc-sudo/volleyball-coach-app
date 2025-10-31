@@ -4,6 +4,7 @@ import {
   VolleyballCourt,
   TrajectoryArrow,
   getCoordinates,
+  clampToViewBox,
   isInBounds,
   calculateDistance,
   type Trajectory
@@ -38,15 +39,16 @@ export default function VisualTrackingPage() {
     if (!svgRef.current) return;
 
     const coords = getCoordinates(event, svgRef.current);
+    const clamped = clampToViewBox(coords.x, coords.y);
 
     setIsDragging(true);
     setCurrentTrajectory({
-      startX: coords.x,
-      startY: coords.y,
-      endX: coords.x,
-      endY: coords.y,
-      startInBounds: isInBounds(coords.x, coords.y),
-      endInBounds: isInBounds(coords.x, coords.y)
+      startX: clamped.x,
+      startY: clamped.y,
+      endX: clamped.x,
+      endY: clamped.y,
+      startInBounds: isInBounds(clamped.x, clamped.y),
+      endInBounds: isInBounds(clamped.x, clamped.y)
     });
   };
 
@@ -60,12 +62,13 @@ export default function VisualTrackingPage() {
     event.preventDefault();
 
     const coords = getCoordinates(event, svgRef.current);
+    const clamped = clampToViewBox(coords.x, coords.y);
 
     setCurrentTrajectory(prev => prev ? {
       ...prev,
-      endX: coords.x,
-      endY: coords.y,
-      endInBounds: isInBounds(coords.x, coords.y)
+      endX: clamped.x,
+      endY: clamped.y,
+      endInBounds: isInBounds(clamped.x, clamped.y)
     } : null);
   };
 

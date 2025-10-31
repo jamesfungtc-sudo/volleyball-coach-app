@@ -1,0 +1,207 @@
+.court-grid-container {
+  padding: 0;
+}
+
+/* Court Labels */
+.court-labels {
+  text-align: center;
+  margin: 6px 0;
+}
+
+.label-top,
+.label-bottom {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #6b7280;
+  letter-spacing: 0.3px;
+}
+
+.label-top {
+  margin-bottom: 4px;
+}
+
+.label-bottom {
+  margin-top: 4px;
+}
+
+/* Grid Layout - Compact */
+.court-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-width: 500px;
+  margin: 0 auto;
+  padding: 10px;
+  background: #f9fafb;
+  border: 2px solid #3b82f6;
+  border-radius: 6px;
+}
+
+.court-row {
+  display: flex;
+  gap: 3px;
+}
+
+/* Court Cells - Compact */
+.court-cell {
+  flex: 1;
+  aspect-ratio: 1;
+  min-height: 60px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  position: relative;
+  font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
+}
+
+.court-cell:hover:not(.disabled) {
+  border-color: #3b82f6;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+  transform: scale(1.05);
+  z-index: 1;
+}
+
+.court-cell:active:not(.disabled) {
+  transform: scale(0.98);
+  box-shadow: 0 1px 4px rgba(59, 130, 246, 0.3);
+}
+
+.court-cell.disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.cell-coord {
+  font-size: 0.625rem;
+  color: #9ca3af;
+  font-weight: 500;
+}
+
+.cell-count {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1f2937;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 1px 6px;
+  border-radius: 10px;
+  min-width: 22px;
+  text-align: center;
+}
+
+/* Legend - Compact */
+.court-legend {
+  margin-top: 10px;
+  padding: 10px;
+  background: #f9fafb;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+}
+
+.legend-label {
+  display: block;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 6px;
+}
+
+.legend-gradient {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-min,
+.legend-max {
+  font-size: 0.625rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.legend-bar {
+  flex: 1;
+  height: 18px;
+  background: linear-gradient(
+    to right,
+    rgba(59, 130, 246, 0.2),
+    rgba(59, 130, 246, 0.8)
+  );
+  border-radius: 3px;
+  border: 1px solid #e5e7eb;
+}
+
+/* Instructions - Compact */
+.court-instructions {
+  margin-top: 10px;
+  text-align: center;
+  font-size: 0.6875rem;
+  color: #6b7280;
+  font-style: italic;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .court-grid-container {
+    padding: 16px;
+  }
+
+  .court-grid {
+    padding: 12px;
+    max-width: 100%;
+  }
+
+  .court-cell {
+    min-height: 60px;
+  }
+
+  .cell-count {
+    font-size: 1rem;
+    padding: 2px 6px;
+    min-width: 24px;
+  }
+
+  .cell-coord {
+    font-size: 0.625rem;
+  }
+
+  .label-top,
+  .label-bottom {
+    font-size: 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .court-cell {
+    min-height: 48px;
+  }
+
+  .cell-count {
+    font-size: 0.875rem;
+    padding: 1px 4px;
+    min-width: 20px;
+  }
+
+  .cell-coord {
+    font-size: 0.5rem;
+  }
+}
+
+/* iPad Landscape Optimization */
+@media (min-width: 768px) and (max-width: 1024px) and (orientation: landscape) {
+  .court-grid {
+    max-width: 700px;
+  }
+
+  .court-cell {
+    min-height: 90px;
+  }
+}

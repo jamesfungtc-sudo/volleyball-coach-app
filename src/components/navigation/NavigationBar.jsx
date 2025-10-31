@@ -10,6 +10,7 @@ function NavigationBar() {
     { path: '/teams', label: 'Teams', icon: '👥' },
     { path: '/statistics', label: 'Stats', icon: '📊' },
     { path: '/in-game-stats', label: 'In-Game Stats', icon: '⚡' },
+    { path: '/opponent-analysis', label: 'Opponent Analysis', icon: '🎯' },
     { path: '/analytics', label: 'Analytics', icon: '📈' },
   ]
 

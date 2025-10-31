@@ -1,0 +1,192 @@
+.opponent-player-selector {
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+  border: 2px solid #e5e7eb;
+  margin-bottom: 20px;
+}
+
+.selector-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.selector-header h4 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.clear-selection-btn {
+  padding: 4px 10px;
+  font-size: 1rem;
+  color: #6b7280;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.clear-selection-btn:hover {
+  background: #f3f4f6;
+  color: #ef4444;
+}
+
+/* Recent Players */
+.recent-players {
+  margin-bottom: 16px;
+}
+
+.player-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.player-chip {
+  padding: 10px 16px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+  background: #f3f4f6;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.player-chip:hover {
+  background: #e5e7eb;
+  border-color: #3b82f6;
+  color: #1f2937;
+}
+
+.player-chip.selected {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: white;
+}
+
+/* Add Player Section */
+.add-player-section {
+  margin-top: 12px;
+}
+
+.add-player-btn {
+  width: 100%;
+  padding: 10px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #3b82f6;
+  background: #eff6ff;
+  border: 2px dashed #3b82f6;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.add-player-btn:hover {
+  background: #dbeafe;
+  border-style: solid;
+}
+
+.add-player-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.player-name-input {
+  width: 100%;
+  padding: 12px;
+  font-size: 0.875rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.player-name-input:focus {
+  border-color: #3b82f6;
+}
+
+.form-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-confirm,
+.btn-cancel {
+  flex: 1;
+  padding: 10px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-confirm {
+  background: #3b82f6;
+  color: white;
+}
+
+.btn-confirm:hover:not(:disabled) {
+  background: #2563eb;
+}
+
+.btn-confirm:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
+.btn-cancel {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.btn-cancel:hover {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+/* Selected Player Display */
+.selected-player-display {
+  margin-top: 16px;
+  padding: 12px;
+  background: #eff6ff;
+  border: 2px solid #3b82f6;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.selected-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #1e40af;
+}
+
+.selected-name {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #1e3a8a;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .opponent-player-selector {
+    padding: 16px;
+  }
+
+  .player-chip {
+    padding: 8px 12px;
+    font-size: 0.8125rem;
+  }
+}

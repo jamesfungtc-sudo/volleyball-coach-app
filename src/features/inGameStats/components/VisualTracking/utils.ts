@@ -89,6 +89,22 @@ export const getCoordinates = (
 };
 
 /**
+ * Clamp coordinates to stay within SVG viewBox bounds
+ *
+ * @param x - X coordinate in SVG viewBox coordinates
+ * @param y - Y coordinate in SVG viewBox coordinates
+ * @returns Clamped coordinates
+ */
+export const clampToViewBox = (x: number, y: number): { x: number; y: number } => {
+  const { viewBoxWidth, viewBoxHeight } = COURT_DIMENSIONS;
+
+  return {
+    x: Math.max(0, Math.min(viewBoxWidth, x)),
+    y: Math.max(0, Math.min(viewBoxHeight, y))
+  };
+};
+
+/**
  * Calculate distance between two points
  *
  * @param x1 - First point X
