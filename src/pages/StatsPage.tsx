@@ -2,14 +2,11 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import PageLayout from '../components/layout/PageLayout';
 import { MatchProvider, useMatch } from '../features/inGameStats/context/MatchContext';
-import { OpponentTrackingProvider } from '../features/inGameStats/context/OpponentTrackingContext';
-import { OpponentTrackingModule } from '../features/inGameStats/components/OpponentTracking/OpponentTrackingModule';
 import { PointEntryForm } from '../features/inGameStats/components/PointEntryForm';
 import { PointByPointList } from '../features/inGameStats/components/PointByPointList';
 import { StatsDashboard } from '../features/inGameStats/components/StatsDashboard';
 import { getMatch, getPlayersByTeam, getTeams, type Player } from '../services/googleSheetsAPI';
 import type { MatchData } from '../types/inGameStats.types';
-import type { OpponentPlayer } from '../features/inGameStats/types/opponentTracking.types';
 import './StatsPage.css';
 
 /**
@@ -118,14 +115,6 @@ function StatsPageContent() {
     dispatch({ type: 'UNDO_LAST_POINT' });
   };
 
-  // Convert opponent roster to OpponentPlayer format
-  const opponentPlayers: OpponentPlayer[] = opponentRoster.map(player => ({
-    id: player.Id,
-    name: player.Name,
-    number: player['Jersey Number']?.toString() || '',
-    role: player.Position as any
-  }));
-
   return (
     <ViewModeContext.Provider value={{ viewMode, setViewMode }}>
       {/* Set Tabs and View Toggle */}
@@ -154,18 +143,10 @@ function StatsPageContent() {
       <div className="stats-page-content">
         {/* Point Entry & List View */}
         {viewMode === 'list' && (
-          <OpponentTrackingProvider>
-            <div className="list-view">
-              {/* Opponent Tracking Module - Always visible at top */}
-              <OpponentTrackingModule
-                opponentPlayers={opponentPlayers}
-                disabled={false}
-              />
-
-              <PointEntryForm />
-              <PointByPointList points={currentSetData} onUndo={handleUndo} />
-            </div>
-          </OpponentTrackingProvider>
+          <div className="list-view">
+            <PointEntryForm />
+            <PointByPointList points={currentSetData} onUndo={handleUndo} />
+          </div>
         )}
 
         {/* Statistics Dashboard View */}
