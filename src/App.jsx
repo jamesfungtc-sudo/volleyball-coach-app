@@ -7,7 +7,6 @@ import MatchListPage from './pages/MatchListPage'
 import MatchSetupPage from './pages/MatchSetupPage'
 import StatsPage from './pages/StatsPage'
 import AnalyticsPage from './pages/AnalyticsPage'
-import OpponentAnalysisPage from './pages/OpponentAnalysisPage'
 import VisualTrackingPage from './pages/VisualTrackingPage'
 import './App.css'
 
@@ -27,7 +26,6 @@ function App() {
             <Route path="/in-game-stats/:matchId" element={<StatsPage />} />
             <Route path="/in-game-stats/:matchId/visual" element={<VisualTrackingPage />} />
             <Route path="/analytics" element={<AnalyticsPage />} />
-            <Route path="/opponent-analysis" element={<OpponentAnalysisPage />} />
           </Routes>
         </main>
       </div>
