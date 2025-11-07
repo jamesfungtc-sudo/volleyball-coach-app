@@ -45,6 +45,8 @@ interface VolleyballCourtProps {
   className?: string;
   /** Children to render on top of the court (e.g., player markers, trajectories) */
   children?: React.ReactNode;
+  /** Which side to disable: 'home' | 'opponent' | null */
+  disabledSide?: 'home' | 'opponent' | null;
   /** Mouse down event handler */
   onMouseDown?: (event: React.MouseEvent<SVGSVGElement>) => void;
   /** Mouse move event handler */
@@ -78,6 +80,7 @@ export const VolleyballCourt: React.FC<VolleyballCourtProps> = ({
   isDrawing = false,
   className = '',
   children,
+  disabledSide = null,
   onMouseDown,
   onMouseMove,
   onMouseUp,
@@ -193,53 +196,30 @@ export const VolleyballCourt: React.FC<VolleyballCourtProps> = ({
 
       {/* ========== LABELS ========== */}
 
-      {/* Opponent side label (top half) */}
+      {/* Opponent label at top baseline */}
       <text
         x={viewBoxWidth / 2}
-        y={250}
+        y={25}
         textAnchor="middle"
         fill="white"
-        fontSize="28"
+        fontSize="20"
         fontWeight="bold"
         opacity="0.8"
       >
         OPPONENT
       </text>
 
-      {/* Home team side label (bottom half) */}
-      <text
-        x={viewBoxWidth / 2}
-        y={570}
-        textAnchor="middle"
-        fill="white"
-        fontSize="28"
-        fontWeight="bold"
-        opacity="0.8"
-      >
-        HOME TEAM
-      </text>
-
-      {/* Out of bounds labels */}
-      <text
-        x={viewBoxWidth / 2}
-        y={25}
-        textAnchor="middle"
-        fill="white"
-        fontSize="14"
-        opacity="0.7"
-      >
-        OUT OF BOUNDS
-      </text>
-
+      {/* Home label at bottom baseline */}
       <text
         x={viewBoxWidth / 2}
         y={785}
         textAnchor="middle"
         fill="white"
-        fontSize="14"
-        opacity="0.7"
+        fontSize="20"
+        fontWeight="bold"
+        opacity="0.8"
       >
-        OUT OF BOUNDS
+        HOME
       </text>
 
       {/* Net visual indicator */}
@@ -259,6 +239,46 @@ export const VolleyballCourt: React.FC<VolleyballCourtProps> = ({
           strokeDasharray="2,2"
         />
       </g>
+
+      {/* ========== DISABLED SIDE OVERLAY ========== */}
+      {disabledSide && (
+        <g>
+          {/* Dim the disabled side with a semi-transparent overlay */}
+          <rect
+            x={courtLeft}
+            y={disabledSide === 'opponent' ? courtTop : netY}
+            width={courtWidth}
+            height={disabledSide === 'opponent' ? (netY - courtTop) : (courtBottom - netY)}
+            fill="rgba(0, 0, 0, 0.5)"
+            pointerEvents="none"
+          />
+
+          {/* Add a "Not Available" message */}
+          <text
+            x={viewBoxWidth / 2}
+            y={disabledSide === 'opponent' ? (courtTop + (netY - courtTop) / 2) : (netY + (courtBottom - netY) / 2)}
+            textAnchor="middle"
+            fill="white"
+            fontSize="24"
+            fontWeight="bold"
+            opacity="0.9"
+            pointerEvents="none"
+          >
+            {disabledSide === 'opponent' ? 'OPPONENT SIDE' : 'HOME SIDE'}
+          </text>
+          <text
+            x={viewBoxWidth / 2}
+            y={disabledSide === 'opponent' ? (courtTop + (netY - courtTop) / 2 + 30) : (netY + (courtBottom - netY) / 2 + 30)}
+            textAnchor="middle"
+            fill="white"
+            fontSize="16"
+            opacity="0.8"
+            pointerEvents="none"
+          >
+            Cannot draw here
+          </text>
+        </g>
+      )}
 
       {/* ========== CHILDREN (Player markers, trajectories, etc.) ========== */}
       {children}

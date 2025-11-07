@@ -1,0 +1,49 @@
+/* PlayerMarker - Circle with jersey number */
+
+.player-marker {
+  transition: opacity 0.2s ease;
+}
+
+.player-marker-circle {
+  fill: white;
+  stroke: #333;
+  stroke-width: 2;
+  transition: all 0.2s ease;
+}
+
+.player-marker-number {
+  fill: #333;
+  pointer-events: none;
+  transition: fill 0.2s ease;
+}
+
+/* Hover state */
+.player-marker:hover .player-marker-circle {
+  stroke: #2563eb;
+  stroke-width: 3;
+}
+
+/* Selected state - Blue fill with white text */
+.player-marker-selected .player-marker-circle {
+  fill: #2563eb;
+  stroke: #1e40af;
+  stroke-width: 3;
+}
+
+.player-marker-selected .player-marker-number {
+  fill: white;
+}
+
+/* Faded state - 30% opacity when another player selected */
+.player-marker-faded {
+  opacity: 0.3;
+}
+
+/* Team-specific colors (optional borders) */
+.player-marker-home .player-marker-circle {
+  /* Can add team-specific styling if needed */
+}
+
+.player-marker-opponent .player-marker-circle {
+  /* Can add team-specific styling if needed */
+}
