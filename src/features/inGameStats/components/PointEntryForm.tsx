@@ -17,7 +17,6 @@ import {
 } from '../utils/formHelpers';
 import { validatePointEntry, getValidationErrors } from '../utils/formValidation';
 import { useMatch, useTeamRosters } from '../context/MatchContext';
-import { useOpponentTracking } from '../context/OpponentTrackingContext';
 import { saveMatch, updateMatch } from '../../../services/googleSheetsAPI';
 import './PointEntryForm.css';
 
@@ -119,7 +118,6 @@ export function PointEntryForm() {
   const [state, dispatch] = useReducer(pointEntryReducer, initialState);
   const { dispatch: matchDispatch, currentScore, homeTeam, opponentTeam, currentSetData, state: matchState } = useMatch();
   const { homeRoster, opponentRoster } = useTeamRosters();
-  const { state: opponentTrackingState, resetForNewPoint, setAttemptResult } = useOpponentTracking();
   const [isSaving, setIsSaving] = React.useState(false);
   const [saveError, setSaveError] = React.useState<string | null>(null);
 
@@ -175,17 +173,6 @@ export function PointEntryForm() {
       return;
     }
 
-    // Determine if this is a kill/ace (terminal action by opponent)
-    const isOpponentKill = state.winLoss === 'Loss' && state.category === 'Attack';
-    const isOpponentAce = state.winLoss === 'Loss' && state.category === 'Serve';
-
-    // Update opponent tracking attempts with terminal result if applicable
-    if ((isOpponentKill || isOpponentAce) && opponentTrackingState.attemptQueue.length > 0) {
-      const lastAttempt = opponentTrackingState.attemptQueue[opponentTrackingState.attemptQueue.length - 1];
-      const result = isOpponentAce ? 'ace' : 'kill';
-      setAttemptResult(lastAttempt.attempt_number, result);
-    }
-
     // Create new point (simplified structure matching OldTool)
     // Store player ID (not name) - will be looked up from roster when displaying
     const newPoint = {
@@ -199,18 +186,11 @@ export function PointEntryForm() {
       home_score:
         state.winLoss === 'Win' ? currentScore.home + 1 : currentScore.home,
       opponent_score:
-        state.winLoss === 'Loss' ? currentScore.opponent + 1 : currentScore.opponent,
-      // Include opponent tracking attempts (if any)
-      opponent_attempts: opponentTrackingState.attemptQueue.length > 0
-        ? opponentTrackingState.attemptQueue
-        : undefined
+        state.winLoss === 'Loss' ? currentScore.opponent + 1 : currentScore.opponent
     };
 
     // Add point to context (updates UI immediately)
     matchDispatch({ type: 'ADD_POINT', payload: newPoint });
-
-    // Reset opponent tracking for new point
-    resetForNewPoint();
 
     // Reset form
     dispatch({ type: 'RESET_FORM' });

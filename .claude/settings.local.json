@@ -35,7 +35,9 @@
       "Bash(node:*)",
       "Bash(find:*)",
       "Bash(nvm install:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(lsof:*)",
+      "Bash(pkill:*)"
     ],
     "deny": [],
     "ask": []

@@ -13,7 +13,21 @@ export default defineConfig({
         enabled: true
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg}']
+        globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        // Force service worker update by changing runtime caching
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/jamesfungtc-sudo\.github\.io\/.*/i,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'volleyball-coach-v2',
+              expiration: {
+                maxEntries: 10,
+                maxAgeSeconds: 60 * 60 * 24 // 24 hours
+              }
+            }
+          }
+        ]
       },
       manifest: {
         name: 'Volleyball Coach',
@@ -23,6 +37,8 @@ export default defineConfig({
         background_color: '#ffffff',
         display: 'standalone',
         orientation: 'any',
+        // Increment version to force update
+        version: '2.0.0',
         icons: [
           {
             src: '/vite.svg',
