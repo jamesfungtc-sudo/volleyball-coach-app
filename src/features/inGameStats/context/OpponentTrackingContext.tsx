@@ -5,7 +5,10 @@ import {
   OpponentPlayer,
   OpponentLineup,
   HitPosition,
-  OpponentAttemptResult
+  OpponentAttemptResult,
+  OpponentAttemptType,
+  TrajectoryData,
+  TeamLineup
 } from '../types/opponentTracking.types';
 
 // ============================================
@@ -13,6 +16,14 @@ import {
 // ============================================
 
 type OpponentTrackingAction =
+  // NEW: Core visual tracking actions
+  | { type: 'SELECT_PLAYER'; payload: { player: OpponentPlayer; team: 'home' | 'opponent' } }
+  | { type: 'SET_ACTION_TYPE'; payload: OpponentAttemptType }
+  | { type: 'SET_TRAJECTORY'; payload: TrajectoryData }
+  | { type: 'CLEAR_TRAJECTORY' }
+  | { type: 'SAVE_VISUAL_ATTEMPT'; payload: { result: OpponentAttemptResult } }
+
+  // OLD: Keep existing actions for backwards compatibility
   | { type: 'SET_SERVE_POSITION'; payload: { position: number; player: OpponentPlayer } }
   | { type: 'SET_HIT_POSITION'; payload: { position: HitPosition; player: OpponentPlayer | null } }
   | { type: 'SET_GRID_CELL'; payload: { x: number; y: number } }
@@ -29,21 +40,51 @@ type OpponentTrackingAction =
 // ============================================
 
 const initialState: OpponentTrackingState = {
+  // NEW: Visual tracking state
+  selectedPlayer: null,
+  selectedTeam: null,
+  selectedActionType: 'attack', // Default to attack
+  currentTrajectory: null,
+  isDrawing: false,
+
+  // NEW: Attempt storage (immediate save model)
+  savedAttempts: [],
+
+  // NEW: Placeholders for future features
+  undoStack: [],
+  redoStack: [],
+  firstServerLocked: false,
+  firstServerPlayerId: null,
+  rotation: {
+    homeLineup: {
+      P1: null,
+      P2: null,
+      P3: null,
+      P4: null,
+      P5: null,
+      P6: null
+    },
+    opponentLineup: {
+      P1: null,
+      P2: null,
+      P3: null,
+      P4: null,
+      P5: null,
+      P6: null
+    },
+    homeServerPosition: null,
+    opponentServerPosition: null
+  },
+
+  // OLD: Keep for backwards compatibility
   selectedServePosition: null,
   selectedServePlayer: null,
   selectedHitPosition: null,
   selectedHitPlayer: null,
   selectedGridCell: null,
   serveDropdownsLocked: false,
-  attemptQueue: [],
-  currentLineup: {
-    P1: null,
-    P2: null,
-    P3: null,
-    P4: null,
-    P5: null,
-    P6: null
-  },
+
+  // Metadata
   currentAttemptNumber: 1
 };
 
@@ -56,6 +97,114 @@ function opponentTrackingReducer(
   action: OpponentTrackingAction
 ): OpponentTrackingState {
   switch (action.type) {
+    // ==== NEW: VISUAL TRACKING ACTIONS ====
+
+    case 'SELECT_PLAYER':
+      return {
+        ...state,
+        selectedPlayer: action.payload.player,
+        selectedTeam: action.payload.team
+      };
+
+    case 'SET_ACTION_TYPE':
+      return {
+        ...state,
+        selectedActionType: action.payload
+      };
+
+    case 'SET_TRAJECTORY':
+      return {
+        ...state,
+        currentTrajectory: action.payload,
+        isDrawing: false
+      };
+
+    case 'CLEAR_TRAJECTORY':
+      return {
+        ...state,
+        currentTrajectory: null,
+        isDrawing: false
+      };
+
+    case 'SAVE_VISUAL_ATTEMPT': {
+      // Validate required data
+      if (!state.selectedPlayer || !state.currentTrajectory || !state.selectedTeam) {
+        console.warn('Cannot save visual attempt: missing player, team, or trajectory');
+        return state;
+      }
+
+      // Import coordinate calculations
+      const { calculateGridCell } = require('../components/VisualTracking/coordinateCalculations');
+
+      // Calculate grid cell from trajectory end point
+      const gridCell = calculateGridCell(
+        state.currentTrajectory.endX,
+        state.currentTrajectory.endY
+      );
+
+      // Auto-detect hit position/serve zone based on trajectory
+      let hitPosition: HitPosition | undefined;
+      let servePosition: number | undefined;
+
+      if (state.selectedActionType === 'attack') {
+        // Import from coordinate calculations
+        const { calculateHitPosition } = require('../components/VisualTracking/coordinateCalculations');
+        hitPosition = calculateHitPosition(
+          state.currentTrajectory.startX,
+          state.currentTrajectory.startY,
+          state.selectedTeam
+        );
+      } else if (state.selectedActionType === 'serve') {
+        // Import from coordinate calculations
+        const { calculateServeZone } = require('../components/VisualTracking/coordinateCalculations');
+        const zone = calculateServeZone(
+          state.currentTrajectory.endX,
+          state.currentTrajectory.endY
+        );
+        servePosition = zone ? zone - 1 : undefined; // Convert 1-5 to 0-4
+      }
+
+      // Create the hybrid attempt object
+      const newAttempt: OpponentAttempt = {
+        attempt_number: state.currentAttemptNumber,
+        type: state.selectedActionType,
+
+        // Player info (required)
+        player_id: state.selectedPlayer.id,
+        player_name: state.selectedPlayer.name,
+        player_jersey: parseInt(state.selectedPlayer.number),
+
+        // Position-specific fields
+        hit_position: hitPosition,
+        serve_position: servePosition,
+
+        // Landing grid (discrete)
+        landing_grid_x: gridCell.col,
+        landing_grid_y: gridCell.row,
+
+        // Trajectory data (continuous)
+        trajectory: state.currentTrajectory,
+
+        // Result
+        result: action.payload.result,
+
+        // Timestamp
+        timestamp: Date.now()
+      };
+
+      return {
+        ...state,
+        savedAttempts: [...state.savedAttempts, newAttempt],
+        currentAttemptNumber: state.currentAttemptNumber + 1,
+        currentTrajectory: null,
+        // Keep player selected for next attempt
+        // selectedPlayer: null,
+        // selectedTeam: null,
+      };
+    }
+
+    // ==== OLD: BACKWARDS COMPATIBLE ACTIONS ====
+
     case 'SET_SERVE_POSITION':
       return {
         ...state,
@@ -198,6 +347,15 @@ function opponentTrackingReducer(
 
 interface OpponentTrackingContextValue {
   state: OpponentTrackingState;
+
+  // NEW: Visual tracking functions
+  selectPlayer: (player: OpponentPlayer, team: 'home' | 'opponent') => void;
+  setActionType: (type: OpponentAttemptType) => void;
+  setTrajectory: (trajectory: TrajectoryData) => void;
+  clearTrajectory: () => void;
+  saveVisualAttempt: (result: OpponentAttemptResult) => void;
+
+  // OLD: Backwards compatible functions
   setServePosition: (position: number, player: OpponentPlayer) => void;
   setHitPosition: (position: HitPosition, player: OpponentPlayer | null) => void;
   setGridCell: (x: number, y: number) => void;
@@ -225,7 +383,28 @@ interface OpponentTrackingProviderProps {
 export const OpponentTrackingProvider: React.FC<OpponentTrackingProviderProps> = ({ children }) => {
   const [state, dispatch] = useReducer(opponentTrackingReducer, initialState);
 
-  // Action creators
+  // NEW: Visual tracking action creators
+  const selectPlayer = (player: OpponentPlayer, team: 'home' | 'opponent') => {
+    dispatch({ type: 'SELECT_PLAYER', payload: { player, team } });
+  };
+
+  const setActionType = (type: OpponentAttemptType) => {
+    dispatch({ type: 'SET_ACTION_TYPE', payload: type });
+  };
+
+  const setTrajectory = (trajectory: TrajectoryData) => {
+    dispatch({ type: 'SET_TRAJECTORY', payload: trajectory });
+  };
+
+  const clearTrajectory = () => {
+    dispatch({ type: 'CLEAR_TRAJECTORY' });
+  };
+
+  const saveVisualAttempt = (result: OpponentAttemptResult) => {
+    dispatch({ type: 'SAVE_VISUAL_ATTEMPT', payload: { result } });
+  };
+
+  // OLD: Backwards compatible action creators
   const setServePosition = (position: number, player: OpponentPlayer) => {
     dispatch({ type: 'SET_SERVE_POSITION', payload: { position, player } });
   };
@@ -281,6 +460,15 @@ export const OpponentTrackingProvider: React.FC<OpponentTrackingProviderProps> =
 
   const value: OpponentTrackingContextValue = {
     state,
+
+    // NEW: Visual tracking functions
+    selectPlayer,
+    setActionType,
+    setTrajectory,
+    clearTrajectory,
+    saveVisualAttempt,
+
+    // OLD: Backwards compatible functions
     setServePosition,
     setHitPosition,
     setGridCell,
