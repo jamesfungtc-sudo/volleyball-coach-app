@@ -41,14 +41,14 @@ function VisualTrackingPageContent() {
   const navigate = useNavigate();
   const svgRef = useRef<SVGSVGElement>(null);
 
-  // Opponent Tracking Context
-  const {
-    selectPlayer,
-    setActionType: setContextActionType,
-    setTrajectory,
-    saveVisualAttempt,
-    state: contextState
-  } = useOpponentTracking();
+  // TODO: Re-enable OpponentTrackingContext after fixing require() issue
+  // const {
+  //   selectPlayer,
+  //   setActionType: setContextActionType,
+  //   setTrajectory,
+  //   saveVisualAttempt,
+  //   state: contextState
+  // } = useOpponentTracking();
 
   // Player selection state
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerInPosition | null>(null);
@@ -83,6 +83,8 @@ function VisualTrackingPageContent() {
   /**
    * Save the current attempt with result button
    * Converts trajectory and player data to context format and saves
+   *
+   * TODO: Re-enable after fixing require() issue in OpponentTrackingContext
    */
   const handleSaveAttempt = (result: OpponentAttemptResult) => {
     if (!selectedPlayer || !currentTrajectory || !selectedTeam || !trajectoryAnalysis) {
@@ -90,6 +92,24 @@ function VisualTrackingPageContent() {
       return;
     }
 
+    // Just log for now - saving disabled temporarily
+    console.log(`📝 Would save ${actionType} attempt:`, {
+      player: `#${selectedPlayer.jerseyNumber} ${selectedPlayer.playerName}`,
+      result,
+      trajectory: {
+        start: [currentTrajectory.startX, currentTrajectory.startY],
+        end: [currentTrajectory.endX, currentTrajectory.endY],
+        distance: trajectoryAnalysis.distance,
+        speed: trajectoryAnalysis.speed,
+        landingArea: trajectoryAnalysis.landingArea
+      }
+    });
+
+    // Clear trajectory and allow user to draw again for same player
+    setCurrentTrajectory(null);
+
+    // TODO: Uncomment when context is fixed
+    /*
     // Convert PlayerInPosition to OpponentPlayer format
     const opponentPlayer: OpponentPlayer = {
       id: selectedPlayer.playerId,
@@ -106,7 +126,7 @@ function VisualTrackingPageContent() {
       startInBounds: currentTrajectory.startInBounds,
       endInBounds: currentTrajectory.endInBounds,
       distance: trajectoryAnalysis.distance,
-      angle: 0, // TODO: Calculate angle if needed
+      angle: 0,
       speed: trajectoryAnalysis.speed,
       landingArea: trajectoryAnalysis.landingArea
     };
@@ -118,15 +138,7 @@ function VisualTrackingPageContent() {
 
     // Save the attempt
     saveVisualAttempt(result);
-
-    // Clear trajectory and allow user to draw again for same player
-    setCurrentTrajectory(null);
-
-    console.log(`✅ Saved ${actionType} attempt:`, {
-      player: opponentPlayer.name,
-      result,
-      trajectory: trajectoryData
-    });
+    */
   };
 
   /**
@@ -730,45 +742,9 @@ function VisualTrackingPageContent() {
                 </button>
               </div>
 
+              {/* TODO: Re-enable saved attempts list after fixing context */}
               {/* Saved Attempts List */}
-              {contextState.savedAttempts.length > 0 && (
-                <div style={{ padding: '20px', borderTop: '2px solid #e5e7eb' }}>
-                  <h4 style={{ marginBottom: '12px', fontSize: '14px', fontWeight: '600' }}>
-                    📋 Saved Attempts ({contextState.savedAttempts.length})
-                  </h4>
-                  <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                    {contextState.savedAttempts.map((attempt, index) => (
-                      <div
-                        key={index}
-                        style={{
-                          padding: '8px',
-                          marginBottom: '8px',
-                          background: '#f9fafb',
-                          borderRadius: '4px',
-                          fontSize: '12px',
-                          borderLeft: `4px solid ${
-                            attempt.result === 'kill' ? '#10b981' :
-                            attempt.result === 'ace' ? '#f59e0b' :
-                            attempt.result === 'error' ? '#ef4444' : '#3b82f6'
-                          }`
-                        }}
-                      >
-                        <div style={{ fontWeight: '600', marginBottom: '4px' }}>
-                          #{attempt.attempt_number} - {attempt.player_name}
-                        </div>
-                        <div style={{ color: '#666' }}>
-                          {attempt.type.toUpperCase()} → {attempt.result.replace('_', ' ').toUpperCase()}
-                        </div>
-                        {attempt.hit_position && (
-                          <div style={{ color: '#666', fontSize: '11px' }}>
-                            Position: {attempt.hit_position}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {/* {contextState.savedAttempts.length > 0 && (...)} */}
             </div>
           </div>
         </div>
@@ -787,12 +763,6 @@ function VisualTrackingPageContent() {
 }
 
 /**
- * Wrapper component with OpponentTrackingProvider
+ * Export main component directly (OpponentTrackingProvider temporarily disabled)
  */
-export default function VisualTrackingPage() {
-  return (
-    <OpponentTrackingProvider>
-      <VisualTrackingPageContent />
-    </OpponentTrackingProvider>
-  );
-}
+export default VisualTrackingPageContent;
