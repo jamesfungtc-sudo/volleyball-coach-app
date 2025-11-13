@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   VolleyballCourt,
@@ -16,6 +16,15 @@ import {
   type PlayerInPosition,
   type TrajectoryAnalysis
 } from '../features/inGameStats/components/VisualTracking';
+import {
+  OpponentTrackingProvider,
+  useOpponentTracking
+} from '../features/inGameStats/context/OpponentTrackingContext';
+import type {
+  OpponentPlayer,
+  TrajectoryData,
+  OpponentAttemptResult
+} from '../features/inGameStats/types/opponentTracking.types';
 import './VisualTrackingPage.css';
 
 /**
@@ -28,9 +37,18 @@ import './VisualTrackingPage.css';
  *
  * Drawing system ported from: CourtDrawing Protopype/src/CourtDrawing.jsx
  */
-export default function VisualTrackingPage() {
+function VisualTrackingPageContent() {
   const navigate = useNavigate();
   const svgRef = useRef<SVGSVGElement>(null);
+
+  // Opponent Tracking Context
+  const {
+    selectPlayer,
+    setActionType: setContextActionType,
+    setTrajectory,
+    saveVisualAttempt,
+    state: contextState
+  } = useOpponentTracking();
 
   // Player selection state
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerInPosition | null>(null);
@@ -61,6 +79,55 @@ export default function VisualTrackingPage() {
     P5: { playerId: 'o5', jerseyNumber: 11, playerName: 'Opponent 5', position: 'P5' },
     P6: { playerId: 'o6', jerseyNumber: 12, playerName: 'Opponent 6', position: 'P6' }
   });
+
+  /**
+   * Save the current attempt with result button
+   * Converts trajectory and player data to context format and saves
+   */
+  const handleSaveAttempt = (result: OpponentAttemptResult) => {
+    if (!selectedPlayer || !currentTrajectory || !selectedTeam || !trajectoryAnalysis) {
+      console.warn('Cannot save: missing player, trajectory, team, or analysis');
+      return;
+    }
+
+    // Convert PlayerInPosition to OpponentPlayer format
+    const opponentPlayer: OpponentPlayer = {
+      id: selectedPlayer.playerId,
+      name: `#${selectedPlayer.jerseyNumber} ${selectedPlayer.playerName}`,
+      number: selectedPlayer.jerseyNumber.toString()
+    };
+
+    // Convert local Trajectory to TrajectoryData format
+    const trajectoryData: TrajectoryData = {
+      startX: currentTrajectory.startX,
+      startY: currentTrajectory.startY,
+      endX: currentTrajectory.endX,
+      endY: currentTrajectory.endY,
+      startInBounds: currentTrajectory.startInBounds,
+      endInBounds: currentTrajectory.endInBounds,
+      distance: trajectoryAnalysis.distance,
+      angle: 0, // TODO: Calculate angle if needed
+      speed: trajectoryAnalysis.speed,
+      landingArea: trajectoryAnalysis.landingArea
+    };
+
+    // Update context with player and trajectory
+    selectPlayer(opponentPlayer, selectedTeam);
+    setContextActionType(actionType);
+    setTrajectory(trajectoryData);
+
+    // Save the attempt
+    saveVisualAttempt(result);
+
+    // Clear trajectory and allow user to draw again for same player
+    setCurrentTrajectory(null);
+
+    console.log(`✅ Saved ${actionType} attempt:`, {
+      player: opponentPlayer.name,
+      result,
+      trajectory: trajectoryData
+    });
+  };
 
   /**
    * Handle drawing start (mouse down or touch start)
@@ -194,6 +261,22 @@ export default function VisualTrackingPage() {
     // If home team selected, disable opponent side (they should start from home side)
     return selectedTeam === 'opponent' ? 'home' : 'opponent';
   }, [selectedTeam, isDragging, currentTrajectory]);
+
+  /**
+   * Keyboard shortcut: Space bar for "In Play"
+   */
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Only trigger if Space bar and we have a valid trajectory
+      if (event.code === 'Space' && trajectoryAnalysis && selectedPlayer && currentTrajectory && selectedTeam) {
+        event.preventDefault();
+        handleSaveAttempt('in_play');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [trajectoryAnalysis, selectedPlayer, currentTrajectory, selectedTeam]);
 
   /**
    * Analyze current trajectory using coordinate calculations
@@ -511,6 +594,90 @@ export default function VisualTrackingPage() {
                     <p>Grid: Row {trajectoryAnalysis.gridCell.row + 1}, Col {trajectoryAnalysis.gridCell.col + 1}</p>
                   </div>
 
+                  {/* Result Buttons - NEW */}
+                  <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '2px solid #e5e7eb' }}>
+                    <p style={{ fontWeight: '600', marginBottom: '12px', fontSize: '14px' }}>
+                      📝 Save Attempt:
+                    </p>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      <button
+                        onClick={() => handleSaveAttempt('in_play')}
+                        style={{
+                          padding: '12px',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          border: '2px solid #3b82f6',
+                          background: '#3b82f6',
+                          color: 'white',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseOver={(e) => e.currentTarget.style.background = '#2563eb'}
+                        onMouseOut={(e) => e.currentTarget.style.background = '#3b82f6'}
+                      >
+                        ▶️ In Play
+                      </button>
+                      <button
+                        onClick={() => handleSaveAttempt('kill')}
+                        style={{
+                          padding: '12px',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          border: '2px solid #10b981',
+                          background: '#10b981',
+                          color: 'white',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseOver={(e) => e.currentTarget.style.background = '#059669'}
+                        onMouseOut={(e) => e.currentTarget.style.background = '#10b981'}
+                      >
+                        ⚡ Kill
+                      </button>
+                      <button
+                        onClick={() => handleSaveAttempt('ace')}
+                        style={{
+                          padding: '12px',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          border: '2px solid #f59e0b',
+                          background: '#f59e0b',
+                          color: 'white',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseOver={(e) => e.currentTarget.style.background = '#d97706'}
+                        onMouseOut={(e) => e.currentTarget.style.background = '#f59e0b'}
+                      >
+                        🎯 Ace
+                      </button>
+                      <button
+                        onClick={() => handleSaveAttempt('error')}
+                        style={{
+                          padding: '12px',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          border: '2px solid #ef4444',
+                          background: '#ef4444',
+                          color: 'white',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseOver={(e) => e.currentTarget.style.background = '#dc2626'}
+                        onMouseOut={(e) => e.currentTarget.style.background = '#ef4444'}
+                      >
+                        ❌ Error
+                      </button>
+                    </div>
+                    <p style={{ fontSize: '11px', color: '#666', marginTop: '8px', textAlign: 'center' }}>
+                      💡 Tip: Press Space for "In Play"
+                    </p>
+                  </div>
+
                   {/* Debug Info */}
                   {currentTrajectory && (
                     <div style={{ fontSize: '11px', color: '#999', marginTop: '12px', padding: '8px', background: '#f9fafb', borderRadius: '4px' }}>
@@ -562,6 +729,46 @@ export default function VisualTrackingPage() {
                   Clear Selection
                 </button>
               </div>
+
+              {/* Saved Attempts List */}
+              {contextState.savedAttempts.length > 0 && (
+                <div style={{ padding: '20px', borderTop: '2px solid #e5e7eb' }}>
+                  <h4 style={{ marginBottom: '12px', fontSize: '14px', fontWeight: '600' }}>
+                    📋 Saved Attempts ({contextState.savedAttempts.length})
+                  </h4>
+                  <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                    {contextState.savedAttempts.map((attempt, index) => (
+                      <div
+                        key={index}
+                        style={{
+                          padding: '8px',
+                          marginBottom: '8px',
+                          background: '#f9fafb',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          borderLeft: `4px solid ${
+                            attempt.result === 'kill' ? '#10b981' :
+                            attempt.result === 'ace' ? '#f59e0b' :
+                            attempt.result === 'error' ? '#ef4444' : '#3b82f6'
+                          }`
+                        }}
+                      >
+                        <div style={{ fontWeight: '600', marginBottom: '4px' }}>
+                          #{attempt.attempt_number} - {attempt.player_name}
+                        </div>
+                        <div style={{ color: '#666' }}>
+                          {attempt.type.toUpperCase()} → {attempt.result.replace('_', ' ').toUpperCase()}
+                        </div>
+                        {attempt.hit_position && (
+                          <div style={{ color: '#666', fontSize: '11px' }}>
+                            Position: {attempt.hit_position}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -576,5 +783,16 @@ export default function VisualTrackingPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Wrapper component with OpponentTrackingProvider
+ */
+export default function VisualTrackingPage() {
+  return (
+    <OpponentTrackingProvider>
+      <VisualTrackingPageContent />
+    </OpponentTrackingProvider>
   );
 }
