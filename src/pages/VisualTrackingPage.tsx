@@ -55,11 +55,21 @@ function VisualTrackingPageContent() {
   const [selectedTeam, setSelectedTeam] = useState<'home' | 'opponent' | null>(null);
 
   // Action type state
-  const [actionType, setActionType] = useState<'attack' | 'serve' | 'block' | 'dig'>('attack');
+  const [actionType, setActionType] = useState<'attack' | 'serve' | 'block' | 'dig'>('serve'); // Start with serve
 
   // Drawing state
   const [currentTrajectory, setCurrentTrajectory] = useState<Trajectory | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+
+  // Point/Rally tracking state
+  const [pointNumber, setPointNumber] = useState(1); // Current point number
+  const [attemptNumber, setAttemptNumber] = useState(1); // Attempt within current point
+  const [isServePhase, setIsServePhase] = useState(true); // True = waiting for serve, False = rally phase
+  const [homeScore, setHomeScore] = useState(0);
+  const [opponentScore, setOpponentScore] = useState(0);
+
+  // Save attempts for current point (local storage until point ends)
+  const [currentPointAttempts, setCurrentPointAttempts] = useState<any[]>([]);
 
   // Mock player lineups (TODO: Load from match context)
   const [homeLineup] = useState<TeamLineup>({
@@ -81,10 +91,7 @@ function VisualTrackingPageContent() {
   });
 
   /**
-   * Save the current attempt with result button
-   * Converts trajectory and player data to context format and saves
-   *
-   * TODO: Re-enable after fixing require() issue in OpponentTrackingContext
+   * Save the current attempt and handle point workflow
    */
   const handleSaveAttempt = (result: OpponentAttemptResult) => {
     if (!selectedPlayer || !currentTrajectory || !selectedTeam || !trajectoryAnalysis) {
@@ -92,53 +99,78 @@ function VisualTrackingPageContent() {
       return;
     }
 
-    // Just log for now - saving disabled temporarily
-    console.log(`📝 Would save ${actionType} attempt:`, {
+    // Create attempt data
+    const attemptData = {
+      pointNumber,
+      attemptNumber,
+      actionType,
       player: `#${selectedPlayer.jerseyNumber} ${selectedPlayer.playerName}`,
+      team: selectedTeam,
       result,
       trajectory: {
         start: [currentTrajectory.startX, currentTrajectory.startY],
         end: [currentTrajectory.endX, currentTrajectory.endY],
         distance: trajectoryAnalysis.distance,
         speed: trajectoryAnalysis.speed,
-        landingArea: trajectoryAnalysis.landingArea
+        landingArea: trajectoryAnalysis.landingArea,
+        hitPosition: trajectoryAnalysis.hitPosition,
+        serveZone: trajectoryAnalysis.serveZone
       }
-    });
+    };
 
-    // Clear trajectory and allow user to draw again for same player
+    // Add to current point attempts
+    setCurrentPointAttempts(prev => [...prev, attemptData]);
+
+    console.log(`📝 Point ${pointNumber}, Attempt ${attemptNumber}:`, attemptData);
+
+    // Check if point ended
+    const pointEnded = result === 'ace' || result === 'kill' || result === 'error';
+
+    if (pointEnded) {
+      // Update score
+      if (result === 'error') {
+        // Error by selected team = point to other team
+        if (selectedTeam === 'home') {
+          setOpponentScore(prev => prev + 1);
+          console.log('📊 Opponent scores! (Home error)');
+        } else {
+          setHomeScore(prev => prev + 1);
+          console.log('📊 Home scores! (Opponent error)');
+        }
+      } else {
+        // Kill or Ace = point to selected team
+        if (selectedTeam === 'home') {
+          setHomeScore(prev => prev + 1);
+          console.log('📊 Home scores! (Kill/Ace)');
+        } else {
+          setOpponentScore(prev => prev + 1);
+          console.log('📊 Opponent scores! (Kill/Ace)');
+        }
+      }
+
+      // Start new point
+      console.log(`🏐 Point ${pointNumber} ended. Starting Point ${pointNumber + 1}`);
+      console.log('All attempts in point:', [...currentPointAttempts, attemptData]);
+
+      setPointNumber(prev => prev + 1);
+      setAttemptNumber(1);
+      setIsServePhase(true);
+      setActionType('serve');
+      setCurrentPointAttempts([]); // Clear attempts for new point
+      setSelectedPlayer(null);
+      setSelectedTeam(null);
+    } else {
+      // Point continues - rally phase
+      setAttemptNumber(prev => prev + 1);
+      setIsServePhase(false);
+      setActionType('attack'); // Default to attack for rally
+      setSelectedPlayer(null); // Force reselect player
+      setSelectedTeam(null);
+      console.log('▶️ Point continues - select next player');
+    }
+
+    // Clear trajectory
     setCurrentTrajectory(null);
-
-    // TODO: Uncomment when context is fixed
-    /*
-    // Convert PlayerInPosition to OpponentPlayer format
-    const opponentPlayer: OpponentPlayer = {
-      id: selectedPlayer.playerId,
-      name: `#${selectedPlayer.jerseyNumber} ${selectedPlayer.playerName}`,
-      number: selectedPlayer.jerseyNumber.toString()
-    };
-
-    // Convert local Trajectory to TrajectoryData format
-    const trajectoryData: TrajectoryData = {
-      startX: currentTrajectory.startX,
-      startY: currentTrajectory.startY,
-      endX: currentTrajectory.endX,
-      endY: currentTrajectory.endY,
-      startInBounds: currentTrajectory.startInBounds,
-      endInBounds: currentTrajectory.endInBounds,
-      distance: trajectoryAnalysis.distance,
-      angle: 0,
-      speed: trajectoryAnalysis.speed,
-      landingArea: trajectoryAnalysis.landingArea
-    };
-
-    // Update context with player and trajectory
-    selectPlayer(opponentPlayer, selectedTeam);
-    setContextActionType(actionType);
-    setTrajectory(trajectoryData);
-
-    // Save the attempt
-    saveVisualAttempt(result);
-    */
   };
 
   /**
@@ -233,13 +265,44 @@ function VisualTrackingPageContent() {
   };
 
   /**
+   * Get available result buttons based on current action type
+   */
+  const getResultButtons = () => {
+    if (actionType === 'serve') {
+      return [
+        { result: 'in_play' as OpponentAttemptResult, label: '▶️ In Play', color: '#3b82f6' },
+        { result: 'ace' as OpponentAttemptResult, label: '🎯 Ace', color: '#f59e0b' },
+        { result: 'error' as OpponentAttemptResult, label: '❌ Error', color: '#ef4444' }
+      ];
+    } else if (actionType === 'attack') {
+      return [
+        { result: 'in_play' as OpponentAttemptResult, label: '▶️ In Play', color: '#3b82f6' },
+        { result: 'kill' as OpponentAttemptResult, label: '⚡ Kill', color: '#10b981' },
+        { result: 'error' as OpponentAttemptResult, label: '❌ Error', color: '#ef4444' }
+      ];
+    } else if (actionType === 'block') {
+      return [
+        { result: 'in_play' as OpponentAttemptResult, label: '▶️ In Play', color: '#3b82f6' },
+        { result: 'kill' as OpponentAttemptResult, label: '🛡️ Stuff', color: '#10b981' },
+        { result: 'error' as OpponentAttemptResult, label: '❌ Error', color: '#ef4444' }
+      ];
+    } else if (actionType === 'dig') {
+      return [
+        { result: 'in_play' as OpponentAttemptResult, label: '▶️ In Play', color: '#3b82f6' },
+        { result: 'error' as OpponentAttemptResult, label: '❌ Error', color: '#ef4444' }
+      ];
+    }
+    return [];
+  };
+
+  /**
    * Clear selection and reset to player selection mode
    */
   const handleClear = () => {
     setCurrentTrajectory(null);
     setSelectedPlayer(null);
     setSelectedTeam(null);
-    setActionType('attack'); // Reset to default
+    // Keep action type as-is (don't reset)
   };
 
   /**
@@ -317,15 +380,51 @@ function VisualTrackingPageContent() {
           onClick={() => navigate('/in-game-stats')}
           className="btn-back-arrow"
         >
-          ← Back to Stats
+          ← Back
         </button>
-        <div className="header-info">
-          <h1>Visual Opponent Tracking</h1>
-          <p className="match-info">Eagles vs Hawks • Set 1</p>
+        <div className="header-info" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+          {/* Scoreboard */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '20px',
+            fontSize: '24px',
+            fontWeight: '700'
+          }}>
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              minWidth: '80px'
+            }}>
+              <span style={{ fontSize: '14px', fontWeight: '400', color: '#666' }}>Home</span>
+              <span style={{ fontSize: '32px', color: '#2563eb' }}>{homeScore}</span>
+            </div>
+            <span style={{ fontSize: '20px', color: '#999' }}>-</span>
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              minWidth: '80px'
+            }}>
+              <span style={{ fontSize: '14px', fontWeight: '400', color: '#666' }}>Opponent</span>
+              <span style={{ fontSize: '32px', color: '#dc2626' }}>{opponentScore}</span>
+            </div>
+          </div>
+          {/* Point/Attempt Info */}
+          <div style={{
+            fontSize: '12px',
+            color: '#666',
+            background: '#f3f4f6',
+            padding: '4px 12px',
+            borderRadius: '12px',
+            fontWeight: '500'
+          }}>
+            Point #{pointNumber} • Attempt #{attemptNumber} • {isServePhase ? '🏐 SERVE' : '⚡ RALLY'}
+          </div>
         </div>
         <div className="header-actions">
           <button className="btn-icon" title="Settings">⚙️</button>
-          <button className="btn-icon" title="Export">📥</button>
         </div>
       </header>
 
@@ -420,76 +519,78 @@ function VisualTrackingPageContent() {
                     Position: {selectedPlayer.position} ({selectedTeam === 'home' ? 'Home' : 'Opponent'})
                   </p>
 
-                  {/* Action Type Selector */}
-                  <div style={{ marginTop: '16px' }}>
-                    <p style={{ fontWeight: '600', marginBottom: '8px', fontSize: '14px' }}>Action Type:</p>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                      <button
-                        onClick={() => setActionType('attack')}
-                        style={{
-                          padding: '10px',
-                          fontSize: '14px',
-                          fontWeight: '600',
-                          border: actionType === 'attack' ? '2px solid #059669' : '2px solid #e5e7eb',
-                          background: actionType === 'attack' ? '#059669' : 'white',
-                          color: actionType === 'attack' ? 'white' : '#333',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s'
-                        }}
-                      >
-                        Attack
-                      </button>
-                      <button
-                        onClick={() => setActionType('serve')}
-                        style={{
-                          padding: '10px',
-                          fontSize: '14px',
-                          fontWeight: '600',
-                          border: actionType === 'serve' ? '2px solid #ea580c' : '2px solid #e5e7eb',
-                          background: actionType === 'serve' ? '#ea580c' : 'white',
-                          color: actionType === 'serve' ? 'white' : '#333',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s'
-                        }}
-                      >
-                        Serve
-                      </button>
-                      <button
-                        onClick={() => setActionType('block')}
-                        style={{
-                          padding: '10px',
-                          fontSize: '14px',
-                          fontWeight: '600',
-                          border: actionType === 'block' ? '2px solid #7c3aed' : '2px solid #e5e7eb',
-                          background: actionType === 'block' ? '#7c3aed' : 'white',
-                          color: actionType === 'block' ? 'white' : '#333',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s'
-                        }}
-                      >
-                        Block
-                      </button>
-                      <button
-                        onClick={() => setActionType('dig')}
-                        style={{
-                          padding: '10px',
-                          fontSize: '14px',
-                          fontWeight: '600',
-                          border: actionType === 'dig' ? '2px solid #0891b2' : '2px solid #e5e7eb',
-                          background: actionType === 'dig' ? '#0891b2' : 'white',
-                          color: actionType === 'dig' ? 'white' : '#333',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s'
-                        }}
-                      >
-                        Dig
-                      </button>
+                  {/* Action Type Selector - Only show in rally phase */}
+                  {!isServePhase && (
+                    <div style={{ marginTop: '16px' }}>
+                      <p style={{ fontWeight: '600', marginBottom: '8px', fontSize: '14px' }}>Action Type:</p>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                        <button
+                          onClick={() => setActionType('attack')}
+                          style={{
+                            padding: '10px',
+                            fontSize: '14px',
+                            fontWeight: '600',
+                            border: actionType === 'attack' ? '2px solid #059669' : '2px solid #e5e7eb',
+                            background: actionType === 'attack' ? '#059669' : 'white',
+                            color: actionType === 'attack' ? 'white' : '#333',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          Attack
+                        </button>
+                        <button
+                          onClick={() => setActionType('block')}
+                          style={{
+                            padding: '10px',
+                            fontSize: '14px',
+                            fontWeight: '600',
+                            border: actionType === 'block' ? '2px solid #7c3aed' : '2px solid #e5e7eb',
+                            background: actionType === 'block' ? '#7c3aed' : 'white',
+                            color: actionType === 'block' ? 'white' : '#333',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          Block
+                        </button>
+                        <button
+                          onClick={() => setActionType('dig')}
+                          style={{
+                            padding: '10px',
+                            fontSize: '14px',
+                            fontWeight: '600',
+                            border: actionType === 'dig' ? '2px solid #0891b2' : '2px solid #e5e7eb',
+                            background: actionType === 'dig' ? '#0891b2' : 'white',
+                            color: actionType === 'dig' ? 'white' : '#333',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          Dig
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  )}
+
+                  {/* Show serve indicator during serve phase */}
+                  {isServePhase && (
+                    <div style={{
+                      marginTop: '16px',
+                      padding: '12px',
+                      background: '#fef3c7',
+                      borderRadius: '8px',
+                      border: '2px solid #f59e0b',
+                      textAlign: 'center'
+                    }}>
+                      <p style={{ fontWeight: '600', color: '#92400e', fontSize: '14px' }}>
+                        🏐 SERVE PHASE
+                      </p>
+                    </div>
+                  )}
 
                   {/* Reselect Player Button */}
                   <button
@@ -606,84 +707,38 @@ function VisualTrackingPageContent() {
                     <p>Grid: Row {trajectoryAnalysis.gridCell.row + 1}, Col {trajectoryAnalysis.gridCell.col + 1}</p>
                   </div>
 
-                  {/* Result Buttons - NEW */}
+                  {/* Result Buttons - Dynamic based on action type */}
                   <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '2px solid #e5e7eb' }}>
                     <p style={{ fontWeight: '600', marginBottom: '12px', fontSize: '14px' }}>
                       📝 Save Attempt:
                     </p>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                      <button
-                        onClick={() => handleSaveAttempt('in_play')}
-                        style={{
-                          padding: '12px',
-                          fontSize: '14px',
-                          fontWeight: '600',
-                          border: '2px solid #3b82f6',
-                          background: '#3b82f6',
-                          color: 'white',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s'
-                        }}
-                        onMouseOver={(e) => e.currentTarget.style.background = '#2563eb'}
-                        onMouseOut={(e) => e.currentTarget.style.background = '#3b82f6'}
-                      >
-                        ▶️ In Play
-                      </button>
-                      <button
-                        onClick={() => handleSaveAttempt('kill')}
-                        style={{
-                          padding: '12px',
-                          fontSize: '14px',
-                          fontWeight: '600',
-                          border: '2px solid #10b981',
-                          background: '#10b981',
-                          color: 'white',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s'
-                        }}
-                        onMouseOver={(e) => e.currentTarget.style.background = '#059669'}
-                        onMouseOut={(e) => e.currentTarget.style.background = '#10b981'}
-                      >
-                        ⚡ Kill
-                      </button>
-                      <button
-                        onClick={() => handleSaveAttempt('ace')}
-                        style={{
-                          padding: '12px',
-                          fontSize: '14px',
-                          fontWeight: '600',
-                          border: '2px solid #f59e0b',
-                          background: '#f59e0b',
-                          color: 'white',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s'
-                        }}
-                        onMouseOver={(e) => e.currentTarget.style.background = '#d97706'}
-                        onMouseOut={(e) => e.currentTarget.style.background = '#f59e0b'}
-                      >
-                        🎯 Ace
-                      </button>
-                      <button
-                        onClick={() => handleSaveAttempt('error')}
-                        style={{
-                          padding: '12px',
-                          fontSize: '14px',
-                          fontWeight: '600',
-                          border: '2px solid #ef4444',
-                          background: '#ef4444',
-                          color: 'white',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s'
-                        }}
-                        onMouseOver={(e) => e.currentTarget.style.background = '#dc2626'}
-                        onMouseOut={(e) => e.currentTarget.style.background = '#ef4444'}
-                      >
-                        ❌ Error
-                      </button>
+                    <div style={{ display: 'grid', gridTemplateColumns: getResultButtons().length === 2 ? '1fr 1fr' : '1fr 1fr', gap: '8px' }}>
+                      {getResultButtons().map((btn) => (
+                        <button
+                          key={btn.result}
+                          onClick={() => handleSaveAttempt(btn.result)}
+                          style={{
+                            padding: '12px',
+                            fontSize: '14px',
+                            fontWeight: '600',
+                            border: `2px solid ${btn.color}`,
+                            background: btn.color,
+                            color: 'white',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            gridColumn: getResultButtons().length === 2 && btn.result === 'error' ? 'span 2' : 'auto'
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.opacity = '0.8';
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.opacity = '1';
+                          }}
+                        >
+                          {btn.label}
+                        </button>
+                      ))}
                     </div>
                     <p style={{ fontSize: '11px', color: '#666', marginTop: '8px', textAlign: 'center' }}>
                       💡 Tip: Press Space for "In Play"
