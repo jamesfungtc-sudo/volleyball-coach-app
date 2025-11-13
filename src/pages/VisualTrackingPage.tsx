@@ -263,22 +263,6 @@ function VisualTrackingPageContent() {
   }, [selectedTeam, isDragging, currentTrajectory]);
 
   /**
-   * Keyboard shortcut: Space bar for "In Play"
-   */
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      // Only trigger if Space bar and we have a valid trajectory
-      if (event.code === 'Space' && trajectoryAnalysis && selectedPlayer && currentTrajectory && selectedTeam) {
-        event.preventDefault();
-        handleSaveAttempt('in_play');
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [trajectoryAnalysis, selectedPlayer, currentTrajectory, selectedTeam]);
-
-  /**
    * Analyze current trajectory using coordinate calculations
    * Only calculate when trajectory exists and is not being dragged
    */
@@ -296,6 +280,22 @@ function VisualTrackingPageContent() {
       currentTrajectory.endInBounds
     );
   }, [currentTrajectory, isDragging, selectedTeam, actionType]);
+
+  /**
+   * Keyboard shortcut: Space bar for "In Play"
+   */
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Only trigger if Space bar and we have a valid trajectory
+      if (event.code === 'Space' && trajectoryAnalysis && selectedPlayer && currentTrajectory && selectedTeam) {
+        event.preventDefault();
+        handleSaveAttempt('in_play');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [trajectoryAnalysis, selectedPlayer, currentTrajectory, selectedTeam]);
 
   return (
     <div className="visual-tracking-page">
