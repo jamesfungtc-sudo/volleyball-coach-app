@@ -61,6 +61,9 @@ function VisualTrackingPageContent() {
   const [currentTrajectory, setCurrentTrajectory] = useState<Trajectory | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
+  // Debug info toggle
+  const [showDebugInfo, setShowDebugInfo] = useState(false);
+
   // Point/Rally tracking state
   const [pointNumber, setPointNumber] = useState(1); // Current point number
   const [attemptNumber, setAttemptNumber] = useState(1); // Attempt within current point
@@ -374,7 +377,7 @@ function VisualTrackingPageContent() {
 
   return (
     <div className="visual-tracking-page">
-      {/* Header */}
+      {/* Header - Simplified */}
       <header className="visual-tracking-header">
         <button
           onClick={() => navigate('/in-game-stats')}
@@ -382,46 +385,8 @@ function VisualTrackingPageContent() {
         >
           ← Back
         </button>
-        <div className="header-info" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-          {/* Scoreboard */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '20px',
-            fontSize: '24px',
-            fontWeight: '700'
-          }}>
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              minWidth: '80px'
-            }}>
-              <span style={{ fontSize: '14px', fontWeight: '400', color: '#666' }}>Home</span>
-              <span style={{ fontSize: '32px', color: '#2563eb' }}>{homeScore}</span>
-            </div>
-            <span style={{ fontSize: '20px', color: '#999' }}>-</span>
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              minWidth: '80px'
-            }}>
-              <span style={{ fontSize: '14px', fontWeight: '400', color: '#666' }}>Opponent</span>
-              <span style={{ fontSize: '32px', color: '#dc2626' }}>{opponentScore}</span>
-            </div>
-          </div>
-          {/* Point/Attempt Info */}
-          <div style={{
-            fontSize: '12px',
-            color: '#666',
-            background: '#f3f4f6',
-            padding: '4px 12px',
-            borderRadius: '12px',
-            fontWeight: '500'
-          }}>
-            Point #{pointNumber} • Attempt #{attemptNumber} • {isServePhase ? '🏐 SERVE' : '⚡ RALLY'}
-          </div>
+        <div className="header-info">
+          <h1>Visual Tracking</h1>
         </div>
         <div className="header-actions">
           <button className="btn-icon" title="Settings">⚙️</button>
@@ -501,306 +466,383 @@ function VisualTrackingPageContent() {
           </VolleyballCourt>
         </div>
 
-        {/* Right Column: Stats + Controls */}
+        {/* Right Column: 3 Sectors */}
         <div className="panel-section">
-          {/* Top: Stats Panel */}
-          <div className="stats-panel">
-            <div className="panel-placeholder">
-              <h3>📊 Player & Drawing Info</h3>
+          {/* TOP SECTOR (40%): Scoreboard + Stats */}
+          <div className="stats-panel" style={{ position: 'relative' }}>
+            {/* Scoreboard Section */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr auto 1fr',
+              gap: '16px',
+              alignItems: 'center',
+              margin: 0,
+              padding: '16px',
+              background: '#f9fafb',
+              borderRadius: '8px'
+            }}>
+              {/* Home Score */}
+              <div style={{
+                background: '#7c3aed',
+                color: 'white',
+                padding: '8px',
+                borderRadius: '8px',
+                textAlign: 'center'
+              }}>
+                <div style={{ fontSize: '12px', fontWeight: '400', opacity: 0.9 }}>Home</div>
+                <div style={{ fontSize: '28px', fontWeight: '700' }}>{homeScore}</div>
+              </div>
 
-              {/* Selected Player */}
-              {selectedPlayer && (
-                <div style={{ padding: '20px', borderBottom: '1px solid #e5e7eb' }}>
-                  <p><strong>Selected Player:</strong></p>
-                  <p style={{ fontSize: '18px', fontWeight: '600', color: '#2563eb' }}>
-                    #{selectedPlayer.jerseyNumber} {selectedPlayer.playerName}
-                  </p>
-                  <p style={{ color: '#666', fontSize: '14px', marginBottom: '16px' }}>
-                    Position: {selectedPlayer.position} ({selectedTeam === 'home' ? 'Home' : 'Opponent'})
-                  </p>
+              {/* Reset Button */}
+              <button
+                onClick={() => {
+                  if (window.confirm('Reset scoreboard to 0-0?')) {
+                    setHomeScore(0);
+                    setOpponentScore(0);
+                    setPointNumber(1);
+                    setAttemptNumber(1);
+                    setIsServePhase(true);
+                    setActionType('serve');
+                    setCurrentPointAttempts([]);
+                    setSelectedPlayer(null);
+                    setSelectedTeam(null);
+                    setCurrentTrajectory(null);
+                  }
+                }}
+                style={{
+                  padding: '12px 20px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  background: '#f3f4f6',
+                  border: '2px solid #d1d5db',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                🔄 Reset
+              </button>
 
-                  {/* Action Type Selector - Only show in rally phase */}
-                  {!isServePhase && (
-                    <div style={{ marginTop: '16px' }}>
-                      <p style={{ fontWeight: '600', marginBottom: '8px', fontSize: '14px' }}>Action Type:</p>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                        <button
-                          onClick={() => setActionType('attack')}
-                          style={{
-                            padding: '10px',
-                            fontSize: '14px',
-                            fontWeight: '600',
-                            border: actionType === 'attack' ? '2px solid #059669' : '2px solid #e5e7eb',
-                            background: actionType === 'attack' ? '#059669' : 'white',
-                            color: actionType === 'attack' ? 'white' : '#333',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s'
-                          }}
-                        >
-                          Attack
-                        </button>
-                        <button
-                          onClick={() => setActionType('block')}
-                          style={{
-                            padding: '10px',
-                            fontSize: '14px',
-                            fontWeight: '600',
-                            border: actionType === 'block' ? '2px solid #7c3aed' : '2px solid #e5e7eb',
-                            background: actionType === 'block' ? '#7c3aed' : 'white',
-                            color: actionType === 'block' ? 'white' : '#333',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s'
-                          }}
-                        >
-                          Block
-                        </button>
-                        <button
-                          onClick={() => setActionType('dig')}
-                          style={{
-                            padding: '10px',
-                            fontSize: '14px',
-                            fontWeight: '600',
-                            border: actionType === 'dig' ? '2px solid #0891b2' : '2px solid #e5e7eb',
-                            background: actionType === 'dig' ? '#0891b2' : 'white',
-                            color: actionType === 'dig' ? 'white' : '#333',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s'
-                          }}
-                        >
-                          Dig
-                        </button>
-                      </div>
-                    </div>
-                  )}
+              {/* Opponent Score */}
+              <div style={{
+                background: '#ef4444',
+                color: 'white',
+                padding: '8px',
+                borderRadius: '8px',
+                textAlign: 'center'
+              }}>
+                <div style={{ fontSize: '12px', fontWeight: '400', opacity: 0.9 }}>Opponent</div>
+                <div style={{ fontSize: '28px', fontWeight: '700' }}>{opponentScore}</div>
+              </div>
+            </div>
 
-                  {/* Show serve indicator during serve phase */}
-                  {isServePhase && (
-                    <div style={{
-                      marginTop: '16px',
-                      padding: '12px',
-                      background: '#fef3c7',
-                      borderRadius: '8px',
-                      border: '2px solid #f59e0b',
-                      textAlign: 'center'
-                    }}>
-                      <p style={{ fontWeight: '600', color: '#92400e', fontSize: '14px' }}>
-                        🏐 SERVE PHASE
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Reselect Player Button */}
-                  <button
-                    onClick={handleReselectPlayer}
-                    style={{
-                      marginTop: '16px',
-                      padding: '10px',
-                      width: '100%',
-                      fontSize: '14px',
-                      fontWeight: '600',
-                      border: '2px solid #2563eb',
-                      background: 'white',
-                      color: '#2563eb',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    🔄 Reselect Player
-                  </button>
-                </div>
-              )}
-
-              {/* Trajectory Analysis */}
-              {trajectoryAnalysis && (
-                <div style={{ padding: '20px', borderTop: '1px solid #e5e7eb' }}>
-                  <p style={{ fontWeight: '600', marginBottom: '12px', fontSize: '16px' }}>
-                    📍 Trajectory Analysis
-                  </p>
-
-                  {/* Bounds Check */}
-                  <div style={{ marginBottom: '12px', fontSize: '14px' }}>
-                    <p style={{ marginBottom: '4px' }}>
-                      <strong>Start:</strong>{' '}
-                      {trajectoryAnalysis.startInBounds ? '✅ In bounds' : '❌ Out of bounds'}
-                    </p>
-                    <p>
-                      <strong>Landing:</strong>{' '}
-                      {trajectoryAnalysis.endInBounds ? '✅ In bounds' : '❌ Out of bounds'}
-                    </p>
-                  </div>
-
-                  {/* Distance & Speed */}
-                  <div style={{ marginBottom: '12px', fontSize: '14px' }}>
-                    <p style={{ marginBottom: '4px' }}>
-                      <strong>Distance:</strong> {Math.round(trajectoryAnalysis.distance)}px
-                    </p>
-                    <p>
-                      <strong>Speed:</strong>{' '}
-                      <span style={{
-                        padding: '2px 8px',
-                        borderRadius: '4px',
-                        background: trajectoryAnalysis.speed === 'short' ? '#fef3c7' :
-                                   trajectoryAnalysis.speed === 'medium' ? '#fed7aa' : '#fecaca',
-                        color: '#333',
-                        fontWeight: '600',
-                        fontSize: '12px'
-                      }}>
-                        {trajectoryAnalysis.speed.toUpperCase()}
-                      </span>
-                    </p>
-                  </div>
-
-                  {/* Landing Area */}
-                  <div style={{ marginBottom: '12px', fontSize: '14px' }}>
-                    <p>
-                      <strong>Landing Area:</strong>{' '}
-                      <span style={{ textTransform: 'capitalize', fontWeight: '600' }}>
-                        {trajectoryAnalysis.landingArea} Court
-                      </span>
-                    </p>
-                  </div>
-
-                  {/* Serve Zone (if serve) */}
-                  {actionType === 'serve' && trajectoryAnalysis.serveZone && (
-                    <div style={{ marginBottom: '12px', fontSize: '14px' }}>
-                      <p>
-                        <strong>Serve Zone:</strong>{' '}
-                        <span style={{
-                          padding: '4px 10px',
-                          borderRadius: '4px',
-                          background: '#dbeafe',
-                          color: '#1e40af',
-                          fontWeight: '600',
-                          fontSize: '14px'
-                        }}>
-                          Zone {trajectoryAnalysis.serveZone}
-                        </span>
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Hit Position (if attack) */}
-                  {actionType === 'attack' && trajectoryAnalysis.hitPosition && (
-                    <div style={{ marginBottom: '12px', fontSize: '14px' }}>
-                      <p>
-                        <strong>Hit Position:</strong>{' '}
-                        <span style={{
-                          padding: '4px 10px',
-                          borderRadius: '4px',
-                          background: '#dcfce7',
-                          color: '#166534',
-                          fontWeight: '600',
-                          fontSize: '14px'
-                        }}>
-                          {trajectoryAnalysis.hitPosition}
-                        </span>
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Grid Cell (for reference) */}
-                  <div style={{ fontSize: '12px', color: '#666', marginTop: '8px' }}>
-                    <p>Grid: Row {trajectoryAnalysis.gridCell.row + 1}, Col {trajectoryAnalysis.gridCell.col + 1}</p>
-                  </div>
-
-                  {/* Result Buttons - Dynamic based on action type */}
-                  <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '2px solid #e5e7eb' }}>
-                    <p style={{ fontWeight: '600', marginBottom: '12px', fontSize: '14px' }}>
-                      📝 Save Attempt:
-                    </p>
-                    <div style={{ display: 'grid', gridTemplateColumns: getResultButtons().length === 2 ? '1fr 1fr' : '1fr 1fr', gap: '8px' }}>
-                      {getResultButtons().map((btn) => (
-                        <button
-                          key={btn.result}
-                          onClick={() => handleSaveAttempt(btn.result)}
-                          style={{
-                            padding: '12px',
-                            fontSize: '14px',
-                            fontWeight: '600',
-                            border: `2px solid ${btn.color}`,
-                            background: btn.color,
-                            color: 'white',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
-                            gridColumn: getResultButtons().length === 2 && btn.result === 'error' ? 'span 2' : 'auto'
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.opacity = '0.8';
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.opacity = '1';
-                          }}
-                        >
-                          {btn.label}
-                        </button>
-                      ))}
-                    </div>
-                    <p style={{ fontSize: '11px', color: '#666', marginTop: '8px', textAlign: 'center' }}>
-                      💡 Tip: Press Space for "In Play"
-                    </p>
-                  </div>
-
-                  {/* Debug Info */}
-                  {currentTrajectory && (
-                    <div style={{ fontSize: '11px', color: '#999', marginTop: '12px', padding: '8px', background: '#f9fafb', borderRadius: '4px' }}>
-                      <p style={{ fontWeight: '600', marginBottom: '4px' }}>Debug Info:</p>
-                      <p>Start: ({Math.round(currentTrajectory.startX)}, {Math.round(currentTrajectory.startY)})</p>
-                      <p>End: ({Math.round(currentTrajectory.endX)}, {Math.round(currentTrajectory.endY)})</p>
-                      <p>Start X%: {Math.round((currentTrajectory.startX - 40) / 340 * 100)}%</p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* No selection message */}
-              {!selectedPlayer && !currentTrajectory && (
-                <p style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
-                  Step 1: Click a player on the court to select them
-                </p>
-              )}
-
-              {/* Selected but no trajectory */}
-              {selectedPlayer && !currentTrajectory && (
-                <p style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
-                  Step 2: Draw on the court to create a trajectory
-                </p>
-              )}
+            {/* Debug Info Toggle Button - Top Right Corner */}
+            <div style={{
+              position: 'absolute',
+              top: '20px',
+              right: '20px',
+              zIndex: 10
+            }}>
+              <button
+                onClick={() => setShowDebugInfo(!showDebugInfo)}
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  border: '2px solid #d1d5db',
+                  background: showDebugInfo ? '#7c3aed' : '#f3f4f6',
+                  color: showDebugInfo ? 'white' : '#666',
+                  fontSize: '16px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+                }}
+                title="Toggle debug info"
+              >
+                i
+              </button>
             </div>
           </div>
 
-          {/* Bottom: Controls Panel */}
-          <div className="controls-panel">
-            <div className="panel-placeholder">
-              <h3>🎮 Controls</h3>
-              <div style={{ padding: '20px' }}>
+          {/* MIDDLE SECTOR (15%): Action Bar */}
+          <div className="action-bar">
+            {/* Selected Player Button */}
+            {selectedPlayer ? (
+              <button
+                onClick={handleReselectPlayer}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '8px 16px',
+                  fontSize: '18px',
+                  fontWeight: '700',
+                  background: selectedTeam === 'home' ? '#7c3aed' : '#ef4444',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  minWidth: '120px',
+                  justifyContent: 'center'
+                }}
+              >
+                <span>←</span>
+                <span>#{selectedPlayer.jerseyNumber}</span>
+              </button>
+            ) : (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                padding: '8px 16px',
+                fontSize: '14px',
+                color: '#999',
+                background: '#f3f4f6',
+                borderRadius: '6px',
+                minWidth: '120px',
+                justifyContent: 'center'
+              }}>
+                No Player
+              </div>
+            )}
+
+            {/* Action Type Buttons - Show only in rally phase */}
+            {!isServePhase && selectedPlayer && (
+              <div style={{
+                display: 'flex',
+                gap: '8px',
+                flex: 1
+              }}>
                 <button
-                  onClick={handleClear}
-                  disabled={!selectedPlayer && !currentTrajectory}
+                  onClick={() => setActionType('attack')}
                   style={{
-                    padding: '12px 24px',
-                    fontSize: '16px',
-                    fontWeight: 600,
-                    cursor: (selectedPlayer || currentTrajectory) ? 'pointer' : 'not-allowed',
-                    background: (selectedPlayer || currentTrajectory) ? '#ef4444' : '#e0e0e0',
-                    color: (selectedPlayer || currentTrajectory) ? '#ffffff' : '#999',
-                    border: 'none',
-                    borderRadius: '8px',
-                    width: '100%'
+                    flex: 1,
+                    padding: '10px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    border: actionType === 'attack' ? '3px solid #059669' : '2px solid #e5e7eb',
+                    background: actionType === 'attack' ? '#059669' : 'white',
+                    color: actionType === 'attack' ? 'white' : '#333',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
                   }}
                 >
-                  Clear Selection
+                  ⚡ Hit
+                </button>
+                <button
+                  onClick={() => setActionType('block')}
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    border: actionType === 'block' ? '3px solid #7c3aed' : '2px solid #e5e7eb',
+                    background: actionType === 'block' ? '#7c3aed' : 'white',
+                    color: actionType === 'block' ? 'white' : '#333',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  🛡️ Block
+                </button>
+                <button
+                  onClick={() => setActionType('dig')}
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    border: actionType === 'dig' ? '3px solid #0891b2' : '2px solid #e5e7eb',
+                    background: actionType === 'dig' ? '#0891b2' : 'white',
+                    color: actionType === 'dig' ? 'white' : '#333',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  💪 Dig
                 </button>
               </div>
+            )}
 
-              {/* TODO: Re-enable saved attempts list after fixing context */}
-              {/* Saved Attempts List */}
-              {/* {contextState.savedAttempts.length > 0 && (...)} */}
-            </div>
+            {/* Serve indicator during serve phase */}
+            {isServePhase && selectedPlayer && (
+              <div style={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '16px',
+                fontWeight: '600',
+                color: '#92400e',
+                background: '#fef3c7',
+                borderRadius: '6px',
+                padding: '10px',
+                border: '2px solid #f59e0b'
+              }}>
+                🏐 SERVE PHASE
+              </div>
+            )}
+
+            {/* Instructions - Show when no player or no trajectory */}
+            {!selectedPlayer && (
+              <div style={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '14px',
+                color: '#999',
+                background: '#f9fafb',
+                borderRadius: '6px',
+                padding: '10px',
+                border: '2px dashed #d1d5db'
+              }}>
+                👆 Click a player on the court to begin
+              </div>
+            )}
+            {selectedPlayer && !currentTrajectory && !isServePhase && (
+              <div style={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '14px',
+                color: '#999',
+                background: '#f9fafb',
+                borderRadius: '6px',
+                padding: '10px',
+                border: '2px dashed #d1d5db'
+              }}>
+                ✏️ Draw a trajectory on the court
+              </div>
+            )}
+          </div>
+
+          {/* BOTTOM SECTOR (45%): Result Buttons + Hit Zones */}
+          <div className="controls-panel">
+            {trajectoryAnalysis ? (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', height: '100%' }}>
+                {/* Left: Result Buttons (Vertical Stack) */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <h3 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600', color: '#666' }}>
+                    📝 Result
+                  </h3>
+                  {getResultButtons().map((btn) => (
+                    <button
+                      key={btn.result}
+                      onClick={() => handleSaveAttempt(btn.result)}
+                      style={{
+                        flex: getResultButtons().length === 2 && btn.result === 'error' ? 2 : 1,
+                        padding: '16px',
+                        fontSize: '16px',
+                        fontWeight: '700',
+                        border: `3px solid ${btn.color}`,
+                        background: btn.color,
+                        color: 'white',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.opacity = '0.85';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.opacity = '1';
+                      }}
+                    >
+                      {btn.label}
+                    </button>
+                  ))}
+                  <p style={{ fontSize: '11px', color: '#999', textAlign: 'center', marginTop: 'auto' }}>
+                    💡 Press Space for "In Play"
+                  </p>
+                </div>
+
+                {/* Right: Hit Zone Grid (3x3) - Only show for attacks */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <h3 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600', color: '#666' }}>
+                    🎯 Hit Zone
+                  </h3>
+                  {actionType === 'attack' ? (
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(3, 1fr)',
+                      gridTemplateRows: 'repeat(3, 1fr)',
+                      gap: '8px',
+                      flex: 1
+                    }}>
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((zone) => {
+                        const row = Math.floor((zone - 1) / 3);
+                        const col = (zone - 1) % 3;
+                        const isSelected = trajectoryAnalysis.gridCell.row === row && trajectoryAnalysis.gridCell.col === col;
+
+                        return (
+                          <button
+                            key={zone}
+                            style={{
+                              padding: '12px',
+                              fontSize: '18px',
+                              fontWeight: '700',
+                              background: isSelected ? '#7c3aed' : '#f3f4f6',
+                              color: isSelected ? 'white' : '#666',
+                              border: isSelected ? '3px solid #5b21b6' : '2px solid #d1d5db',
+                              borderRadius: '8px',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseOver={(e) => {
+                              if (!isSelected) {
+                                e.currentTarget.style.background = '#e5e7eb';
+                              }
+                            }}
+                            onMouseOut={(e) => {
+                              if (!isSelected) {
+                                e.currentTarget.style.background = '#f3f4f6';
+                              }
+                            }}
+                          >
+                            {zone}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div style={{
+                      flex: 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: '#f9fafb',
+                      borderRadius: '8px',
+                      color: '#999',
+                      fontSize: '14px',
+                      border: '2px dashed #d1d5db'
+                    }}>
+                      Hit zones available for attacks only
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div style={{
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#999'
+              }}>
+                <p style={{ fontSize: '16px', marginBottom: '8px' }}>Draw a trajectory to see result buttons</p>
+                <p style={{ fontSize: '12px' }}>Select a player and draw on the court</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -813,6 +855,154 @@ function VisualTrackingPageContent() {
           <div className="rotate-icon">⤾</div>
         </div>
       </div>
+
+      {/* Debug Info Modal */}
+      {showDebugInfo && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+          onClick={() => setShowDebugInfo(false)}
+        >
+          <div
+            style={{
+              background: 'white',
+              borderRadius: '12px',
+              padding: '24px',
+              maxWidth: '700px',
+              width: '90%',
+              maxHeight: '80vh',
+              overflow: 'auto',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '16px'
+            }}>
+              <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: '#333' }}>
+                Debug Information
+              </h3>
+              <button
+                onClick={() => setShowDebugInfo(false)}
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  border: '2px solid #d1d5db',
+                  background: '#f3f4f6',
+                  color: '#666',
+                  fontSize: '18px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={{ fontSize: '14px', color: '#666' }}>
+              {/* Grid Layout for top section */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '16px',
+                marginBottom: '16px',
+                paddingBottom: '16px',
+                borderBottom: '2px solid #e5e7eb'
+              }}>
+                {/* Point/Attempt Info */}
+                <div>
+                  <p style={{ fontWeight: '700', color: '#333', marginBottom: '8px' }}>Point & Phase</p>
+                  <p><strong>Point:</strong> #{pointNumber}</p>
+                  <p><strong>Attempt:</strong> #{attemptNumber}</p>
+                  <p><strong>Phase:</strong> {isServePhase ? 'SERVE' : 'RALLY'}</p>
+                </div>
+
+                {/* Player Info */}
+                {selectedPlayer ? (
+                  <div>
+                    <p style={{ fontWeight: '700', color: '#333', marginBottom: '8px' }}>Selected Player</p>
+                    <p><strong>Player:</strong> #{selectedPlayer.jerseyNumber} {selectedPlayer.playerName}</p>
+                    <p><strong>Position:</strong> {selectedPlayer.position}</p>
+                    <p><strong>Team:</strong> {selectedTeam === 'home' ? 'Home' : 'Opponent'}</p>
+                  </div>
+                ) : (
+                  <div>
+                    <p style={{ fontWeight: '700', color: '#333', marginBottom: '8px' }}>Selected Player</p>
+                    <p style={{ color: '#999' }}>No player selected</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Trajectory Analysis */}
+              {trajectoryAnalysis && currentTrajectory && (
+                <>
+                  <div style={{ marginBottom: '16px', paddingBottom: '16px', borderBottom: '2px solid #e5e7eb' }}>
+                    <p style={{ fontWeight: '700', color: '#333', marginBottom: '8px' }}>Bounds Check</p>
+                    <p><strong>Start:</strong> {trajectoryAnalysis.startInBounds ? '✅ In bounds' : '❌ Out of bounds'}</p>
+                    <p><strong>Landing:</strong> {trajectoryAnalysis.endInBounds ? '✅ In bounds' : '❌ Out of bounds'}</p>
+                  </div>
+
+                  <div style={{ marginBottom: '16px', paddingBottom: '16px', borderBottom: '2px solid #e5e7eb' }}>
+                    <p style={{ fontWeight: '700', color: '#333', marginBottom: '8px' }}>Trajectory Metrics</p>
+                    <p><strong>Distance:</strong> {Math.round(trajectoryAnalysis.distance)}px</p>
+                    <p><strong>Speed:</strong> {trajectoryAnalysis.speed.toUpperCase()}</p>
+                    <p><strong>Landing Area:</strong> {trajectoryAnalysis.landingArea} court</p>
+                  </div>
+
+                  {actionType === 'serve' && trajectoryAnalysis.serveZone && (
+                    <div style={{ marginBottom: '16px', paddingBottom: '16px', borderBottom: '2px solid #e5e7eb' }}>
+                      <p style={{ fontWeight: '700', color: '#333', marginBottom: '8px' }}>Serve Info</p>
+                      <p><strong>Serve Zone:</strong> {trajectoryAnalysis.serveZone}</p>
+                    </div>
+                  )}
+
+                  {actionType === 'attack' && trajectoryAnalysis.hitPosition && (
+                    <div style={{ marginBottom: '16px', paddingBottom: '16px', borderBottom: '2px solid #e5e7eb' }}>
+                      <p style={{ fontWeight: '700', color: '#333', marginBottom: '8px' }}>Attack Info</p>
+                      <p><strong>Hit Position:</strong> {trajectoryAnalysis.hitPosition}</p>
+                    </div>
+                  )}
+
+                  <div style={{ marginBottom: '16px', paddingBottom: '16px', borderBottom: '2px solid #e5e7eb' }}>
+                    <p style={{ fontWeight: '700', color: '#333', marginBottom: '8px' }}>Grid Cell</p>
+                    <p><strong>Location:</strong> Row {trajectoryAnalysis.gridCell.row + 1}, Col {trajectoryAnalysis.gridCell.col + 1}</p>
+                  </div>
+
+                  <div>
+                    <p style={{ fontWeight: '700', color: '#333', marginBottom: '8px' }}>Raw Coordinates</p>
+                    <p><strong>Start:</strong> ({Math.round(currentTrajectory.startX)}, {Math.round(currentTrajectory.startY)})</p>
+                    <p><strong>End:</strong> ({Math.round(currentTrajectory.endX)}, {Math.round(currentTrajectory.endY)})</p>
+                    <p><strong>Start X%:</strong> {Math.round((currentTrajectory.startX - 40) / 340 * 100)}%</p>
+                  </div>
+                </>
+              )}
+
+              {!trajectoryAnalysis && !currentTrajectory && (
+                <p style={{ textAlign: 'center', color: '#999', padding: '20px' }}>
+                  Draw a trajectory to see debug information
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

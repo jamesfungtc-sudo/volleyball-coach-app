@@ -123,35 +123,48 @@
 }
 
 /* ============================================
-   RIGHT COLUMN - PANEL SECTION
+   RIGHT COLUMN - PANEL SECTION (3 SECTORS)
    ============================================ */
 
 .panel-section {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  gap: 16px;
   overflow: hidden;
+  height: 100%;
 }
 
+/* TOP SECTOR - Scoreboard + Stats (40%) */
 .stats-panel {
-  flex: 1;
   background: #ffffff;
   border: 2px solid #e0e0e0;
   border-radius: 12px;
-  padding: 20px;
+  padding: 10px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   overflow-y: auto;
 }
 
-.controls-panel {
-  flex-shrink: 0;
+/* MIDDLE SECTOR - Action Bar (15%) */
+.action-bar {
   background: #ffffff;
   border: 2px solid #e0e0e0;
   border-radius: 12px;
-  padding: 20px;
+  padding: 10px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  min-height: 280px;
-  max-height: 320px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  overflow: hidden;
+}
+
+/* BOTTOM SECTOR - Result Buttons (45%) */
+.controls-panel {
+  background: #ffffff;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  overflow-y: auto;
 }
 
 /* ============================================
@@ -306,9 +319,12 @@
     font-size: 16px;
   }
 
-  .controls-panel {
-    min-height: 240px;
-    max-height: 280px;
+  .panel-section {
+    gap: 12px;
+  }
+
+  .action-bar {
+    padding: 8px 16px;
   }
 }
 
