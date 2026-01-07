@@ -47,6 +47,8 @@ interface VolleyballCourtProps {
   children?: React.ReactNode;
   /** Which side to disable: 'home' | 'opponent' | null */
   disabledSide?: 'home' | 'opponent' | null;
+  /** Which team is currently serving */
+  servingTeam?: 'home' | 'opponent' | null;
   /** Mouse down event handler */
   onMouseDown?: (event: React.MouseEvent<SVGSVGElement>) => void;
   /** Mouse move event handler */
@@ -81,6 +83,7 @@ export const VolleyballCourt: React.FC<VolleyballCourtProps> = ({
   className = '',
   children,
   disabledSide = null,
+  servingTeam = null,
   onMouseDown,
   onMouseMove,
   onMouseUp,
@@ -206,7 +209,7 @@ export const VolleyballCourt: React.FC<VolleyballCourtProps> = ({
         fontWeight="bold"
         opacity="0.8"
       >
-        OPPONENT
+        OPPONENT{servingTeam === 'opponent' ? ' (Serving)' : ''}
       </text>
 
       {/* Home label at bottom baseline */}
@@ -219,7 +222,7 @@ export const VolleyballCourt: React.FC<VolleyballCourtProps> = ({
         fontWeight="bold"
         opacity="0.8"
       >
-        HOME
+        HOME{servingTeam === 'home' ? ' (Serving)' : ''}
       </text>
 
       {/* Net visual indicator */}

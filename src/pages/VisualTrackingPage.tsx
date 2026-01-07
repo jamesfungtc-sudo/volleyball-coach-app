@@ -71,6 +71,12 @@ function VisualTrackingPageContent() {
   const [homeScore, setHomeScore] = useState(0);
   const [opponentScore, setOpponentScore] = useState(0);
 
+  // Serving team tracking (volleyball rules: winner of previous point serves)
+  const [servingTeam, setServingTeam] = useState<'home' | 'opponent'>('home'); // Default: home serves first
+
+  // Track if first player has been selected (to hide serve selector)
+  const [firstPlayerSelected, setFirstPlayerSelected] = useState(false);
+
   // Save attempts for current point (local storage until point ends)
   const [currentPointAttempts, setCurrentPointAttempts] = useState<any[]>([]);
 
@@ -130,9 +136,12 @@ function VisualTrackingPageContent() {
     const pointEnded = result === 'ace' || result === 'kill' || result === 'error';
 
     if (pointEnded) {
-      // Update score
+      // Determine point winner and update score + serving team
+      let pointWinner: 'home' | 'opponent';
+
       if (result === 'error') {
         // Error by selected team = point to other team
+        pointWinner = selectedTeam === 'home' ? 'opponent' : 'home';
         if (selectedTeam === 'home') {
           setOpponentScore(prev => prev + 1);
           console.log('📊 Opponent scores! (Home error)');
@@ -142,6 +151,7 @@ function VisualTrackingPageContent() {
         }
       } else {
         // Kill or Ace = point to selected team
+        pointWinner = selectedTeam;
         if (selectedTeam === 'home') {
           setHomeScore(prev => prev + 1);
           console.log('📊 Home scores! (Kill/Ace)');
@@ -150,6 +160,10 @@ function VisualTrackingPageContent() {
           console.log('📊 Opponent scores! (Kill/Ace)');
         }
       }
+
+      // Update serving team (winner serves next)
+      setServingTeam(pointWinner);
+      console.log(`🏐 ${pointWinner} wins the point and will serve next`);
 
       // Start new point
       console.log(`🏐 Point ${pointNumber} ended. Starting Point ${pointNumber + 1}`);
@@ -254,8 +268,15 @@ function VisualTrackingPageContent() {
 
   /**
    * Handle player selection
+   * During serve phase: Only allow selecting players from serving team
    */
   const handlePlayerClick = (playerId: string, team: 'home' | 'opponent') => {
+    // Enforce serving team rule during serve phase
+    if (isServePhase && team !== servingTeam) {
+      console.log(`⚠️ Cannot select ${team} player - ${servingTeam} is serving`);
+      return; // Block selection of non-serving team during serve
+    }
+
     const lineup = team === 'home' ? homeLineup : opponentLineup;
     const player = Object.values(lineup).find(p => p?.playerId === playerId);
 
@@ -264,6 +285,11 @@ function VisualTrackingPageContent() {
       setSelectedTeam(team);
       // Clear any existing trajectory when selecting new player
       setCurrentTrajectory(null);
+
+      // Mark first player as selected (hides serve selector for rest of set)
+      if (!firstPlayerSelected) {
+        setFirstPlayerSelected(true);
+      }
     }
   };
 
@@ -316,6 +342,11 @@ function VisualTrackingPageContent() {
     setSelectedPlayer(null);
     setSelectedTeam(null);
     setActionType('attack');
+
+    // Show serve selector again if we're still at the start (0-0, Point 1)
+    if (pointNumber === 1 && homeScore === 0 && opponentScore === 0) {
+      setFirstPlayerSelected(false);
+    }
   };
 
   /**
@@ -377,22 +408,6 @@ function VisualTrackingPageContent() {
 
   return (
     <div className="visual-tracking-page">
-      {/* Header - Simplified */}
-      <header className="visual-tracking-header">
-        <button
-          onClick={() => navigate('/in-game-stats')}
-          className="btn-back-arrow"
-        >
-          ← Back
-        </button>
-        <div className="header-info">
-          <h1>Visual Tracking</h1>
-        </div>
-        <div className="header-actions">
-          <button className="btn-icon" title="Settings">⚙️</button>
-        </div>
-      </header>
-
       {/* Main Content - 2 Column Grid */}
       <div className="visual-tracking-content">
         {/* Left Column: Volleyball Court */}
@@ -401,6 +416,7 @@ function VisualTrackingPageContent() {
             svgRef={svgRef}
             isDrawing={isDragging}
             disabledSide={disabledSide}
+            servingTeam={servingTeam}
             onMouseDown={handleStart}
             onMouseMove={handleMove}
             onMouseUp={handleEnd}
@@ -470,6 +486,65 @@ function VisualTrackingPageContent() {
         <div className="panel-section">
           {/* TOP SECTOR (40%): Scoreboard + Stats */}
           <div className="stats-panel" style={{ position: 'relative' }}>
+            {/* First Serve Selector - Show only before first player selected */}
+            {!firstPlayerSelected && (
+              <div style={{
+                padding: '12px',
+                background: '#fef3c7',
+                border: '2px solid #f59e0b',
+                borderRadius: '8px',
+                marginBottom: '12px'
+              }}>
+                <div style={{
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  color: '#92400e',
+                  marginBottom: '8px',
+                  textAlign: 'center'
+                }}>
+                  Who serves first?
+                </div>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '8px'
+                }}>
+                  <button
+                    onClick={() => setServingTeam('home')}
+                    style={{
+                      padding: '8px',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      background: servingTeam === 'home' ? '#7c3aed' : '#f3f4f6',
+                      color: servingTeam === 'home' ? 'white' : '#333',
+                      border: servingTeam === 'home' ? '2px solid #5b21b6' : '2px solid #d1d5db',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    🏠 Home
+                  </button>
+                  <button
+                    onClick={() => setServingTeam('opponent')}
+                    style={{
+                      padding: '8px',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      background: servingTeam === 'opponent' ? '#ef4444' : '#f3f4f6',
+                      color: servingTeam === 'opponent' ? 'white' : '#333',
+                      border: servingTeam === 'opponent' ? '2px solid #dc2626' : '2px solid #d1d5db',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    🏐 Opponent
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Scoreboard Section */}
             <div style={{
               display: 'grid',
@@ -489,7 +564,9 @@ function VisualTrackingPageContent() {
                 borderRadius: '8px',
                 textAlign: 'center'
               }}>
-                <div style={{ fontSize: '12px', fontWeight: '400', opacity: 0.9 }}>Home</div>
+                <div style={{ fontSize: '12px', fontWeight: '400', opacity: 0.9 }}>
+                  Home{servingTeam === 'home' ? ' (Serving)' : ''}
+                </div>
                 <div style={{ fontSize: '28px', fontWeight: '700' }}>{homeScore}</div>
               </div>
 
@@ -503,6 +580,8 @@ function VisualTrackingPageContent() {
                     setAttemptNumber(1);
                     setIsServePhase(true);
                     setActionType('serve');
+                    setServingTeam('home'); // Reset to home serves first
+                    setFirstPlayerSelected(false); // Show serve selector again
                     setCurrentPointAttempts([]);
                     setSelectedPlayer(null);
                     setSelectedTeam(null);
@@ -531,7 +610,9 @@ function VisualTrackingPageContent() {
                 borderRadius: '8px',
                 textAlign: 'center'
               }}>
-                <div style={{ fontSize: '12px', fontWeight: '400', opacity: 0.9 }}>Opponent</div>
+                <div style={{ fontSize: '12px', fontWeight: '400', opacity: 0.9 }}>
+                  Opponent{servingTeam === 'opponent' ? ' (Serving)' : ''}
+                </div>
                 <div style={{ fontSize: '28px', fontWeight: '700' }}>{opponentScore}</div>
               </div>
             </div>
@@ -723,6 +804,34 @@ function VisualTrackingPageContent() {
                 ✏️ Draw a trajectory on the court
               </div>
             )}
+
+            {/* Settings Button */}
+            <button
+              style={{
+                width: '40px',
+                height: '40px',
+                border: '1px solid #ddd',
+                borderRadius: '6px',
+                background: '#ffffff',
+                fontSize: '18px',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              title="Settings"
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = '#f5f5f5';
+                e.currentTarget.style.borderColor = '#ccc';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = '#ffffff';
+                e.currentTarget.style.borderColor = '#ddd';
+              }}
+            >
+              ⚙️
+            </button>
           </div>
 
           {/* BOTTOM SECTOR (45%): Result Buttons + Hit Zones */}
