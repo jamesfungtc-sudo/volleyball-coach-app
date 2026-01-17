@@ -1,5 +1,5 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   VolleyballCourt,
   COURT_DIMENSIONS,
@@ -25,6 +25,29 @@ import type {
   TrajectoryData,
   OpponentAttemptResult
 } from '../features/inGameStats/types/opponentTracking.types';
+import { getMatch, getPlayersByTeam, type Player } from '../services/googleSheetsAPI';
+import type { MatchData } from '../types/inGameStats.types';
+import { RotationConfigModal } from '../features/inGameStats/components/RotationConfigModal';
+import { MatchInfoModal } from '../features/inGameStats/components/MatchInfoModal';
+import type {
+  TeamRotationConfig,
+  RotationHistoryEntry,
+  PlayerRole
+} from '../features/inGameStats/types/rotation.types';
+import {
+  initializeLineup,
+  handlePointEnd,
+  saveSetConfiguration,
+  loadSetConfiguration,
+  manualRotateForward,
+  manualRotateBackward,
+  convertToRallyFormation
+} from '../utils/rotationHelpers';
+import {
+  getPlayerId,
+  getJerseyNumber,
+  getPlayerDisplayName
+} from '../types/playerReference.types';
 import './VisualTrackingPage.css';
 
 /**
@@ -39,7 +62,18 @@ import './VisualTrackingPage.css';
  */
 function VisualTrackingPageContent() {
   const navigate = useNavigate();
+  const { matchId } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const svgRef = useRef<SVGSVGElement>(null);
+
+  // Roster loading state
+  const [loading, setLoading] = useState(true);
+  const [homeRoster, setHomeRoster] = useState<Player[]>([]);
+  const [opponentRoster, setOpponentRoster] = useState<Player[]>([]);
+
+  // Team names
+  const [homeTeamName, setHomeTeamName] = useState<string>('Home');
+  const [opponentTeamName, setOpponentTeamName] = useState<string>('Opponent');
 
   // TODO: Re-enable OpponentTrackingContext after fixing require() issue
   // const {
@@ -64,6 +98,14 @@ function VisualTrackingPageContent() {
   // Debug info toggle
   const [showDebugInfo, setShowDebugInfo] = useState(false);
 
+  // Set tracking state - initialize from URL parameter if available
+  const [currentSet, setCurrentSet] = useState(() => {
+    const setParam = searchParams.get('set');
+    const setNumber = setParam ? parseInt(setParam, 10) : 1;
+    // Validate set number is between 1-5
+    return setNumber >= 1 && setNumber <= 5 ? setNumber : 1;
+  });
+
   // Point/Rally tracking state
   const [pointNumber, setPointNumber] = useState(1); // Current point number
   const [attemptNumber, setAttemptNumber] = useState(1); // Attempt within current point
@@ -77,27 +119,623 @@ function VisualTrackingPageContent() {
   // Track if first player has been selected (to hide serve selector)
   const [firstPlayerSelected, setFirstPlayerSelected] = useState(false);
 
+  // Scoring modal state (for quick scoring without trajectories)
+  const [scoringModalOpen, setScoringModalOpen] = useState(false);
+  const [scoringTeam, setScoringTeam] = useState<'home' | 'opponent' | null>(null);
+  const [scoringOption, setScoringOption] = useState<'team_error' | 'opponent_error' | null>(null);
+  const [quickScorePlayerId, setQuickScorePlayerId] = useState<string | null>(null);
+
   // Save attempts for current point (local storage until point ends)
   const [currentPointAttempts, setCurrentPointAttempts] = useState<any[]>([]);
 
-  // Mock player lineups (TODO: Load from match context)
-  const [homeLineup] = useState<TeamLineup>({
-    P1: { playerId: 'h1', jerseyNumber: 1, playerName: 'Player 1', position: 'P1' },
-    P2: { playerId: 'h2', jerseyNumber: 2, playerName: 'Player 2', position: 'P2' },
-    P3: { playerId: 'h3', jerseyNumber: 3, playerName: 'Player 3', position: 'P3' },
-    P4: { playerId: 'h4', jerseyNumber: 4, playerName: 'Player 4', position: 'P4' },
-    P5: { playerId: 'h5', jerseyNumber: 5, playerName: 'Player 5', position: 'P5' },
-    P6: { playerId: 'h6', jerseyNumber: 6, playerName: 'Player 6', position: 'P6' }
+  // Scoring history for undo functionality
+  const [scoringHistory, setScoringHistory] = useState<Array<{
+    pointNumber: number;
+    homeScore: number;
+    opponentScore: number;
+    servingTeam: 'home' | 'opponent';
+  }>>([]);
+
+  // OLD: Player configuration modal removed - now using RotationConfigModal
+
+  // Full history modal state
+  const [fullHistoryModalOpen, setFullHistoryModalOpen] = useState(false);
+
+  // Set end modal state
+  const [setEndModalOpen, setSetEndModalOpen] = useState(false);
+  const [setWinner, setSetWinner] = useState<'home' | 'opponent' | null>(null);
+
+  // Settings dropdown state
+  const [settingsDropdownOpen, setSettingsDropdownOpen] = useState(false);
+
+  // Match info modal state
+  const [matchInfoModalOpen, setMatchInfoModalOpen] = useState(false);
+
+  // Rotation configuration modal state
+  const [rotationConfigModalOpen, setRotationConfigModalOpen] = useState(false);
+  const [rotationConfigDismissed, setRotationConfigDismissed] = useState(false);
+
+  // Rotation state
+  const [rotationEnabled, setRotationEnabled] = useState(false);
+  const [homeRotationConfig, setHomeRotationConfig] = useState<TeamRotationConfig | null>(null);
+  const [opponentRotationConfig, setOpponentRotationConfig] = useState<TeamRotationConfig | null>(null);
+  const [rotationHistory, setRotationHistory] = useState<RotationHistoryEntry[]>([]);
+
+  // Formation type state (serving vs rally)
+  const [homeFormationType, setHomeFormationType] = useState<'serving' | 'rally'>('serving');
+  const [opponentFormationType, setOpponentFormationType] = useState<'serving' | 'rally'>('serving');
+
+  // Point history for trend display (detailed tracking)
+  interface PointHistoryEntry {
+    pointNumber: number;
+    homeScore: number;
+    opponentScore: number;
+    winningTeam: 'home' | 'opponent';
+    actionType: 'attack' | 'serve' | 'block' | 'dig' | 'error' | 'team_error' | 'opponent_error';
+    playerId: string; // Player who made the action
+    team: 'home' | 'opponent'; // Team of the player
+  }
+  const [pointHistory, setPointHistory] = useState<PointHistoryEntry[]>([]);
+
+  // Player lineups (loaded from rotation config)
+  // Start with empty state - will be populated when rotation config loads
+  const [homeLineup, setHomeLineup] = useState<TeamLineup>({
+    P1: null,
+    P2: null,
+    P3: null,
+    P4: null,
+    P5: null,
+    P6: null
   });
 
-  const [opponentLineup] = useState<TeamLineup>({
-    P1: { playerId: 'o1', jerseyNumber: 7, playerName: 'Opponent 1', position: 'P1' },
-    P2: { playerId: 'o2', jerseyNumber: 8, playerName: 'Opponent 2', position: 'P2' },
-    P3: { playerId: 'o3', jerseyNumber: 9, playerName: 'Opponent 3', position: 'P3' },
-    P4: { playerId: 'o4', jerseyNumber: 10, playerName: 'Opponent 4', position: 'P4' },
-    P5: { playerId: 'o5', jerseyNumber: 11, playerName: 'Opponent 5', position: 'P5' },
-    P6: { playerId: 'o6', jerseyNumber: 12, playerName: 'Opponent 6', position: 'P6' }
+  const [opponentLineup, setOpponentLineup] = useState<TeamLineup>({
+    P1: null,
+    P2: null,
+    P3: null,
+    P4: null,
+    P5: null,
+    P6: null
   });
+
+  // Libero swap state interface
+  interface LiberoSwapState {
+    isActive: boolean;              // Is there a swap active?
+    replacedRole: PlayerRole | null; // Which role is libero replacing?
+    isManualLock: boolean;          // TRUE = locked to specific player, FALSE = auto-swap mode
+  }
+
+  // Manual libero swap state (per team, resets each set)
+  const [homeLiberoSwapState, setHomeLiberoSwapState] = useState<LiberoSwapState>({
+    isActive: false,
+    replacedRole: null,
+    isManualLock: false
+  });
+
+  const [opponentLiberoSwapState, setOpponentLiberoSwapState] = useState<LiberoSwapState>({
+    isActive: false,
+    replacedRole: null,
+    isManualLock: false
+  });
+
+  /**
+   * Load rosters from match context (Google Sheets API)
+   */
+  useEffect(() => {
+    async function loadRosters() {
+      if (!matchId || matchId === 'new') {
+        console.log('No match ID or new match, skipping roster load');
+
+        // Clear any existing rotation configs for new matches
+        if (matchId === 'new') {
+          const rotationKey = `match_new_rotations`;
+          localStorage.removeItem(rotationKey);
+          console.log('🗑️ Cleared rotation configs for new match');
+        }
+
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        console.log('Loading match:', matchId);
+
+        const match = await getMatch(matchId);
+
+        if (match) {
+          console.log('Match loaded:', match);
+
+          // Load players for both teams
+          const [home, opp] = await Promise.all([
+            getPlayersByTeam(match.home_team.id),
+            getPlayersByTeam(match.opponent_team.id)
+          ]);
+
+          console.log('Home roster:', home);
+          console.log('Opponent roster:', opp);
+
+          setHomeRoster(home);
+          setOpponentRoster(opp);
+
+          // Store team names
+          setHomeTeamName(match.home_team.name);
+          setOpponentTeamName(match.opponent_team.name);
+
+          // SMART CONFIG LOADING - Don't clear if match has recorded data
+          // Check if this match has any recorded points/data (indicating it's in progress)
+          const hasRecordedData = homeScore > 0 || opponentScore > 0 || pointHistory.length > 0;
+
+          if (!hasRecordedData) {
+            // Fresh match - clear any stale configs from previous sessions
+            const rotationKey = `match_${matchId}_rotations`;
+            const existingData = localStorage.getItem(rotationKey);
+            if (existingData) {
+              console.log('🗑️ Fresh match detected - clearing previous rotation configurations');
+              localStorage.removeItem(rotationKey);
+            }
+
+            // Reset all rotation-related state to empty for fresh start
+            setHomeLineup({
+              P1: null, P2: null, P3: null, P4: null, P5: null, P6: null
+            });
+            setOpponentLineup({
+              P1: null, P2: null, P3: null, P4: null, P5: null, P6: null
+            });
+            setHomeRotationConfig(null);
+            setOpponentRotationConfig(null);
+            setRotationEnabled(false);
+            console.log('✨ Ready for fresh rotation configuration');
+          } else {
+            // Match in progress - preserve existing config
+            console.log('📊 Match in progress detected - preserving rotation configuration');
+            console.log(`  Current score: Home ${homeScore} - ${opponentScore} Opponent`);
+            console.log(`  Points recorded: ${pointHistory.length}`);
+          }
+
+          // NOTE: Lineups are now populated from rotation configuration (not from roster directly)
+          // The rotation config modal will handle player assignment
+          console.log('Rosters loaded successfully. Team names:', match.home_team.name, 'vs', match.opponent_team.name);
+          console.log('Lineups will be populated when rotation config is loaded or configured.');
+        } else {
+          console.warn('Match not found');
+        }
+      } catch (error) {
+        console.error('Failed to load rosters:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadRosters();
+  }, [matchId]);
+
+  /**
+   * Load or prompt for rotation configuration when set changes
+   */
+  useEffect(() => {
+    // Reset dismissed flag when set changes
+    setRotationConfigDismissed(false);
+
+    console.log('🔍 Rotation config check:', {
+      matchId,
+      loading,
+      currentSet,
+      rotationConfigModalOpen,
+      rotationEnabled
+    });
+
+    if (!matchId || loading) {
+      console.log('⏭️ Skipping rotation check - no matchId or still loading');
+      return;
+    }
+
+    const existingConfig = loadSetConfiguration(matchId, currentSet, homeRoster, opponentRoster);
+    console.log('📦 Existing config for set', currentSet, ':', existingConfig);
+
+    // Validate that config is actually complete
+    const isValidConfig = existingConfig &&
+                         existingConfig.home &&
+                         existingConfig.opponent &&
+                         existingConfig.home.players &&
+                         existingConfig.opponent.players &&
+                         Object.keys(existingConfig.home.players).length > 0 &&
+                         Object.keys(existingConfig.opponent.players).length > 0;
+
+    console.log('✅ Config validation:', {
+      hasConfig: !!existingConfig,
+      hasHome: !!existingConfig?.home,
+      hasOpponent: !!existingConfig?.opponent,
+      homePlayers: existingConfig?.home?.players ? Object.keys(existingConfig.home.players).length : 0,
+      opponentPlayers: existingConfig?.opponent?.players ? Object.keys(existingConfig.opponent.players).length : 0,
+      isValid: isValidConfig
+    });
+
+    if (!isValidConfig && !rotationConfigModalOpen && !rotationConfigDismissed) {
+      // No valid config for this set - open modal (unless user dismissed it)
+      console.log(`✨ No valid rotation config for set ${currentSet}, opening modal`);
+      setRotationConfigModalOpen(true);
+    } else if (isValidConfig && existingConfig) {
+      // Load existing configuration
+      console.log(`📥 Loading existing rotation config for set ${currentSet}`);
+      setHomeRotationConfig(existingConfig.home);
+      setOpponentRotationConfig(existingConfig.opponent);
+      setServingTeam(existingConfig.startingServer);
+      setRotationEnabled(true);
+
+      // Initialize lineups from config WITH ROSTER DATA
+      // initializeLineup now includes libero substitution via getRotations()
+      // Pass serving status to respect P1 serving position rules
+      const homeLineupData = initializeLineup(
+        existingConfig.home,
+        'home',
+        homeRoster,
+        null,  // No manual swap role initially
+        existingConfig.startingServer === 'home'  // Home is serving
+      );
+      const opponentLineupData = initializeLineup(
+        existingConfig.opponent,
+        'opponent',
+        opponentRoster,
+        null,  // No manual swap role initially
+        existingConfig.startingServer === 'opponent'  // Opponent is serving
+      );
+
+      setHomeLineup(homeLineupData);
+      setOpponentLineup(opponentLineupData);
+    } else {
+      console.log('⚠️ Config validation failed OR modal already open - not opening modal');
+    }
+  }, [currentSet, matchId, loading, rotationConfigModalOpen, homeRoster, opponentRoster]);
+
+  /**
+   * Helper function: Look up player by ID from rosters
+   */
+  const getPlayerById = (playerId: string, team: 'home' | 'opponent') => {
+    const roster = team === 'home' ? homeRoster : opponentRoster;
+    return roster.find(p => p.id === playerId);
+  };
+
+  /**
+   * Helper function: Format player display string
+   * Returns: "#1 Player Name" or "#1 Unknown" if not found
+   */
+  const formatPlayerDisplay = (playerId: string, team: 'home' | 'opponent') => {
+    const player = getPlayerById(playerId, team);
+    if (player) {
+      return `#${player.jerseyNumber} ${player.name}`;
+    }
+    return `#? Unknown`;
+  };
+
+  /**
+   * Helper function: Get player jersey number
+   * Returns number or undefined if not found
+   */
+  const getPlayerJerseyNumber = (playerId: string, team: 'home' | 'opponent') => {
+    const player = getPlayerById(playerId, team);
+    return player?.jerseyNumber;
+  };
+
+  /**
+   * Helper function: Get player name
+   * Returns name or 'Unknown' if not found
+   */
+  const getPlayerName = (playerId: string, team: 'home' | 'opponent') => {
+    const player = getPlayerById(playerId, team);
+    return player?.name || 'Unknown';
+  };
+
+  /**
+   * Handle rotation configuration save from modal
+   */
+  const handleRotationConfigSave = (
+    homeConfig: TeamRotationConfig,
+    opponentConfig: TeamRotationConfig,
+    startingServer: 'home' | 'opponent'
+  ) => {
+    console.log('Saving rotation configuration for set', currentSet);
+
+    // Save to state
+    setHomeRotationConfig(homeConfig);
+    setOpponentRotationConfig(opponentConfig);
+    setServingTeam(startingServer);
+    setRotationEnabled(true);
+
+    // Save to localStorage
+    if (matchId) {
+      saveSetConfiguration(matchId, currentSet, homeConfig, opponentConfig, startingServer);
+    }
+
+    // Initialize lineups from configuration WITH ROSTER DATA
+    console.log('🔍 Initializing lineups with roster data:', {
+      homeRosterSize: homeRoster.length,
+      opponentRosterSize: opponentRoster.length,
+      homeRosterSample: homeRoster[0],
+      opponentRosterSample: opponentRoster[0]
+    });
+
+    console.log('📋 FULL HOME ROSTER:', homeRoster);
+    console.log('📋 FULL OPPONENT ROSTER:', opponentRoster);
+
+    console.log('⚙️ HOME CONFIG.players:', homeConfig.players);
+    console.log('⚙️ OPPONENT CONFIG.players:', opponentConfig.players);
+
+    // Initialize lineups with serving status to respect P1 serving position rules
+    const homeLineupData = initializeLineup(
+      homeConfig,
+      'home',
+      homeRoster,
+      null,  // No manual swap role initially
+      startingServer === 'home'  // Home is serving
+    );
+    const opponentLineupData = initializeLineup(
+      opponentConfig,
+      'opponent',
+      opponentRoster,
+      null,  // No manual swap role initially
+      startingServer === 'opponent'  // Opponent is serving
+    );
+
+    console.log('✅ Lineups initialized:', {
+      homeLineup: homeLineupData,
+      opponentLineup: opponentLineupData
+    });
+
+    // initializeLineup now includes libero substitution via getRotations()
+    setHomeLineup(homeLineupData);
+    setOpponentLineup(opponentLineupData);
+
+    console.log('🏐 Final lineups set with libero:', {
+      home: homeLineupData,
+      opponent: opponentLineupData
+    });
+
+    // Close modal
+    setRotationConfigModalOpen(false);
+  };
+
+  /**
+   * Reset rotation configuration - Clears localStorage and resets state
+   */
+  const handleResetConfiguration = () => {
+    const rotationKey = `match_${matchId}_rotations`;
+    localStorage.removeItem(rotationKey);
+
+    // Reset all rotation-related state
+    setHomeLineup({
+      P1: null, P2: null, P3: null, P4: null, P5: null, P6: null
+    });
+    setOpponentLineup({
+      P1: null, P2: null, P3: null, P4: null, P5: null, P6: null
+    });
+    setHomeRotationConfig(null);
+    setOpponentRotationConfig(null);
+    setRotationEnabled(false);
+
+    // Open rotation config modal
+    setRotationConfigModalOpen(true);
+
+    console.log('🔄 Rotation configuration reset - please reconfigure');
+  };
+
+  /**
+   * Manual rotation controls - Rotate team forward (+1)
+   */
+  const handleManualRotateForward = (team: 'home' | 'opponent') => {
+    const swapState = team === 'home' ? homeLiberoSwapState : opponentLiberoSwapState;
+    // Only pass manual swap role if it's a manual lock (not auto-swap mode)
+    const manualSwapRole = (swapState.isActive && swapState.isManualLock) ? swapState.replacedRole : null;
+    // Check if this team is serving
+    const isServing = servingTeam === team;
+
+    if (team === 'home' && homeRotationConfig) {
+      const result = manualRotateForward(homeLineup, homeRotationConfig, homeRoster, 'home', manualSwapRole, isServing);
+      setHomeLineup(result.lineup);
+      setHomeRotationConfig({
+        ...homeRotationConfig,
+        currentRotation: result.newRotation
+      });
+      console.log(`Home team manually rotated forward to rotation ${result.newRotation} (serving: ${isServing})`);
+    } else if (team === 'opponent' && opponentRotationConfig) {
+      const result = manualRotateForward(opponentLineup, opponentRotationConfig, opponentRoster, 'opponent', manualSwapRole, isServing);
+      setOpponentLineup(result.lineup);
+      setOpponentRotationConfig({
+        ...opponentRotationConfig,
+        currentRotation: result.newRotation
+      });
+      console.log(`Opponent team manually rotated forward to rotation ${result.newRotation} (serving: ${isServing})`);
+    }
+  };
+
+  /**
+   * Manual rotation controls - Rotate team backward (-1)
+   */
+  const handleManualRotateBackward = (team: 'home' | 'opponent') => {
+    const swapState = team === 'home' ? homeLiberoSwapState : opponentLiberoSwapState;
+    // Only pass manual swap role if it's a manual lock (not auto-swap mode)
+    const manualSwapRole = (swapState.isActive && swapState.isManualLock) ? swapState.replacedRole : null;
+    // Check if this team is serving
+    const isServing = servingTeam === team;
+
+    if (team === 'home' && homeRotationConfig) {
+      const result = manualRotateBackward(homeLineup, homeRotationConfig, homeRoster, 'home', manualSwapRole, isServing);
+      setHomeLineup(result.lineup);
+      setHomeRotationConfig({
+        ...homeRotationConfig,
+        currentRotation: result.newRotation
+      });
+      console.log(`Home team manually rotated backward to rotation ${result.newRotation} (serving: ${isServing})`);
+    } else if (team === 'opponent' && opponentRotationConfig) {
+      const result = manualRotateBackward(opponentLineup, opponentRotationConfig, opponentRoster, 'opponent', manualSwapRole, isServing);
+      setOpponentLineup(result.lineup);
+      setOpponentRotationConfig({
+        ...opponentRotationConfig,
+        currentRotation: result.newRotation
+      });
+      console.log(`Opponent team manually rotated backward to rotation ${result.newRotation} (serving: ${isServing})`);
+    }
+  };
+
+  /**
+   * Manual libero swap OUT - Swap libero back to bench, bring original player back
+   */
+  const handleLiberoSwapOut = (team: 'home' | 'opponent') => {
+    console.log(`🔄 handleLiberoSwapOut called for ${team} team`);
+    const lineup = team === 'home' ? homeLineup : opponentLineup;
+    const config = team === 'home' ? homeRotationConfig : opponentRotationConfig;
+    const swapState = team === 'home' ? homeLiberoSwapState : opponentLiberoSwapState;
+
+    console.log('Swap OUT state:', { config: !!config, selectedPlayer, isLibero: selectedPlayer?.isLibero, swapState });
+
+    if (!config || !selectedPlayer || !selectedPlayer.isLibero) {
+      console.error('❌ Invalid swap OUT attempt', { hasConfig: !!config, hasPlayer: !!selectedPlayer, isLibero: selectedPlayer?.isLibero });
+      return;
+    }
+
+    // Validate back row only
+    if (!['P1', 'P5', 'P6'].includes(selectedPlayer.position)) {
+      console.error('❌ Cannot swap OUT libero from front row');
+      return;
+    }
+
+    // Get original player to bring back
+    const originalRole = selectedPlayer.originalRole || swapState.replacedRole;
+    if (!originalRole) {
+      console.error('❌ No original role tracked');
+      return;
+    }
+
+    const originalPlayerRef = config.players[originalRole];
+
+    // Update lineup - bring original player back
+    const newLineup = { ...lineup };
+    newLineup[selectedPlayer.position] = {
+      reference: originalPlayerRef,
+      position: selectedPlayer.position,
+      roleInSystem: originalRole,
+      isLibero: false,
+      playerId: getPlayerId(originalPlayerRef),
+      jerseyNumber: getJerseyNumber(originalPlayerRef),
+      playerName: getPlayerDisplayName(originalPlayerRef)
+    };
+
+    // Update state - clear all swap state (back to default auto-swap)
+    if (team === 'home') {
+      setHomeLineup(newLineup);
+      setHomeLiberoSwapState({ isActive: false, replacedRole: null, isManualLock: false });
+    } else {
+      setOpponentLineup(newLineup);
+      setOpponentLiberoSwapState({ isActive: false, replacedRole: null, isManualLock: false });
+    }
+
+    setSelectedPlayer(null);
+    setSelectedTeam(null);
+
+    console.log(`✅ Libero swapped OUT at ${selectedPlayer.position}`);
+  };
+
+  /**
+   * Manual libero swap IN - Swap selected back row player with libero
+   */
+  const handleLiberoSwapIn = (team: 'home' | 'opponent') => {
+    console.log(`🔄 handleLiberoSwapIn called for ${team} team`);
+    const lineup = team === 'home' ? homeLineup : opponentLineup;
+    const config = team === 'home' ? homeRotationConfig : opponentRotationConfig;
+    const swapState = team === 'home' ? homeLiberoSwapState : opponentLiberoSwapState;
+
+    console.log('Swap IN state:', { config: !!config, hasLibero: !!config?.libero, selectedPlayer, swapState });
+
+    if (!config || !config.libero || !selectedPlayer) {
+      console.error('❌ Invalid swap IN attempt', { hasConfig: !!config, hasLibero: !!config?.libero, hasPlayer: !!selectedPlayer });
+      return;
+    }
+
+    // Validation 1: Back row only
+    if (!['P1', 'P5', 'P6'].includes(selectedPlayer.position)) {
+      console.error('❌ Can only swap IN libero for back row players');
+      return;
+    }
+
+    // Validation 2: Libero not already on court (in back row)
+    const liberoOnCourt = Object.values(lineup).some(p =>
+      p && p.isLibero && ['P1', 'P5', 'P6'].includes(p.position)
+    );
+
+    if (liberoOnCourt) {
+      console.error('❌ Libero already on court in back row');
+      return;
+    }
+
+    // Create libero player at this position
+    const liberoPlayer: PlayerInPosition = {
+      reference: config.libero,
+      position: selectedPlayer.position,
+      roleInSystem: 'L',
+      isLibero: true,
+      originalRole: selectedPlayer.roleInSystem, // Track who libero replaced
+      playerId: getPlayerId(config.libero),
+      jerseyNumber: getJerseyNumber(config.libero),
+      playerName: getPlayerDisplayName(config.libero)
+    };
+
+    // Update lineup
+    const newLineup = { ...lineup };
+    newLineup[selectedPlayer.position] = liberoPlayer;
+
+    // Check if swapping with a default target (reverts to auto-swap mode)
+    const isDefaultTarget = config.liberoReplacementTargets &&
+                            config.liberoReplacementTargets.includes(selectedPlayer.roleInSystem!);
+
+    // Update state
+    if (team === 'home') {
+      setHomeLineup(newLineup);
+      setHomeLiberoSwapState({
+        isActive: true,
+        replacedRole: selectedPlayer.roleInSystem!,
+        isManualLock: !isDefaultTarget  // FALSE if default target (auto-swap mode), TRUE if manual lock
+      });
+    } else {
+      setOpponentLineup(newLineup);
+      setOpponentLiberoSwapState({
+        isActive: true,
+        replacedRole: selectedPlayer.roleInSystem!,
+        isManualLock: !isDefaultTarget  // FALSE if default target (auto-swap mode), TRUE if manual lock
+      });
+    }
+
+    setSelectedPlayer(null);
+    setSelectedTeam(null);
+
+    const mode = isDefaultTarget ? 'AUTO-SWAP MODE' : 'MANUAL LOCK';
+    console.log(`✅ Libero swapped IN at ${selectedPlayer.position} for ${selectedPlayer.roleInSystem} [${mode}]`);
+  };
+
+  /**
+   * Toggle formation type between serving and rally
+   */
+  const handleFormationToggle = (team: 'home' | 'opponent', formationType: 'serving' | 'rally') => {
+    if (team === 'home') {
+      setHomeFormationType(formationType);
+      console.log(`Home team formation set to: ${formationType}`);
+    } else {
+      setOpponentFormationType(formationType);
+      console.log(`Opponent team formation set to: ${formationType}`);
+    }
+  };
+
+  /**
+   * Get the current lineup for a team based on formation type
+   */
+  const getCurrentLineup = (team: 'home' | 'opponent'): TeamLineup => {
+    const lineup = team === 'home' ? homeLineup : opponentLineup;
+    const formationType = team === 'home' ? homeFormationType : opponentFormationType;
+
+    if (formationType === 'rally') {
+      return convertToRallyFormation(lineup);
+    }
+
+    return lineup;
+  };
 
   /**
    * Save the current attempt and handle point workflow
@@ -106,6 +744,19 @@ function VisualTrackingPageContent() {
     if (!selectedPlayer || !currentTrajectory || !selectedTeam || !trajectoryAnalysis) {
       console.warn('Cannot save: missing player, trajectory, team, or analysis');
       return;
+    }
+
+    // Switch to rally formation if ball in play
+    if (result === 'in_play') {
+      // Switch BOTH teams to rally formation
+      if (homeFormationType !== 'rally') {
+        setHomeFormationType('rally');
+        console.log('🏐 Home team → Rally formation (ball in play)');
+      }
+      if (opponentFormationType !== 'rally') {
+        setOpponentFormationType('rally');
+        console.log('🏐 Opponent team → Rally formation (ball in play)');
+      }
     }
 
     // Create attempt data
@@ -136,6 +787,19 @@ function VisualTrackingPageContent() {
     const pointEnded = result === 'ace' || result === 'kill' || result === 'error';
 
     if (pointEnded) {
+      // Point ended - switch BOTH teams back to serving formation
+      setHomeFormationType('serving');
+      setOpponentFormationType('serving');
+      console.log('🏐 Both teams → Serving formation (point ended)');
+
+      // Save current state to history before updating
+      setScoringHistory(prev => [...prev, {
+        pointNumber,
+        homeScore,
+        opponentScore,
+        servingTeam
+      }]);
+
       // Determine point winner and update score + serving team
       let pointWinner: 'home' | 'opponent';
 
@@ -161,9 +825,141 @@ function VisualTrackingPageContent() {
         }
       }
 
-      // Update serving team (winner serves next)
-      setServingTeam(pointWinner);
+      // Handle rotation if enabled
+      if (rotationEnabled && homeRotationConfig && opponentRotationConfig) {
+        const rotationUpdate = handlePointEnd(
+          pointWinner,
+          servingTeam,
+          homeLineup,
+          opponentLineup,
+          homeRotationConfig,
+          opponentRotationConfig,
+          homeRoster,         // ADD roster parameters
+          opponentRoster
+        );
+
+        if (rotationUpdate.rotationChanged) {
+          // Update lineups
+          setHomeLineup(rotationUpdate.homeLineup);
+          setOpponentLineup(rotationUpdate.opponentLineup);
+
+          // Update rotation numbers from the returned values
+          setHomeRotationConfig({
+            ...homeRotationConfig,
+            currentRotation: rotationUpdate.newHomeRotation
+          });
+          setOpponentRotationConfig({
+            ...opponentRotationConfig,
+            currentRotation: rotationUpdate.newOpponentRotation
+          });
+
+          console.log(`🔄 Rotation: ${rotationUpdate.servingTeam} team rotated to rotation ${rotationUpdate.servingTeam === 'home' ? rotationUpdate.newHomeRotation : rotationUpdate.newOpponentRotation}`);
+        }
+
+        setServingTeam(rotationUpdate.servingTeam);
+
+        // Auto libero swap during dead ball (after side-out for losing team)
+        if (rotationUpdate.rotationChanged) {
+          // Side-out occurred - check if losing team's libero should auto-swap back in
+          const losingTeam = servingTeam; // The team that was serving and lost
+
+          console.log(`🔍 Side-out check: losingTeam=${losingTeam}, servingTeam=${servingTeam}`);
+
+          // Check home team
+          if (losingTeam === 'home' && homeRotationConfig.libero && homeRotationConfig.liberoReplacementTargets) {
+            const p1Player = rotationUpdate.homeLineup['P1'];
+            console.log(`🔍 Home P1 player after rotation:`, p1Player);
+            console.log(`🔍 Home libero config targets:`, homeRotationConfig.liberoReplacementTargets);
+            console.log(`🔍 Home libero swap state:`, homeLiberoSwapState);
+
+            // Check if P1 player's role matches configured libero replacement targets
+            // Use manual swap role if active, otherwise use default targets
+            const targetRoles = homeLiberoSwapState.isActive && homeLiberoSwapState.isManualLock
+              ? [homeLiberoSwapState.replacedRole]
+              : homeRotationConfig.liberoReplacementTargets;
+
+            const shouldAutoSwap = p1Player?.roleInSystem &&
+                                   targetRoles.includes(p1Player.roleInSystem) &&
+                                   !p1Player?.isLibero;
+
+            console.log(`🔍 Home shouldAutoSwap=${shouldAutoSwap} (roleInTargets=${targetRoles.includes(p1Player?.roleInSystem || '')}, notLibero=${!p1Player?.isLibero})`);
+
+            if (shouldAutoSwap) {
+              // Auto swap libero back in at P1
+              const newHomeLineup = { ...rotationUpdate.homeLineup };
+              newHomeLineup['P1'] = {
+                reference: homeRotationConfig.libero,
+                position: 'P1',
+                roleInSystem: 'L',
+                isLibero: true,
+                originalRole: p1Player.roleInSystem,
+                playerId: getPlayerId(homeRotationConfig.libero),
+                jerseyNumber: getJerseyNumber(homeRotationConfig.libero),
+                playerName: getPlayerDisplayName(homeRotationConfig.libero)
+              };
+              setHomeLineup(newHomeLineup);
+              console.log(`🔄 Auto libero swap: Home libero → P1 (dead ball after side-out)`);
+            }
+          }
+
+          // Check opponent team
+          if (losingTeam === 'opponent' && opponentRotationConfig.libero && opponentRotationConfig.liberoReplacementTargets) {
+            const p1Player = rotationUpdate.opponentLineup['P1'];
+            console.log(`🔍 Opponent P1 player after rotation:`, p1Player);
+            console.log(`🔍 Opponent libero config targets:`, opponentRotationConfig.liberoReplacementTargets);
+            console.log(`🔍 Opponent libero swap state:`, opponentLiberoSwapState);
+
+            // Check if P1 player's role matches configured libero replacement targets
+            // Use manual swap role if active, otherwise use default targets
+            const targetRoles = opponentLiberoSwapState.isActive && opponentLiberoSwapState.isManualLock
+              ? [opponentLiberoSwapState.replacedRole]
+              : opponentRotationConfig.liberoReplacementTargets;
+
+            const shouldAutoSwap = p1Player?.roleInSystem &&
+                                   targetRoles.includes(p1Player.roleInSystem) &&
+                                   !p1Player?.isLibero;
+
+            console.log(`🔍 Opponent shouldAutoSwap=${shouldAutoSwap} (roleInTargets=${targetRoles.includes(p1Player?.roleInSystem || '')}, notLibero=${!p1Player?.isLibero})`);
+
+            if (shouldAutoSwap) {
+              // Auto swap libero back in at P1
+              const newOpponentLineup = { ...rotationUpdate.opponentLineup };
+              newOpponentLineup['P1'] = {
+                reference: opponentRotationConfig.libero,
+                position: 'P1',
+                roleInSystem: 'L',
+                isLibero: true,
+                originalRole: p1Player.roleInSystem,
+                playerId: getPlayerId(opponentRotationConfig.libero),
+                jerseyNumber: getJerseyNumber(opponentRotationConfig.libero),
+                playerName: getPlayerDisplayName(opponentRotationConfig.libero)
+              };
+              setOpponentLineup(newOpponentLineup);
+              console.log(`🔄 Auto libero swap: Opponent libero → P1 (dead ball after side-out)`);
+            }
+          }
+        }
+      } else {
+        // No rotation enabled - just update serving team
+        setServingTeam(pointWinner);
+      }
+
       console.log(`🏐 ${pointWinner} wins the point and will serve next`);
+
+      // Calculate new scores for point history
+      const newHomeScore = pointWinner === 'home' ? homeScore + 1 : homeScore;
+      const newOpponentScore = pointWinner === 'opponent' ? opponentScore + 1 : opponentScore;
+
+      // Add to point history for trend display
+      setPointHistory(prev => [...prev, {
+        pointNumber,
+        homeScore: newHomeScore,
+        opponentScore: newOpponentScore,
+        winningTeam: pointWinner,
+        actionType: result === 'error' ? 'error' : actionType,
+        playerId: selectedPlayer.playerId,
+        team: selectedTeam
+      }]);
 
       // Start new point
       console.log(`🏐 Point ${pointNumber} ended. Starting Point ${pointNumber + 1}`);
@@ -268,15 +1064,9 @@ function VisualTrackingPageContent() {
 
   /**
    * Handle player selection
-   * During serve phase: Only allow selecting players from serving team
+   * During serve phase: Allow serving team for actions, but also allow receiving team for substitutions
    */
   const handlePlayerClick = (playerId: string, team: 'home' | 'opponent') => {
-    // Enforce serving team rule during serve phase
-    if (isServePhase && team !== servingTeam) {
-      console.log(`⚠️ Cannot select ${team} player - ${servingTeam} is serving`);
-      return; // Block selection of non-serving team during serve
-    }
-
     const lineup = team === 'home' ? homeLineup : opponentLineup;
     const player = Object.values(lineup).find(p => p?.playerId === playerId);
 
@@ -289,6 +1079,11 @@ function VisualTrackingPageContent() {
       // Mark first player as selected (hides serve selector for rest of set)
       if (!firstPlayerSelected) {
         setFirstPlayerSelected(true);
+      }
+
+      // Log warning if selecting receiving team during serve phase (for actions, not substitutions)
+      if (isServePhase && team !== servingTeam) {
+        console.log(`⚠️ Note: ${team} player selected during ${servingTeam} serve - available for substitution only`);
       }
     }
   };
@@ -322,6 +1117,160 @@ function VisualTrackingPageContent() {
       ];
     }
     return [];
+  };
+
+  /**
+   * Handle quick scoring from modal (without trajectory drawing)
+   */
+  const handleQuickScore = (scoringOpt: 'team_error' | 'opponent_error', playerId: string) => {
+    if (!scoringTeam) return;
+
+    // Save current state to history before updating
+    setScoringHistory(prev => [...prev, {
+      pointNumber,
+      homeScore,
+      opponentScore,
+      servingTeam
+    }]);
+
+    let pointWinner: 'home' | 'opponent';
+    let errorTeam: 'home' | 'opponent';
+
+    if (scoringOpt === 'team_error') {
+      // Team that opened the modal made an error = point to other team
+      pointWinner = scoringTeam === 'home' ? 'opponent' : 'home';
+      errorTeam = scoringTeam;
+      if (scoringTeam === 'home') {
+        setOpponentScore(prev => prev + 1);
+        console.log('📊 Opponent scores! (Home error - quick score)');
+      } else {
+        setHomeScore(prev => prev + 1);
+        console.log('📊 Home scores! (Opponent error - quick score)');
+      }
+    } else {
+      // Opponent of the team that opened the modal made an error = point to team
+      pointWinner = scoringTeam;
+      errorTeam = scoringTeam === 'home' ? 'opponent' : 'home';
+      if (scoringTeam === 'home') {
+        setHomeScore(prev => prev + 1);
+        console.log('📊 Home scores! (Opponent error - quick score)');
+      } else {
+        setOpponentScore(prev => prev + 1);
+        console.log('📊 Opponent scores! (Home error - quick score)');
+      }
+    }
+
+    // Handle rotation if enabled
+    if (rotationEnabled && homeRotationConfig && opponentRotationConfig) {
+      const rotationUpdate = handlePointEnd(
+        pointWinner,
+        servingTeam,
+        homeLineup,
+        opponentLineup,
+        homeRotationConfig,
+        opponentRotationConfig,
+        homeRoster,         // ADD roster parameters
+        opponentRoster
+      );
+
+      if (rotationUpdate.rotationChanged) {
+        // Update lineups
+        setHomeLineup(rotationUpdate.homeLineup);
+        setOpponentLineup(rotationUpdate.opponentLineup);
+
+        // Update rotation numbers from the returned values
+        setHomeRotationConfig({
+          ...homeRotationConfig,
+          currentRotation: rotationUpdate.newHomeRotation
+        });
+        setOpponentRotationConfig({
+          ...opponentRotationConfig,
+          currentRotation: rotationUpdate.newOpponentRotation
+        });
+
+        console.log(`🔄 Rotation: ${rotationUpdate.servingTeam} team rotated to rotation ${rotationUpdate.servingTeam === 'home' ? rotationUpdate.newHomeRotation : rotationUpdate.newOpponentRotation}`);
+      }
+
+      setServingTeam(rotationUpdate.servingTeam);
+    } else {
+      // No rotation enabled - just update serving team
+      setServingTeam(pointWinner);
+    }
+
+    console.log(`🏐 ${pointWinner} wins the point and will serve next`);
+
+    // Calculate new scores for point history
+    const newHomeScore = pointWinner === 'home' ? homeScore + 1 : homeScore;
+    const newOpponentScore = pointWinner === 'opponent' ? opponentScore + 1 : opponentScore;
+
+    // Add to point history for trend display
+    setPointHistory(prev => [...prev, {
+      pointNumber,
+      homeScore: newHomeScore,
+      opponentScore: newOpponentScore,
+      winningTeam: pointWinner,
+      actionType: scoringOpt,
+      playerId: playerId,
+      team: errorTeam
+    }]);
+
+    // Start new point
+    console.log(`🏐 Point ${pointNumber} ended (quick score). Starting Point ${pointNumber + 1}`);
+    setPointNumber(prev => prev + 1);
+    setAttemptNumber(1);
+    setIsServePhase(true);
+    setActionType('serve');
+    setCurrentPointAttempts([]);
+    setSelectedPlayer(null);
+    setSelectedTeam(null);
+    setCurrentTrajectory(null);
+
+    // Close modal and reset state
+    setScoringModalOpen(false);
+    setScoringTeam(null);
+    setScoringOption(null);
+    setQuickScorePlayerId(null);
+  };
+
+  /**
+   * Go back / Undo last point scored
+   */
+  const handleGoBack = () => {
+    if (scoringHistory.length === 0) {
+      console.log('⚠️ No scoring history to undo');
+      return;
+    }
+
+    // Get the last state from history
+    const lastState = scoringHistory[scoringHistory.length - 1];
+
+    // Restore the previous state
+    setPointNumber(lastState.pointNumber);
+    setHomeScore(lastState.homeScore);
+    setOpponentScore(lastState.opponentScore);
+    setServingTeam(lastState.servingTeam);
+
+    // ALWAYS reset to serving formation on undo
+    setHomeFormationType('serving');
+    setOpponentFormationType('serving');
+    console.log('⏮️ Undo: Both teams → Serving formation');
+
+    // Remove the last entry from history
+    setScoringHistory(prev => prev.slice(0, -1));
+
+    // Also remove the last point from point history (for trend display)
+    setPointHistory(prev => prev.slice(0, -1));
+
+    // Reset to serve phase
+    setAttemptNumber(1);
+    setIsServePhase(true);
+    setActionType('serve');
+    setCurrentPointAttempts([]);
+    setSelectedPlayer(null);
+    setSelectedTeam(null);
+    setCurrentTrajectory(null);
+
+    console.log(`⏪ Went back to Point ${lastState.pointNumber}, Score: ${lastState.homeScore}-${lastState.opponentScore}`);
   };
 
   /**
@@ -391,6 +1340,35 @@ function VisualTrackingPageContent() {
   }, [currentTrajectory, isDragging, selectedTeam, actionType]);
 
   /**
+   * Sync URL with current set number and reset libero swap state
+   */
+  useEffect(() => {
+    const currentSetParam = searchParams.get('set');
+    const expectedSetParam = currentSet.toString();
+
+    // Only update URL if the set parameter is different
+    if (currentSetParam !== expectedSetParam) {
+      setSearchParams({ set: expectedSetParam }, { replace: true });
+      console.log(`🔗 URL updated: set=${expectedSetParam}`);
+    }
+
+    // Reset libero swap state for new set
+    setHomeLiberoSwapState({
+      isActive: false,
+      replacedRole: null,
+      isManualLock: false
+    });
+
+    setOpponentLiberoSwapState({
+      isActive: false,
+      replacedRole: null,
+      isManualLock: false
+    });
+
+    console.log(`🔄 Set ${currentSet}: Libero swap state reset`);
+  }, [currentSet, searchParams, setSearchParams]);
+
+  /**
    * Keyboard shortcut: Space bar for "In Play"
    */
   useEffect(() => {
@@ -405,6 +1383,135 @@ function VisualTrackingPageContent() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [trajectoryAnalysis, selectedPlayer, currentTrajectory, selectedTeam]);
+
+  /**
+   * Set end detection - Check if current set should end
+   * Rules:
+   * - First to 25 points wins (if ahead by 2+)
+   * - Must win by 2 points
+   * - No upper limit (can go to 26-24, 27-25, etc.)
+   */
+  useEffect(() => {
+    // Only check if we have points scored
+    if (homeScore === 0 && opponentScore === 0) return;
+
+    const scoreDiff = Math.abs(homeScore - opponentScore);
+    const maxScore = Math.max(homeScore, opponentScore);
+
+    // Check if set should end
+    if (maxScore >= 25 && scoreDiff >= 2) {
+      const winner: 'home' | 'opponent' = homeScore > opponentScore ? 'home' : 'opponent';
+      setSetWinner(winner);
+      setSetEndModalOpen(true);
+      console.log(`🏆 Set ${currentSet} ended! ${winner} wins ${homeScore}-${opponentScore}`);
+    }
+  }, [homeScore, opponentScore, currentSet]);
+
+  /**
+   * Handle set change with proper state reset
+   */
+  const handleSetChange = (setNum: number) => {
+    // Warn if there's unsaved data (points recorded in current set)
+    if (homeScore > 0 || opponentScore > 0 || pointHistory.length > 0) {
+      const confirmed = window.confirm(
+        `Changing sets will reset the current set's data. Continue?`
+      );
+      if (!confirmed) return;
+    }
+
+    // Update current set
+    setCurrentSet(setNum);
+
+    // Reset all game state for new set
+    setHomeScore(0);
+    setOpponentScore(0);
+    setPointNumber(1);
+    setAttemptNumber(1);
+    setIsServePhase(true);
+    setFirstPlayerSelected(false);
+
+    // Clear point tracking
+    setCurrentPointAttempts([]);
+    setPointHistory([]);
+    setScoringHistory([]);
+
+    // Reset player selection
+    setSelectedPlayer(null);
+    setSelectedTeam(null);
+    setCurrentTrajectory(null);
+
+    // Reset action type to serve for new set
+    setActionType('serve');
+
+    // Reset formation to serving at start of new set
+    setHomeFormationType('serving');
+    setOpponentFormationType('serving');
+    console.log(`🔄 Set ${setNum}: Both teams → Serving formation`);
+
+    // Note: servingTeam is NOT reset - it should be set explicitly by user
+    // or loaded from previous set data when that's implemented
+
+    console.log(`Set changed to Set ${setNum} - All state reset`);
+  };
+
+  /**
+   * Handle continuing to next set after set ends
+   */
+  const handleContinueToNextSet = () => {
+    // Close the modal
+    setSetEndModalOpen(false);
+
+    // Move to next set if not already at set 5
+    if (currentSet < 5) {
+      const nextSet = currentSet + 1;
+      setCurrentSet(nextSet);
+      console.log(`📋 Moving to Set ${nextSet}`);
+    } else {
+      console.log('🏆 Match completed! All 5 sets played.');
+    }
+
+    // Reset game state for new set
+    setHomeScore(0);
+    setOpponentScore(0);
+    setPointNumber(1);
+    setAttemptNumber(1);
+    setIsServePhase(true);
+    setFirstPlayerSelected(false);
+
+    // Clear point tracking
+    setCurrentPointAttempts([]);
+    setPointHistory([]);
+    setScoringHistory([]);
+
+    // Reset formation to serving at start of new set
+    setHomeFormationType('serving');
+    setOpponentFormationType('serving');
+    console.log(`🔄 New set started: Both teams → Serving formation`);
+
+    // Reset player selection
+    setSelectedPlayer(null);
+    setSelectedTeam(null);
+    setCurrentTrajectory(null);
+
+    // Reset action type to serve for new set
+    setActionType('serve');
+
+    // Reset set winner
+    setSetWinner(null);
+  };
+
+  /**
+   * Handle finishing the match after set ends
+   */
+  const handleFinishMatch = () => {
+    // Close the modal
+    setSetEndModalOpen(false);
+
+    // Navigate back to stats page
+    navigate(`/in-game-stats/${matchId}`);
+
+    console.log('🏁 Match finished! Navigating back to stats page.');
+  };
 
   return (
     <div className="visual-tracking-page">
@@ -425,43 +1532,59 @@ function VisualTrackingPageContent() {
             onTouchMove={handleMove}
             onTouchEnd={handleEnd}
           >
-            {/* Render home team players - Only show if no player selected (drawing mode) */}
-            {!selectedPlayer && Object.values(homeLineup).map((player) => {
+            {/* Render home team players - Always show, with selection/fade states */}
+            {Object.values(getCurrentLineup('home')).map((player) => {
               if (!player) return null;
               const position = getPositionCoordinates('home', player.position);
 
+              // Determine visual state
+              const isThisPlayerSelected = selectedPlayer?.playerId === player.playerId && selectedTeam === 'home';
+              const shouldFade = selectedPlayer !== null && !isThisPlayerSelected;
+
+              // Use unique key combining playerId and position to prevent duplicates
+              const uniqueKey = `home-${player.playerId}-${player.position}`;
+
               return (
                 <PlayerMarker
-                  key={player.playerId}
+                  key={uniqueKey}
                   playerId={player.playerId}
                   jerseyNumber={player.jerseyNumber}
                   playerName={player.playerName}
                   team="home"
+                  isLibero={player.isLibero}
                   x={position.x}
                   y={position.y}
-                  isSelected={false}
-                  isFaded={false}
+                  isSelected={isThisPlayerSelected}
+                  isFaded={shouldFade}
                   onClick={(id) => handlePlayerClick(id, 'home')}
                 />
               );
             })}
 
-            {/* Render opponent team players - Only show if no player selected (drawing mode) */}
-            {!selectedPlayer && Object.values(opponentLineup).map((player) => {
+            {/* Render opponent team players - Always show, with selection/fade states */}
+            {Object.values(getCurrentLineup('opponent')).map((player) => {
               if (!player) return null;
               const position = getPositionCoordinates('opponent', player.position);
 
+              // Determine visual state
+              const isThisPlayerSelected = selectedPlayer?.playerId === player.playerId && selectedTeam === 'opponent';
+              const shouldFade = selectedPlayer !== null && !isThisPlayerSelected;
+
+              // Use unique key combining playerId and position to prevent duplicates
+              const uniqueKey = `opponent-${player.playerId}-${player.position}`;
+
               return (
                 <PlayerMarker
-                  key={player.playerId}
+                  key={uniqueKey}
                   playerId={player.playerId}
                   jerseyNumber={player.jerseyNumber}
                   playerName={player.playerName}
                   team="opponent"
+                  isLibero={player.isLibero}
                   x={position.x}
                   y={position.y}
-                  isSelected={false}
-                  isFaded={false}
+                  isSelected={isThisPlayerSelected}
+                  isFaded={shouldFade}
                   onClick={(id) => handlePlayerClick(id, 'opponent')}
                 />
               );
@@ -486,6 +1609,184 @@ function VisualTrackingPageContent() {
         <div className="panel-section">
           {/* TOP SECTOR (40%): Scoreboard + Stats */}
           <div className="stats-panel" style={{ position: 'relative' }}>
+            {/* Set Tabs with Settings Button */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              marginBottom: '12px',
+              borderBottom: '2px solid #e5e7eb',
+              paddingBottom: '8px'
+            }}>
+              {/* Set Tab Buttons */}
+              <div style={{ display: 'flex', gap: '4px', flex: 1 }}>
+                {[1, 2, 3, 4, 5].map((setNum) => (
+                  <button
+                    key={setNum}
+                    onClick={() => handleSetChange(setNum)}
+                    style={{
+                      flex: 1,
+                      padding: '8px 4px',
+                      fontSize: '13px',
+                      fontWeight: '700',
+                      background: currentSet === setNum ? '#7c3aed' : '#f3f4f6',
+                      color: currentSet === setNum ? 'white' : '#666',
+                      border: currentSet === setNum ? '2px solid #5b21b6' : '2px solid #e5e7eb',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseOver={(e) => {
+                      if (currentSet !== setNum) {
+                        e.currentTarget.style.background = '#e5e7eb';
+                      }
+                    }}
+                    onMouseOut={(e) => {
+                      if (currentSet !== setNum) {
+                        e.currentTarget.style.background = '#f3f4f6';
+                      }
+                    }}
+                  >
+                    Set {setNum}
+                  </button>
+                ))}
+              </div>
+
+              {/* Settings Dropdown Button */}
+              <div style={{ position: 'relative' }}>
+                <button
+                  onClick={() => setSettingsDropdownOpen(!settingsDropdownOpen)}
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    border: '2px solid #d1d5db',
+                    borderRadius: '6px',
+                    background: settingsDropdownOpen ? '#e5e7eb' : 'white',
+                    fontSize: '16px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                  title="Settings & Info"
+                  onMouseOver={(e) => {
+                    if (!settingsDropdownOpen) {
+                      e.currentTarget.style.background = '#f3f4f6';
+                    }
+                  }}
+                  onMouseOut={(e) => {
+                    if (!settingsDropdownOpen) {
+                      e.currentTarget.style.background = 'white';
+                    }
+                  }}
+                >
+                  ⚙️
+                </button>
+
+                {/* Settings Dropdown Menu */}
+                {settingsDropdownOpen && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '38px',
+                      right: 0,
+                      background: 'white',
+                      border: '2px solid #d1d5db',
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                      zIndex: 1000,
+                      minWidth: '180px',
+                      overflow: 'hidden'
+                    }}
+                  >
+                    {/* Debug Info Option */}
+                    <button
+                      onClick={() => {
+                        setShowDebugInfo(!showDebugInfo);
+                        setSettingsDropdownOpen(false);
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '12px 16px',
+                        border: 'none',
+                        background: 'white',
+                        textAlign: 'left',
+                        fontSize: '14px',
+                        fontWeight: '500',
+                        cursor: 'pointer',
+                        transition: 'background 0.2s',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px'
+                      }}
+                      onMouseOver={(e) => e.currentTarget.style.background = '#f3f4f6'}
+                      onMouseOut={(e) => e.currentTarget.style.background = 'white'}
+                    >
+                      <span>{showDebugInfo ? '✅' : '⬜'}</span>
+                      <span>🐛 Debug Info</span>
+                    </button>
+
+                    {/* Match Info Option */}
+                    <button
+                      onClick={() => {
+                        setMatchInfoModalOpen(true);
+                        setSettingsDropdownOpen(false);
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '12px 16px',
+                        border: 'none',
+                        borderTop: '1px solid #e5e7eb',
+                        background: 'white',
+                        textAlign: 'left',
+                        fontSize: '14px',
+                        fontWeight: '500',
+                        cursor: 'pointer',
+                        transition: 'background 0.2s',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px'
+                      }}
+                      onMouseOver={(e) => e.currentTarget.style.background = '#f3f4f6'}
+                      onMouseOut={(e) => e.currentTarget.style.background = 'white'}
+                    >
+                      <span>📊 Match Info & Summary</span>
+                    </button>
+
+                    {/* Rotation Configuration Option */}
+                    {rotationEnabled && (
+                      <button
+                        onClick={() => {
+                          setRotationConfigModalOpen(true);
+                          setSettingsDropdownOpen(false);
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '12px 16px',
+                          border: 'none',
+                          borderTop: '1px solid #e5e7eb',
+                          background: 'white',
+                          textAlign: 'left',
+                          fontSize: '14px',
+                          fontWeight: '500',
+                          cursor: 'pointer',
+                          transition: 'background 0.2s',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px'
+                        }}
+                        onMouseOver={(e) => e.currentTarget.style.background = '#f3f4f6'}
+                        onMouseOut={(e) => e.currentTarget.style.background = 'white'}
+                      >
+                        <span>🔧 Rotation Config</span>
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* First Serve Selector - Show only before first player selected */}
             {!firstPlayerSelected && (
               <div style={{
@@ -546,107 +1847,370 @@ function VisualTrackingPageContent() {
             )}
 
             {/* Scoreboard Section */}
+            {/* Scoreboard + All Controls - Single Row with Better Spacing */}
             <div style={{
               display: 'grid',
-              gridTemplateColumns: '1fr auto 1fr',
-              gap: '16px',
+              gridTemplateColumns: rotationEnabled && homeRotationConfig && opponentRotationConfig
+                ? 'auto 1fr 1fr auto auto'
+                : 'auto',
+              gap: '12px',
               alignItems: 'center',
-              margin: 0,
-              padding: '16px',
+              padding: '10px 12px',
               background: '#f9fafb',
               borderRadius: '8px'
             }}>
-              {/* Home Score */}
-              <div style={{
-                background: '#7c3aed',
-                color: 'white',
-                padding: '8px',
-                borderRadius: '8px',
-                textAlign: 'center'
-              }}>
-                <div style={{ fontSize: '12px', fontWeight: '400', opacity: 0.9 }}>
-                  Home{servingTeam === 'home' ? ' (Serving)' : ''}
-                </div>
-                <div style={{ fontSize: '28px', fontWeight: '700' }}>{homeScore}</div>
+              {/* Scoreboard Section */}
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center', background: 'white', padding: '6px 8px', borderRadius: '6px', border: '2px solid #e5e7eb' }}>
+                <button
+                  onClick={() => {
+                    setScoringTeam('home');
+                    setScoringModalOpen(true);
+                  }}
+                  style={{
+                    background: '#7c3aed',
+                    color: 'white',
+                    padding: '6px 12px',
+                    borderRadius: '5px',
+                    textAlign: 'center',
+                    border: 'none',
+                    cursor: 'pointer',
+                    minWidth: '60px'
+                  }}
+                >
+                  <div style={{ fontSize: '9px', fontWeight: '500', opacity: 0.9, marginBottom: '2px' }}>
+                    {servingTeam === 'home' ? '● HOME' : 'HOME'}
+                  </div>
+                  <div style={{ fontSize: '20px', fontWeight: '700' }}>{homeScore}</div>
+                </button>
+
+                <button
+                  onClick={handleGoBack}
+                  disabled={scoringHistory.length === 0}
+                  style={{
+                    padding: '6px 10px',
+                    fontSize: '16px',
+                    background: scoringHistory.length === 0 ? '#e5e7eb' : '#f3f4f6',
+                    border: '2px solid #d1d5db',
+                    borderRadius: '5px',
+                    cursor: scoringHistory.length === 0 ? 'not-allowed' : 'pointer',
+                    opacity: scoringHistory.length === 0 ? 0.5 : 1
+                  }}
+                  title="Undo last point"
+                >
+                  ⏪
+                </button>
+
+                <button
+                  onClick={() => {
+                    setScoringTeam('opponent');
+                    setScoringModalOpen(true);
+                  }}
+                  style={{
+                    background: '#ef4444',
+                    color: 'white',
+                    padding: '6px 12px',
+                    borderRadius: '5px',
+                    textAlign: 'center',
+                    border: 'none',
+                    cursor: 'pointer',
+                    minWidth: '60px'
+                  }}
+                >
+                  <div style={{ fontSize: '9px', fontWeight: '500', opacity: 0.9, marginBottom: '2px' }}>
+                    {servingTeam === 'opponent' ? '● OPP' : 'OPP'}
+                  </div>
+                  <div style={{ fontSize: '20px', fontWeight: '700' }}>{opponentScore}</div>
+                </button>
               </div>
 
-              {/* Reset Button */}
-              <button
-                onClick={() => {
-                  if (window.confirm('Reset scoreboard to 0-0?')) {
-                    setHomeScore(0);
-                    setOpponentScore(0);
-                    setPointNumber(1);
-                    setAttemptNumber(1);
-                    setIsServePhase(true);
-                    setActionType('serve');
-                    setServingTeam('home'); // Reset to home serves first
-                    setFirstPlayerSelected(false); // Show serve selector again
-                    setCurrentPointAttempts([]);
-                    setSelectedPlayer(null);
-                    setSelectedTeam(null);
-                    setCurrentTrajectory(null);
-                  }
-                }}
-                style={{
-                  padding: '12px 20px',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  background: '#f3f4f6',
-                  border: '2px solid #d1d5db',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                🔄 Reset
-              </button>
+              {/* Rotation & Formation Controls */}
+              {rotationEnabled && homeRotationConfig && opponentRotationConfig && (
+                <>
+                  {/* Home Rotation */}
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px',
+                    background: '#ede9fe',
+                    padding: '6px 10px',
+                    borderRadius: '6px',
+                    border: '2px solid #c4b5fd'
+                  }}>
+                    <div style={{ fontSize: '10px', fontWeight: '700', color: '#5b21b6', textAlign: 'center' }}>
+                      HOME ROT {homeRotationConfig.currentRotation}
+                    </div>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <button
+                        onClick={() => handleManualRotateBackward('home')}
+                        style={{
+                          flex: 1,
+                          padding: '6px 8px',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          background: 'white',
+                          border: '2px solid #d1d5db',
+                          borderRadius: '4px',
+                          cursor: 'pointer'
+                        }}
+                        title="Rotate backward"
+                      >
+                        ↶
+                      </button>
+                      <button
+                        onClick={() => handleManualRotateForward('home')}
+                        style={{
+                          flex: 1,
+                          padding: '6px 8px',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          background: '#7c3aed',
+                          color: 'white',
+                          border: '2px solid #5b21b6',
+                          borderRadius: '4px',
+                          cursor: 'pointer'
+                        }}
+                        title="Rotate forward"
+                      >
+                        ↷
+                      </button>
+                    </div>
+                  </div>
 
-              {/* Opponent Score */}
-              <div style={{
-                background: '#ef4444',
-                color: 'white',
-                padding: '8px',
-                borderRadius: '8px',
-                textAlign: 'center'
-              }}>
-                <div style={{ fontSize: '12px', fontWeight: '400', opacity: 0.9 }}>
-                  Opponent{servingTeam === 'opponent' ? ' (Serving)' : ''}
-                </div>
-                <div style={{ fontSize: '28px', fontWeight: '700' }}>{opponentScore}</div>
-              </div>
+                  {/* Opponent Rotation */}
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px',
+                    background: '#fee2e2',
+                    padding: '6px 10px',
+                    borderRadius: '6px',
+                    border: '2px solid #fecaca'
+                  }}>
+                    <div style={{ fontSize: '10px', fontWeight: '700', color: '#991b1b', textAlign: 'center' }}>
+                      OPP ROT {opponentRotationConfig.currentRotation}
+                    </div>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <button
+                        onClick={() => handleManualRotateBackward('opponent')}
+                        style={{
+                          flex: 1,
+                          padding: '6px 8px',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          background: 'white',
+                          border: '2px solid #d1d5db',
+                          borderRadius: '4px',
+                          cursor: 'pointer'
+                        }}
+                        title="Rotate backward"
+                      >
+                        ↶
+                      </button>
+                      <button
+                        onClick={() => handleManualRotateForward('opponent')}
+                        style={{
+                          flex: 1,
+                          padding: '6px 8px',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          background: '#ef4444',
+                          color: 'white',
+                          border: '2px solid #dc2626',
+                          borderRadius: '4px',
+                          cursor: 'pointer'
+                        }}
+                        title="Rotate forward"
+                      >
+                        ↷
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Home Formation */}
+                  <button
+                    onClick={() => handleFormationToggle('home', homeFormationType === 'serving' ? 'rally' : 'serving')}
+                    style={{
+                      padding: '8px 14px',
+                      fontSize: '11px',
+                      fontWeight: '700',
+                      background: homeFormationType === 'serving' ? '#7c3aed' : '#10b981',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                      minWidth: '85px'
+                    }}
+                    title={`Home: ${homeFormationType} formation`}
+                  >
+                    <div style={{ fontSize: '9px', opacity: 0.9 }}>HOME</div>
+                    <div>{homeFormationType === 'serving' ? 'SERVE' : 'RALLY'}</div>
+                  </button>
+
+                  {/* Opponent Formation */}
+                  <button
+                    onClick={() => handleFormationToggle('opponent', opponentFormationType === 'serving' ? 'rally' : 'serving')}
+                    style={{
+                      padding: '8px 14px',
+                      fontSize: '11px',
+                      fontWeight: '700',
+                      background: opponentFormationType === 'serving' ? '#ef4444' : '#10b981',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                      minWidth: '85px'
+                    }}
+                    title={`Opponent: ${opponentFormationType} formation`}
+                  >
+                    <div style={{ fontSize: '9px', opacity: 0.9 }}>OPP</div>
+                    <div>{opponentFormationType === 'serving' ? 'SERVE' : 'RALLY'}</div>
+                  </button>
+                </>
+              )}
             </div>
 
-            {/* Debug Info Toggle Button - Top Right Corner */}
-            <div style={{
-              position: 'absolute',
-              top: '20px',
-              right: '20px',
-              zIndex: 10
-            }}>
-              <button
-                onClick={() => setShowDebugInfo(!showDebugInfo)}
-                style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '50%',
-                  border: '2px solid #d1d5db',
-                  background: showDebugInfo ? '#7c3aed' : '#f3f4f6',
-                  color: showDebugInfo ? 'white' : '#666',
-                  fontSize: '16px',
-                  fontWeight: '700',
-                  cursor: 'pointer',
+            {/* Point Trend Display - Last 5 Points */}
+            {pointHistory.length > 0 && (
+              <div style={{
+                marginTop: '20px',
+                background: '#ffffff',
+                border: '2px solid #e5e7eb',
+                borderRadius: '8px',
+                overflow: 'hidden'
+              }}>
+                {/* Header with View All button */}
+                <div style={{
                   display: 'flex',
+                  justifyContent: 'space-between',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'all 0.2s',
-                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
-                }}
-                title="Toggle debug info"
-              >
-                i
-              </button>
-            </div>
+                  padding: '12px 16px',
+                  background: '#f9fafb',
+                  borderBottom: '2px solid #e5e7eb'
+                }}>
+                  <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: '#333' }}>
+                    📊 Recent Points
+                  </h4>
+                  <button
+                    onClick={() => setFullHistoryModalOpen(true)}
+                    style={{
+                      padding: '6px 12px',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      background: '#7c3aed',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    View All
+                  </button>
+                </div>
+
+                {/* Column Headers */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '80px 1fr 1fr',
+                  gap: '8px',
+                  padding: '8px 12px',
+                  background: '#f3f4f6',
+                  borderBottom: '1px solid #e5e7eb',
+                  fontSize: '11px',
+                  fontWeight: '700',
+                  color: '#666',
+                  textTransform: 'uppercase'
+                }}>
+                  <div>Score</div>
+                  <div>Home</div>
+                  <div>Opponent</div>
+                </div>
+
+                {/* Point Rows - Last 5 points */}
+                <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                  {pointHistory.slice(-5).reverse().map((point, index) => {
+                    // Format home action
+                    const homeAction = point.winningTeam === 'home' && point.team === 'home'
+                      ? `${formatPlayerDisplay(point.playerId, 'home')} ${
+                          point.actionType === 'error' ? '❌ Error' :
+                          point.actionType === 'serve' ? '🎯 Ace' :
+                          point.actionType === 'attack' ? '⚡ Kill' :
+                          point.actionType === 'block' ? '🛡️ Block' :
+                          '✅ Point'
+                        }`
+                      : point.winningTeam === 'home' && point.team === 'opponent'
+                      ? `${formatPlayerDisplay(point.playerId, 'opponent')} ❌ Error`
+                      : '';
+
+                    // Format opponent action
+                    const opponentAction = point.winningTeam === 'opponent' && point.team === 'opponent'
+                      ? `${formatPlayerDisplay(point.playerId, 'opponent')} ${
+                          point.actionType === 'error' ? '❌ Error' :
+                          point.actionType === 'serve' ? '🎯 Ace' :
+                          point.actionType === 'attack' ? '⚡ Kill' :
+                          point.actionType === 'block' ? '🛡️ Block' :
+                          '✅ Point'
+                        }`
+                      : point.winningTeam === 'opponent' && point.team === 'home'
+                      ? `${formatPlayerDisplay(point.playerId, 'home')} ❌ Error`
+                      : '';
+
+                    // Determine styling based on action type
+                    const homeColor = point.winningTeam === 'home' && point.team === 'home'
+                      ? '#10b981' // Green for home scoring
+                      : point.winningTeam === 'home' && point.team === 'opponent'
+                      ? '#ef4444' // Red for opponent error
+                      : '#e5e7eb';
+
+                    const opponentColor = point.winningTeam === 'opponent' && point.team === 'opponent'
+                      ? '#10b981' // Green for opponent scoring
+                      : point.winningTeam === 'opponent' && point.team === 'home'
+                      ? '#ef4444' // Red for home error
+                      : '#e5e7eb';
+
+                    return (
+                      <div
+                        key={`point-${point.pointNumber}-${index}`}
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: '80px 1fr 1fr',
+                          gap: '8px',
+                          padding: '10px 12px',
+                          borderBottom: '1px solid #f3f4f6',
+                          fontSize: '13px'
+                        }}
+                      >
+                        <div style={{ fontWeight: '700', color: '#666' }}>
+                          {point.homeScore} - {point.opponentScore}
+                        </div>
+                        <div style={{
+                          color: homeAction ? '#333' : '#d1d5db',
+                          fontWeight: homeAction ? '600' : '400',
+                          background: homeAction ? `${homeColor}15` : 'transparent',
+                          padding: homeAction ? '4px 8px' : '0',
+                          borderRadius: '4px',
+                          borderLeft: homeAction ? `3px solid ${homeColor}` : 'none'
+                        }}>
+                          {homeAction || '—'}
+                        </div>
+                        <div style={{
+                          color: opponentAction ? '#333' : '#d1d5db',
+                          fontWeight: opponentAction ? '600' : '400',
+                          background: opponentAction ? `${opponentColor}15` : 'transparent',
+                          padding: opponentAction ? '4px 8px' : '0',
+                          borderRadius: '4px',
+                          borderLeft: opponentAction ? `3px solid ${opponentColor}` : 'none'
+                        }}>
+                          {opponentAction || '—'}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* MIDDLE SECTOR (15%): Action Bar */}
@@ -749,8 +2313,208 @@ function VisualTrackingPageContent() {
                 >
                   💪 Dig
                 </button>
+                <button
+                  onClick={() => {
+                    // Quick error - no trajectory needed
+                    if (!selectedPlayer || !selectedTeam) return;
+
+                    // Point ended - switch BOTH teams back to serving formation
+                    setHomeFormationType('serving');
+                    setOpponentFormationType('serving');
+                    console.log('🏐 Both teams → Serving formation (point ended via error button)');
+
+                    // Save to scoring history
+                    setScoringHistory(prev => [...prev, {
+                      pointNumber,
+                      homeScore,
+                      opponentScore,
+                      servingTeam
+                    }]);
+
+                    // Determine winner (error means other team wins)
+                    const pointWinner: 'home' | 'opponent' = selectedTeam === 'home' ? 'opponent' : 'home';
+
+                    // Update scores
+                    if (pointWinner === 'home') {
+                      setHomeScore(prev => prev + 1);
+                    } else {
+                      setOpponentScore(prev => prev + 1);
+                    }
+
+                    // Calculate new scores for point history
+                    const newHomeScore = pointWinner === 'home' ? homeScore + 1 : homeScore;
+                    const newOpponentScore = pointWinner === 'opponent' ? opponentScore + 1 : opponentScore;
+
+                    // Add to point history
+                    setPointHistory(prev => [...prev, {
+                      pointNumber,
+                      homeScore: newHomeScore,
+                      opponentScore: newOpponentScore,
+                      winningTeam: pointWinner,
+                      actionType: 'error',
+                      playerId: selectedPlayer.playerId,
+                      team: selectedTeam
+                    }]);
+
+                    // Update serving team
+                    setServingTeam(pointWinner);
+
+                    // Start new point
+                    setPointNumber(prev => prev + 1);
+                    setAttemptNumber(1);
+                    setIsServePhase(true);
+                    setActionType('serve');
+                    setCurrentPointAttempts([]);
+                    setSelectedPlayer(null);
+                    setSelectedTeam(null);
+
+                    console.log(`❌ ${selectedTeam} Error - Point to ${pointWinner}`);
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    border: '2px solid #e5e7eb',
+                    background: '#ef4444',
+                    color: 'white',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  ❌ Error
+                </button>
               </div>
             )}
+
+            {/* Libero Swap Button - Show when player selected and rotation enabled */}
+            {selectedPlayer && rotationEnabled && (() => {
+              const team = selectedTeam!;
+              const config = team === 'home' ? homeRotationConfig : opponentRotationConfig;
+              const swapState = team === 'home' ? homeLiberoSwapState : opponentLiberoSwapState;
+
+              console.log('🔍 Libero button check:', {
+                hasConfig: !!config,
+                hasLibero: !!config?.libero,
+                selectedPlayer: selectedPlayer?.jerseyNumber,
+                position: selectedPlayer?.position,
+                isLibero: selectedPlayer?.isLibero,
+                roleInSystem: selectedPlayer?.roleInSystem,
+                liberoReplacementTargets: config?.liberoReplacementTargets,
+                swapState
+              });
+
+              if (!config || !config.libero) {
+                console.log('❌ No config or libero - button hidden');
+                return null;
+              }
+
+              const isBackRow = ['P1', 'P5', 'P6'].includes(selectedPlayer.position);
+
+              // Check if libero is actually on the court (in back row positions)
+              const lineup = team === 'home' ? homeLineup : opponentLineup;
+              const liberoOnCourt = Object.values(lineup).some(p =>
+                p && p.isLibero && ['P1', 'P5', 'P6'].includes(p.position)
+              );
+
+              console.log('🔍 Button state:', { isBackRow, swapActive: swapState.isActive, liberoOnCourt });
+
+              // Case 1: Libero is selected
+              if (selectedPlayer.isLibero) {
+                console.log('✅ Showing Swap OUT button');
+
+                return (
+                  <button
+                    onClick={() => handleLiberoSwapOut(team)}
+                    disabled={!isBackRow}
+                    style={{
+                      padding: '10px 16px',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      borderRadius: '6px',
+                      border: '2px solid',
+                      cursor: isBackRow ? 'pointer' : 'not-allowed',
+                      opacity: isBackRow ? 1 : 0.5,
+                      minWidth: '140px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      background: isBackRow ? '#f59e0b' : '#f3f4f6',
+                      color: isBackRow ? 'white' : '#9ca3af',
+                      borderColor: isBackRow ? '#f59e0b' : '#d1d5db',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <span>🔄</span>
+                    <span>Swap OUT</span>
+                  </button>
+                );
+              }
+
+              // Case 2: ANY back row player selected, libero NOT on back row
+              if (isBackRow && !liberoOnCourt) {
+                console.log('✅ Showing Swap IN button (libero not on back row)');
+                return (
+                  <button
+                    onClick={() => handleLiberoSwapIn(team)}
+                    style={{
+                      padding: '10px 16px',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      borderRadius: '6px',
+                      border: '2px solid',
+                      cursor: 'pointer',
+                      minWidth: '140px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      background: '#10b981',
+                      color: 'white',
+                      borderColor: '#10b981',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <span>🔄</span>
+                    <span>Swap IN</span>
+                  </button>
+                );
+              }
+
+              // Case 3: Front row player - show disabled button for feedback
+              if (!isBackRow) {
+                console.log('⚪ Showing disabled button (front row)');
+                return (
+                  <button
+                    disabled
+                    style={{
+                      padding: '10px 16px',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      borderRadius: '6px',
+                      border: '2px solid #d1d5db',
+                      cursor: 'not-allowed',
+                      opacity: 0.5,
+                      minWidth: '140px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      background: '#f3f4f6',
+                      color: '#9ca3af'
+                    }}
+                  >
+                    <span>🔄</span>
+                    <span>Libero Swap</span>
+                  </button>
+                );
+              }
+
+              console.log('❌ No button condition met - button hidden');
+              return null;
+            })()}
 
             {/* Serve indicator during serve phase */}
             {isServePhase && selectedPlayer && (
@@ -804,34 +2568,6 @@ function VisualTrackingPageContent() {
                 ✏️ Draw a trajectory on the court
               </div>
             )}
-
-            {/* Settings Button */}
-            <button
-              style={{
-                width: '40px',
-                height: '40px',
-                border: '1px solid #ddd',
-                borderRadius: '6px',
-                background: '#ffffff',
-                fontSize: '18px',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-              title="Settings"
-              onMouseOver={(e) => {
-                e.currentTarget.style.background = '#f5f5f5';
-                e.currentTarget.style.borderColor = '#ccc';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.background = '#ffffff';
-                e.currentTarget.style.borderColor = '#ddd';
-              }}
-            >
-              ⚙️
-            </button>
           </div>
 
           {/* BOTTOM SECTOR (45%): Result Buttons + Hit Zones */}
@@ -964,6 +2700,396 @@ function VisualTrackingPageContent() {
           <div className="rotate-icon">⤾</div>
         </div>
       </div>
+
+      {/* Quick Scoring Modal */}
+      {scoringModalOpen && scoringTeam && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+          onClick={() => {
+            setScoringModalOpen(false);
+            setScoringTeam(null);
+          }}
+        >
+          <div
+            style={{
+              background: 'white',
+              borderRadius: '12px',
+              padding: '24px',
+              maxWidth: '400px',
+              width: '90%',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '16px'
+            }}>
+              <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: '#333' }}>
+                Quick Score: {scoringTeam === 'home' ? 'Home' : 'Opponent'}
+              </h3>
+              <button
+                onClick={() => {
+                  setScoringModalOpen(false);
+                  setScoringTeam(null);
+                }}
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  border: '2px solid #d1d5db',
+                  background: '#f3f4f6',
+                  color: '#666',
+                  fontSize: '18px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Show either error type selection or player selection */}
+            {!scoringOption ? (
+              <>
+                <p style={{ fontSize: '14px', color: '#666', marginBottom: '20px' }}>
+                  Select a scoring option to award a point:
+                </p>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {/* Team Error Option */}
+                  <button
+                    onClick={() => setScoringOption('team_error')}
+                    style={{
+                      padding: '16px',
+                      fontSize: '16px',
+                      fontWeight: '700',
+                      background: '#ef4444',
+                      color: 'white',
+                      border: '3px solid #dc2626',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      textAlign: 'left'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.transform = 'scale(1.02)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.3)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.transform = 'scale(1)';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
+                  >
+                    <div style={{ fontSize: '18px', marginBottom: '4px' }}>❌ {scoringTeam === 'home' ? 'Home' : 'Opponent'} Error</div>
+                    <div style={{ fontSize: '12px', opacity: 0.9 }}>
+                      Point to {scoringTeam === 'home' ? 'Opponent' : 'Home'}
+                    </div>
+                  </button>
+
+                  {/* Opponent Error Option */}
+                  <button
+                    onClick={() => setScoringOption('opponent_error')}
+                    style={{
+                      padding: '16px',
+                      fontSize: '16px',
+                      fontWeight: '700',
+                      background: '#10b981',
+                      color: 'white',
+                      border: '3px solid #059669',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      textAlign: 'left'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.transform = 'scale(1.02)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.transform = 'scale(1)';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
+                  >
+                    <div style={{ fontSize: '18px', marginBottom: '4px' }}>✅ {scoringTeam === 'home' ? 'Opponent' : 'Home'} Error</div>
+                    <div style={{ fontSize: '12px', opacity: 0.9 }}>
+                      Point to {scoringTeam === 'home' ? 'Home' : 'Opponent'}
+                    </div>
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Player Selection Step */}
+                <button
+                  onClick={() => setScoringOption(null)}
+                  style={{
+                    padding: '8px 12px',
+                    fontSize: '14px',
+                    background: '#f3f4f6',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    marginBottom: '16px'
+                  }}
+                >
+                  ← Back
+                </button>
+
+                <p style={{ fontSize: '14px', color: '#666', marginBottom: '12px' }}>
+                  {scoringOption === 'team_error'
+                    ? `Which ${scoringTeam} player made the error?`
+                    : `Which ${scoringTeam === 'home' ? 'Opponent' : 'Home'} player made the error?`
+                  }
+                </p>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', maxHeight: '300px', overflowY: 'auto' }}>
+                  {(() => {
+                    // Determine which roster to show based on scoring option
+                    const errorTeam = scoringOption === 'team_error' ? scoringTeam : (scoringTeam === 'home' ? 'opponent' : 'home');
+                    const roster = errorTeam === 'home' ? homeRoster : opponentRoster;
+
+                    return roster.map((player) => (
+                      <button
+                        key={player.Id}
+                        onClick={() => handleQuickScore(scoringOption, player.Id)}
+                        style={{
+                          padding: '12px 8px',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          background: '#ffffff',
+                          border: '2px solid #e5e7eb',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          textAlign: 'center'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = '#f3f4f6';
+                          e.currentTarget.style.borderColor = '#7c3aed';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = '#ffffff';
+                          e.currentTarget.style.borderColor = '#e5e7eb';
+                        }}
+                      >
+                        <div style={{ fontSize: '18px', marginBottom: '4px' }}>#{player.jerseyNumber}</div>
+                        <div style={{ fontSize: '12px', color: '#666' }}>{player.name}</div>
+                      </button>
+                    ));
+                  })()}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+
+      {/* Full History Modal */}
+      {fullHistoryModalOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+          onClick={() => setFullHistoryModalOpen(false)}
+        >
+          <div
+            style={{
+              background: 'white',
+              borderRadius: '12px',
+              padding: '24px',
+              maxWidth: '900px',
+              width: '90%',
+              maxHeight: '80vh',
+              overflow: 'hidden',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+              display: 'flex',
+              flexDirection: 'column'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '16px',
+              borderBottom: '2px solid #e5e7eb',
+              paddingBottom: '12px'
+            }}>
+              <h3 style={{ margin: 0, fontSize: '24px', fontWeight: '700', color: '#333' }}>
+                📊 Full Point History
+              </h3>
+              <button
+                onClick={() => setFullHistoryModalOpen(false)}
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  border: '2px solid #d1d5db',
+                  background: '#f3f4f6',
+                  color: '#666',
+                  fontSize: '18px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {pointHistory.length === 0 ? (
+              <div style={{
+                padding: '40px',
+                textAlign: 'center',
+                color: '#999'
+              }}>
+                <p style={{ fontSize: '16px', margin: 0 }}>No points recorded yet. Start playing to see history!</p>
+              </div>
+            ) : (
+              <>
+                <p style={{ fontSize: '14px', color: '#666', marginBottom: '16px' }}>
+                  Showing all {pointHistory.length} point{pointHistory.length !== 1 ? 's' : ''} in chronological order (newest first).
+                </p>
+
+                {/* Column Headers */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '80px 1fr 1fr',
+                  gap: '12px',
+                  padding: '12px 16px',
+                  background: '#f3f4f6',
+                  borderRadius: '8px 8px 0 0',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  color: '#666',
+                  textTransform: 'uppercase',
+                  borderBottom: '2px solid #e5e7eb'
+                }}>
+                  <div>Score</div>
+                  <div>Home Team Action</div>
+                  <div>Opponent Team Action</div>
+                </div>
+
+                {/* Scrollable Point List */}
+                <div style={{
+                  flex: 1,
+                  overflowY: 'auto',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '0 0 8px 8px'
+                }}>
+                  {pointHistory.slice().reverse().map((point, index) => {
+                    // Format home action
+                    const homeAction = point.winningTeam === 'home' && point.team === 'home'
+                      ? `${formatPlayerDisplay(point.playerId, 'home')} ${
+                          point.actionType === 'error' ? '❌ Error' :
+                          point.actionType === 'serve' ? '🎯 Ace' :
+                          point.actionType === 'attack' ? '⚡ Kill' :
+                          point.actionType === 'block' ? '🛡️ Block' :
+                          '✅ Point'
+                        }`
+                      : point.winningTeam === 'home' && point.team === 'opponent'
+                      ? `${formatPlayerDisplay(point.playerId, 'opponent')} ❌ Error`
+                      : '';
+
+                    // Format opponent action
+                    const opponentAction = point.winningTeam === 'opponent' && point.team === 'opponent'
+                      ? `${formatPlayerDisplay(point.playerId, 'opponent')} ${
+                          point.actionType === 'error' ? '❌ Error' :
+                          point.actionType === 'serve' ? '🎯 Ace' :
+                          point.actionType === 'attack' ? '⚡ Kill' :
+                          point.actionType === 'block' ? '🛡️ Block' :
+                          '✅ Point'
+                        }`
+                      : point.winningTeam === 'opponent' && point.team === 'home'
+                      ? `${formatPlayerDisplay(point.playerId, 'home')} ❌ Error`
+                      : '';
+
+                    // Determine styling based on action type
+                    const homeColor = point.winningTeam === 'home' && point.team === 'home'
+                      ? '#10b981' // Green for home scoring
+                      : point.winningTeam === 'home' && point.team === 'opponent'
+                      ? '#ef4444' // Red for opponent error
+                      : '#e5e7eb';
+
+                    const opponentColor = point.winningTeam === 'opponent' && point.team === 'opponent'
+                      ? '#10b981' // Green for opponent scoring
+                      : point.winningTeam === 'opponent' && point.team === 'home'
+                      ? '#ef4444' // Red for home error
+                      : '#e5e7eb';
+
+                    return (
+                      <div
+                        key={`full-point-${point.pointNumber}-${index}`}
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: '80px 1fr 1fr',
+                          gap: '12px',
+                          padding: '14px 16px',
+                          borderBottom: index < pointHistory.length - 1 ? '1px solid #f3f4f6' : 'none',
+                          fontSize: '14px'
+                        }}
+                      >
+                        <div style={{ fontWeight: '700', color: '#666' }}>
+                          {point.homeScore} - {point.opponentScore}
+                        </div>
+                        <div style={{
+                          color: homeAction ? '#333' : '#d1d5db',
+                          fontWeight: homeAction ? '600' : '400',
+                          background: homeAction ? `${homeColor}15` : 'transparent',
+                          padding: homeAction ? '6px 10px' : '0',
+                          borderRadius: '6px',
+                          borderLeft: homeAction ? `3px solid ${homeColor}` : 'none'
+                        }}>
+                          {homeAction || '—'}
+                        </div>
+                        <div style={{
+                          color: opponentAction ? '#333' : '#d1d5db',
+                          fontWeight: opponentAction ? '600' : '400',
+                          background: opponentAction ? `${opponentColor}15` : 'transparent',
+                          padding: opponentAction ? '6px 10px' : '0',
+                          borderRadius: '6px',
+                          borderLeft: opponentAction ? `3px solid ${opponentColor}` : 'none'
+                        }}>
+                          {opponentAction || '—'}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Debug Info Modal */}
       {showDebugInfo && (
@@ -1112,6 +3238,179 @@ function VisualTrackingPageContent() {
           </div>
         </div>
       )}
+
+      {/* Set End Modal */}
+      {setEndModalOpen && setWinner && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            background: 'rgba(0, 0, 0, 0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 2000
+          }}
+        >
+          <div
+            style={{
+              background: 'white',
+              borderRadius: '16px',
+              padding: '32px',
+              maxWidth: '500px',
+              width: '90%',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.4)',
+              textAlign: 'center'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{
+              fontSize: '48px',
+              marginBottom: '16px'
+            }}>
+              🏆
+            </div>
+
+            <h2 style={{
+              margin: '0 0 12px 0',
+              fontSize: '28px',
+              fontWeight: '700',
+              color: '#333'
+            }}>
+              Set {currentSet} Complete!
+            </h2>
+
+            <div style={{
+              fontSize: '32px',
+              fontWeight: '700',
+              color: setWinner === 'home' ? '#7c3aed' : '#ef4444',
+              marginBottom: '8px'
+            }}>
+              {setWinner === 'home' ? 'HOME' : 'OPPONENT'} WINS
+            </div>
+
+            <div style={{
+              fontSize: '48px',
+              fontWeight: '700',
+              color: '#666',
+              marginBottom: '24px',
+              letterSpacing: '4px'
+            }}>
+              {homeScore} - {opponentScore}
+            </div>
+
+            <p style={{
+              fontSize: '14px',
+              color: '#666',
+              marginBottom: '32px'
+            }}>
+              {currentSet < 5
+                ? 'Would you like to continue to the next set or finish the match?'
+                : 'This was the final set. Match complete!'}
+            </p>
+
+            <div style={{
+              display: 'flex',
+              gap: '12px',
+              justifyContent: 'center'
+            }}>
+              {currentSet < 5 && (
+                <button
+                  onClick={handleContinueToNextSet}
+                  style={{
+                    flex: 1,
+                    padding: '14px 24px',
+                    fontSize: '16px',
+                    fontWeight: '700',
+                    background: '#7c3aed',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = '#6d28d9';
+                    e.currentTarget.style.transform = 'scale(1.02)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = '#7c3aed';
+                    e.currentTarget.style.transform = 'scale(1)';
+                  }}
+                >
+                  Continue to Set {currentSet + 1}
+                </button>
+              )}
+
+              <button
+                onClick={handleFinishMatch}
+                style={{
+                  flex: currentSet < 5 ? 1 : undefined,
+                  padding: '14px 24px',
+                  fontSize: '16px',
+                  fontWeight: '700',
+                  background: '#f3f4f6',
+                  color: '#333',
+                  border: '2px solid #d1d5db',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = '#e5e7eb';
+                  e.currentTarget.style.borderColor = '#9ca3af';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = '#f3f4f6';
+                  e.currentTarget.style.borderColor = '#d1d5db';
+                }}
+              >
+                Finish Match
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Match Info Modal */}
+      <MatchInfoModal
+        isOpen={matchInfoModalOpen}
+        onClose={() => setMatchInfoModalOpen(false)}
+        matchId={matchId || 'unknown'}
+        homeTeamName={homeTeamName}
+        opponentTeamName={opponentTeamName}
+        currentSet={currentSet}
+        homeScore={homeScore}
+        opponentScore={opponentScore}
+        pointHistoryLength={pointHistory.length}
+        homeRotationConfig={homeRotationConfig}
+        opponentRotationConfig={opponentRotationConfig}
+        homeRoster={homeRoster}
+        opponentRoster={opponentRoster}
+        rotationEnabled={rotationEnabled}
+        onResetConfiguration={handleResetConfiguration}
+      />
+
+      {/* Rotation Configuration Modal */}
+      <RotationConfigModal
+        isOpen={rotationConfigModalOpen}
+        onClose={() => {
+          setRotationConfigModalOpen(false);
+          setRotationConfigDismissed(true);
+        }}
+        onSave={handleRotationConfigSave}
+        initialHomeConfig={homeRotationConfig || undefined}
+        initialOpponentConfig={opponentRotationConfig || undefined}
+        onResetConfiguration={handleResetConfiguration}
+        currentSet={currentSet}
+        homeTeamName={homeTeamName}
+        opponentTeamName={opponentTeamName}
+        homeRoster={homeRoster}
+        opponentRoster={opponentRoster}
+      />
     </div>
   );
 }
