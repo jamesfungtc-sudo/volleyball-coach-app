@@ -379,7 +379,7 @@ export function RotationConfigModal({
               const isRosterPlayer = playerRef?.type === 'roster';
               const playerName = playerRef?.type === 'roster'
                 ? (roster.find(p => p.id === playerRef.playerId)?.name || '')
-                : (playerRef?.customName || '');
+                : (playerRef?.type === 'custom' ? playerRef.name || '' : '');
               const jerseyNum = playerRef ? getJerseyNumber(playerRef) : 0;
 
               return (
@@ -447,7 +447,7 @@ export function RotationConfigModal({
                 value={
                   config.libero && config.libero.type === 'roster'
                     ? (roster.find(p => p.id === (config.libero as any).playerId)?.name || '')
-                    : (config.libero && config.libero.type === 'custom' ? config.libero.customName || '' : '')
+                    : (config.libero && config.libero.type === 'custom' ? config.libero.name || '' : '')
                 }
                 onChange={(e) => handleLiberoNameChange(team, e.target.value)}
                 placeholder="Enter or select Libero name"
