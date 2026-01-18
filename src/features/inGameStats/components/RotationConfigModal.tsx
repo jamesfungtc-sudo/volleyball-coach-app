@@ -101,7 +101,7 @@ export function RotationConfigModal({
       const selectedPlayer = roster.find(p => p.name === value);
       if (selectedPlayer) {
         // Roster player selected - use their data (auto-fills jersey)
-        playerRef = createRosterReference(selectedPlayer);
+        playerRef = createRosterReference(selectedPlayer.id, selectedPlayer.teamId);
       } else {
         // Custom name - preserve existing jersey number
         const existingJersey = currentPlayerRef ? getJerseyNumber(currentPlayerRef) : 0;
@@ -186,7 +186,7 @@ export function RotationConfigModal({
     } else {
       const selectedPlayer = roster.find(p => p.name === value);
       if (selectedPlayer) {
-        playerRef = createRosterReference(selectedPlayer);
+        playerRef = createRosterReference(selectedPlayer.id, selectedPlayer.teamId);
       } else {
         const existingJersey = currentLiberoRef ? getJerseyNumber(currentLiberoRef) : 0;
         playerRef = createCustomReference(existingJersey, value);
@@ -377,10 +377,13 @@ export function RotationConfigModal({
             {roles.map((role: string) => {
               const playerRef = config.players[role as PlayerRole];
               const isRosterPlayer = playerRef?.type === 'roster';
-              const playerName = playerRef?.type === 'roster'
-                ? (roster.find(p => p.id === playerRef.playerId)?.name || '')
+              const rosterPlayer = isRosterPlayer ? roster.find(p => p.id === playerRef.playerId) : null;
+              const playerName = isRosterPlayer
+                ? (rosterPlayer?.name || '')
                 : (playerRef?.type === 'custom' ? playerRef.name || '' : '');
-              const jerseyNum = playerRef ? getJerseyNumber(playerRef) : 0;
+              const jerseyNum = isRosterPlayer
+                ? (rosterPlayer?.jerseyNumber ? Number(rosterPlayer.jerseyNumber) : 0)
+                : (playerRef ? getJerseyNumber(playerRef) : 0);
 
               return (
                 <React.Fragment key={role}>
@@ -472,7 +475,15 @@ export function RotationConfigModal({
 
             <input
               type="number"
-              value={config.libero ? (getJerseyNumber(config.libero) === 0 ? '' : getJerseyNumber(config.libero)) : ''}
+              value={(() => {
+                if (!config.libero) return '';
+                if (config.libero.type === 'roster') {
+                  const liberoPlayer = roster.find(p => p.id === config.libero!.playerId);
+                  return liberoPlayer?.jerseyNumber ? Number(liberoPlayer.jerseyNumber) : '';
+                }
+                const jerseyNum = getJerseyNumber(config.libero);
+                return jerseyNum === 0 ? '' : jerseyNum;
+              })()}
               onChange={(e) => {
                 // If libero is null, create empty custom reference first
                 if (!config.libero) {
