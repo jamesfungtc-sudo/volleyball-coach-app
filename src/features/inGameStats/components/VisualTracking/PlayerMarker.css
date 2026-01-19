@@ -39,6 +39,35 @@
   opacity: 0.3;
 }
 
+/* Libero state - Gold/yellow background to distinguish */
+.player-marker-libero .player-marker-circle {
+  fill: #fbbf24;  /* Amber/gold color */
+  stroke: #d97706;  /* Darker amber border */
+  stroke-width: 2.5;
+}
+
+.player-marker-libero .player-marker-number {
+  fill: #78350f;  /* Dark brown text for contrast */
+  font-weight: 700;
+}
+
+/* Libero + Selected state */
+.player-marker-libero.player-marker-selected .player-marker-circle {
+  fill: #f59e0b;  /* Darker amber when selected */
+  stroke: #b45309;
+  stroke-width: 3;
+}
+
+.player-marker-libero.player-marker-selected .player-marker-number {
+  fill: white;
+}
+
+/* Libero hover state */
+.player-marker-libero:hover .player-marker-circle {
+  stroke: #d97706;
+  stroke-width: 3;
+}
+
 /* Team-specific colors (optional borders) */
 .player-marker-home .player-marker-circle {
   /* Can add team-specific styling if needed */
