@@ -1,7 +1,24 @@
 # Claude Code Instructions for volleyball-coach-app
 
+## CRITICAL: Working Directory
+
+**ALWAYS** work in:
+```
+/Users/tszchiujamesfung/Documents/GitHub/volleyball-coach-app
+```
+
+**NEVER** use `/private/tmp/vball-fresh` or any other temp directory.
+
+Before ANY file operation (read, write, edit), verify the path starts with:
+`/Users/tszchiujamesfung/Documents/GitHub/volleyball-coach-app/`
+
 ## Project Overview
 Volleyball coaching app with rotation tracking, player management, and game statistics.
+
+## Node.js - REQUIRED
+```bash
+source ~/.nvm/nvm.sh && nvm use 22
+```
 
 ## Git Workflow - CRITICAL
 

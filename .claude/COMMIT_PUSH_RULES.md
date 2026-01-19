@@ -1,6 +1,26 @@
-# Commit and Push Rules for volleyball-coach-app
+# Development and Deployment Rules for volleyball-coach-app
 
-## CRITICAL: Always Follow This Workflow
+## CRITICAL: Working Directory
+
+**ALWAYS** work in this directory for ALL operations:
+```
+/Users/tszchiujamesfung/Documents/GitHub/volleyball-coach-app
+```
+
+**NEVER** use:
+- `/private/tmp/vball-fresh` (old temp clone - DO NOT USE)
+- Any other temporary directory
+- Any other clone of this repo
+
+## Local Development
+
+When making ANY code changes:
+1. Verify you're in the correct directory first
+2. Use Node.js 22+: `source ~/.nvm/nvm.sh && nvm use 22`
+3. Run dev server: `npm run dev`
+4. Local URL: http://localhost:5173
+
+## CRITICAL: Commit and Push Workflow
 
 When the user asks to "commit and push" or "deploy", follow these steps EXACTLY:
 
