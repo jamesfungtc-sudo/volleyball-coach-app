@@ -7,6 +7,7 @@ export interface PlayerMarkerProps {
   jerseyNumber: string | number;
   playerName?: string;
   team: 'home' | 'opponent';
+  isLibero?: boolean;  // NEW: Indicates if this is a libero player
 
   // Position
   x: number;
@@ -28,6 +29,7 @@ export interface PlayerMarkerProps {
  * - Hover: Blue border
  * - Selected: Blue fill with white text
  * - Faded: 30% opacity (when another player selected)
+ * - Libero: Gold/yellow background to distinguish from other players
  */
 export function PlayerMarker({
   playerId,
@@ -38,6 +40,7 @@ export function PlayerMarker({
   y,
   isSelected = false,
   isFaded = false,
+  isLibero = false,
   onClick
 }: PlayerMarkerProps) {
   const handleClick = (e: React.MouseEvent) => {
@@ -49,7 +52,8 @@ export function PlayerMarker({
     'player-marker',
     team === 'home' ? 'player-marker-home' : 'player-marker-opponent',
     isSelected ? 'player-marker-selected' : '',
-    isFaded ? 'player-marker-faded' : ''
+    isFaded ? 'player-marker-faded' : '',
+    isLibero ? 'player-marker-libero' : ''
   ].filter(Boolean).join(' ');
 
   return (

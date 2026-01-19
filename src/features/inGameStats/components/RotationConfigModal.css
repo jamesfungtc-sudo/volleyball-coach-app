@@ -1,230 +1,269 @@
+/* Modal Overlay */
 .rotation-config-modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.7);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 10000;
+  animation: fadeIn 0.2s ease-out;
 }
 
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Modal Container */
 .rotation-config-modal {
   background: white;
   border-radius: 12px;
-  width: 95%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   max-width: 900px;
+  width: 90%;
   max-height: 90vh;
-  overflow: hidden;
   display: flex;
   flex-direction: column;
+  animation: slideUp 0.3s ease-out;
 }
 
-.modal-header {
+@keyframes slideUp {
+  from {
+    transform: translateY(50px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Modal Header */
+.rotation-config-modal .modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 20px;
+  padding: 20px 24px;
   border-bottom: 2px solid #e5e7eb;
-  background: #f9fafb;
 }
 
-.modal-header h2 {
+.rotation-config-modal .modal-header h2 {
   margin: 0;
-  font-size: 18px;
-  font-weight: 700;
-  color: #333;
+  font-size: 24px;
+  color: #111827;
 }
 
-.close-btn {
+.rotation-config-modal .close-btn {
   background: none;
   border: none;
-  font-size: 24px;
+  font-size: 32px;
+  line-height: 1;
+  color: #6b7280;
   cursor: pointer;
   padding: 0;
-  line-height: 1;
-  color: #666;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
 }
 
-.close-btn:hover {
-  color: #333;
+.rotation-config-modal .close-btn:hover {
+  background: #f3f4f6;
+  color: #111827;
 }
 
-.modal-body {
-  padding: 20px;
+/* Modal Body */
+.rotation-config-modal .modal-body {
+  padding: 24px;
   overflow-y: auto;
   flex: 1;
 }
 
+/* Teams Container */
 .teams-container {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 20px;
+  gap: 24px;
+  margin-bottom: 24px;
 }
 
-.team-config {
+/* Team Config Section */
+.team-config-section {
   background: #f9fafb;
-  border-radius: 8px;
-  padding: 16px;
   border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 20px;
 }
 
-.team-config.home {
-  border-color: #c4b5fd;
+.team-config-section h3 {
+  margin: 0 0 16px 0;
+  font-size: 20px;
+  color: #111827;
+  font-weight: 600;
 }
 
-.team-config.opponent {
-  border-color: #fecaca;
+.team-config-section h4 {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  color: #374151;
+  font-weight: 600;
 }
 
-.team-header {
+/* Config Row */
+.config-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   margin-bottom: 16px;
 }
 
-.team-name {
-  font-size: 16px;
-  font-weight: 700;
-  margin: 0 0 8px 0;
+.config-row label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
 }
 
-.team-config.home .team-name {
-  color: #5b21b6;
-}
-
-.team-config.opponent .team-name {
-  color: #991b1b;
-}
-
-.system-select {
+.system-select,
+.starting-p1-select {
   width: 100%;
-  padding: 8px 12px;
+  padding: 10px 12px;
+  font-size: 14px;
   border: 2px solid #d1d5db;
   border-radius: 6px;
-  font-size: 14px;
-  font-weight: 500;
+  background: white;
+  color: #111827;
+  cursor: pointer;
+  transition: border-color 0.2s;
 }
 
+.system-select:hover,
+.starting-p1-select:hover {
+  border-color: #4A9FB8;
+}
+
+.system-select:focus,
+.starting-p1-select:focus {
+  outline: none;
+  border-color: #4A9FB8;
+  box-shadow: 0 0 0 3px rgba(74, 159, 184, 0.1);
+}
+
+/* Config Divider */
+.config-divider {
+  height: 1px;
+  background: #e5e7eb;
+  margin: 16px 0;
+}
+
+/* Players Section */
 .players-section {
   margin-top: 16px;
 }
 
-.players-section h4 {
-  font-size: 13px;
-  font-weight: 600;
-  color: #666;
-  margin: 0 0 8px 0;
-}
-
-.player-row {
+.player-input-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: 12px;
+  margin-bottom: 10px;
 }
 
-.role-label {
-  font-size: 12px;
-  font-weight: 600;
-  width: 60px;
-  color: #666;
+.player-input-row label {
+  min-width: 100px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
 }
 
-.player-input {
+.player-name-input {
   flex: 1;
-  padding: 6px 10px;
+  padding: 8px 12px;
+  font-size: 14px;
   border: 2px solid #d1d5db;
-  border-radius: 4px;
-  font-size: 13px;
+  border-radius: 6px;
+  background: white;
+  color: #111827;
+  transition: border-color 0.2s;
 }
 
-.jersey-input {
-  width: 60px;
-  padding: 6px 10px;
-  border: 2px solid #d1d5db;
-  border-radius: 4px;
-  font-size: 13px;
-  text-align: center;
+.player-name-input:hover {
+  border-color: #9ca3af;
 }
 
-.starting-p1-section {
-  margin-top: 16px;
-  padding-top: 16px;
+.player-name-input:focus {
+  outline: none;
+  border-color: #4A9FB8;
+  box-shadow: 0 0 0 3px rgba(74, 159, 184, 0.1);
+}
+
+.player-name-input::placeholder {
+  color: #9ca3af;
+}
+
+/* Libero Input */
+.libero-input {
+  margin-top: 12px;
+  padding-top: 12px;
   border-top: 1px solid #e5e7eb;
 }
 
-.starting-p1-section h4 {
-  font-size: 13px;
+.libero-input label {
+  color: #9B59B6;
   font-weight: 600;
-  color: #666;
-  margin: 0 0 8px 0;
 }
 
-.p1-radio-group {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-}
-
-.p1-radio-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.libero-section {
+/* Validation Status */
+.validation-status {
   margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid #e5e7eb;
-}
-
-.libero-section h4 {
-  font-size: 13px;
-  font-weight: 600;
-  color: #666;
-  margin: 0 0 8px 0;
-}
-
-.libero-checkbox {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.libero-targets {
-  margin-top: 8px;
-}
-
-.libero-target-checkbox {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  margin-bottom: 4px;
-}
-
-.starting-server-section {
-  margin-top: 20px;
-  padding: 16px;
-  background: #f0fdf4;
-  border-radius: 8px;
-  border: 2px solid #bbf7d0;
-}
-
-.starting-server-section label {
+  padding: 10px 12px;
+  border-radius: 6px;
   font-size: 14px;
   font-weight: 600;
-  color: #166534;
+}
+
+.validation-status .valid {
+  color: #059669;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.validation-status .invalid {
+  color: #dc2626;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Starting Server Section */
+.starting-server-section {
+  padding: 20px;
+  background: #f9fafb;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.starting-server-section > label {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 12px;
 }
 
 .radio-group {
   display: flex;
-  gap: 20px;
-  margin-top: 8px;
+  gap: 24px;
 }
 
 .radio-label {
@@ -232,26 +271,50 @@
   align-items: center;
   gap: 8px;
   font-size: 14px;
+  color: #374151;
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+
+.radio-label:hover {
+  background: #e5e7eb;
+}
+
+.radio-label input[type="radio"] {
+  width: 18px;
+  height: 18px;
   cursor: pointer;
 }
 
-.modal-footer {
+.radio-label span {
+  font-weight: 500;
+}
+
+/* Modal Footer */
+.rotation-config-modal .modal-footer {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 20px;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 20px 24px;
   border-top: 2px solid #e5e7eb;
-  background: #f9fafb;
+}
+
+.cancel-btn,
+.save-btn {
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 600;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
 .cancel-btn {
-  padding: 10px 20px;
-  font-size: 14px;
-  font-weight: 600;
   background: #f3f4f6;
-  border: 2px solid #d1d5db;
-  border-radius: 6px;
-  cursor: pointer;
+  color: #374151;
 }
 
 .cancel-btn:hover {
@@ -259,27 +322,33 @@
 }
 
 .save-btn {
-  padding: 10px 24px;
-  font-size: 14px;
-  font-weight: 600;
-  background: #10b981;
+  background: #4A9FB8;
   color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
 }
 
 .save-btn:hover {
-  background: #059669;
+  background: #3d8399;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(74, 159, 184, 0.3);
 }
 
+.save-btn:active {
+  transform: translateY(0);
+}
+
+/* Responsive Design */
 @media (max-width: 768px) {
   .teams-container {
     grid-template-columns: 1fr;
   }
 
   .rotation-config-modal {
-    width: 98%;
+    width: 95%;
     max-height: 95vh;
+  }
+
+  .radio-group {
+    flex-direction: column;
+    gap: 12px;
   }
 }

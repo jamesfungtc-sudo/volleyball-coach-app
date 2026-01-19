@@ -1,4 +1,9 @@
 import { COURT_DIMENSIONS } from './VolleyballCourt';
+import type {
+  PlayerInPosition,
+  TeamLineup
+} from '../../types/rotation.types';
+import type { VolleyballPosition } from '../../types/opponentTracking.types';
 
 /**
  * Volleyball rotation positions on court
@@ -14,7 +19,8 @@ import { COURT_DIMENSIONS } from './VolleyballCourt';
  * Coordinates are in SVG viewBox units (420×800)
  */
 
-export type VolleyballPosition = 'P1' | 'P2' | 'P3' | 'P4' | 'P5' | 'P6';
+// Re-export types for backwards compatibility
+export type { PlayerInPosition, TeamLineup, VolleyballPosition };
 
 export interface PositionCoordinates {
   x: number;
@@ -45,21 +51,26 @@ const rightX = courtLeft + courtWidth * 0.8;   // 20% from right
  * - Front row: 2m from net (80px)
  * - Back row: 6m from net (240px) - on the 6-meter line
  *
- * Layout (viewing from above):
+ * IMPORTANT: Opponent faces opposite direction, so left/right are FLIPPED from viewer's perspective
+ * Layout (viewing from above, viewer's perspective):
  *   P1(right)  P6(center)  P5(left)    <- Back row
  *   P2(right)  P3(center)  P4(left)    <- Front row
  *   ========== NET ==========
  */
 export const OPPONENT_POSITIONS: TeamPositions = {
   // Front row (between net and attack line)
-  P4: { x: leftX, y: netY - 80 },      // Front-left (2m from net)
+  // Opponent's P4 (their left) appears on viewer's RIGHT, so use rightX
+  // Opponent's P2 (their right) appears on viewer's LEFT, so use leftX
+  P4: { x: rightX, y: netY - 80 },     // Front-left (from opponent's view) = viewer's RIGHT
   P3: { x: centerX, y: netY - 80 },    // Front-center (2m from net)
-  P2: { x: rightX, y: netY - 80 },     // Front-right (2m from net)
+  P2: { x: leftX, y: netY - 80 },      // Front-right (from opponent's view) = viewer's LEFT
 
   // Back row (on the 6-meter line)
-  P5: { x: leftX, y: netY - 240 },     // Back-left (6m from net)
+  // Opponent's P5 (their left) appears on viewer's RIGHT
+  // Opponent's P1 (their right) appears on viewer's LEFT
+  P5: { x: rightX, y: netY - 240 },    // Back-left (from opponent's view) = viewer's RIGHT
   P6: { x: centerX, y: netY - 240 },   // Back-center (6m from net)
-  P1: { x: rightX, y: netY - 240 }     // Back-right (6m from net)
+  P1: { x: leftX, y: netY - 240 }      // Back-right (from opponent's view) = viewer's LEFT
 };
 
 /**
@@ -97,24 +108,8 @@ export function getPositionCoordinates(
   return positions[position];
 }
 
-/**
- * Player lineup - maps position to player data
- */
-export interface PlayerInPosition {
-  playerId: string;
-  jerseyNumber: string | number;
-  playerName: string;
-  position: VolleyballPosition;
-}
-
-export interface TeamLineup {
-  P1: PlayerInPosition | null;
-  P2: PlayerInPosition | null;
-  P3: PlayerInPosition | null;
-  P4: PlayerInPosition | null;
-  P5: PlayerInPosition | null;
-  P6: PlayerInPosition | null;
-}
+// PlayerInPosition and TeamLineup now imported from rotation.types.ts
+// (see imports at top of file)
 
 /**
  * Rotate lineup clockwise (after side-out)
