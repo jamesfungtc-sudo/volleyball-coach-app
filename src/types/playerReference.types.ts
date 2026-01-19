@@ -1,110 +1,166 @@
+/**
+ * Player Reference Type System
+ * Resolves player identification ambiguity with discriminated union types
+ */
+
 import type { Player } from '../services/googleSheetsAPI';
 
-/**
- * PlayerReference - A unified way to reference players across the app
- * Supports both roster-based players (with full data) and custom/opponent players
- */
-export type PlayerReference = {
-  type: 'roster';
-  playerId: string;
-  teamId: string;
-} | {
-  type: 'custom';
-  jerseyNumber: number;
-  name: string;
-};
+// ============== CORE TYPES ==============
 
 /**
- * Create a reference to a player from the roster
+ * Discriminated union for explicit player identification
+ * - RosterPlayerReference: Player from team roster (guaranteed full data)
+ * - CustomPlayerReference: Quick entry fallback (jersey number only)
  */
-export function createRosterReference(playerId: string, teamId: string): PlayerReference {
+export type PlayerReference =
+  | RosterPlayerReference
+  | CustomPlayerReference;
+
+/**
+ * Player from roster (guaranteed full data)
+ */
+export interface RosterPlayerReference {
+  type: 'roster';
+  playerId: string;          // PlayerInfo.Id from database
+  jerseyNumber: number;      // Actual jersey number (e.g., 5, 12, 7)
+  displayName: string;       // PreferredName || #${jerseyNumber}
+  teamId: string;            // TeamInfo.Id
+}
+
+/**
+ * Custom player (not in roster - jersey number fallback)
+ */
+export interface CustomPlayerReference {
+  type: 'custom';
+  jerseyNumber: number;      // REQUIRED identifier
+  customName?: string;       // Optional custom name
+  displayName: string;       // Display value
+  syntheticId: string;       // Generated ID: "CUSTOM:7"
+}
+
+// ============== FACTORY FUNCTIONS ==============
+
+/**
+ * Create reference from roster player
+ * Converts Player object to type-safe PlayerReference
+ */
+export function createRosterReference(player: Player): RosterPlayerReference {
   return {
     type: 'roster',
-    playerId,
-    teamId
+    playerId: player.id,
+    jerseyNumber: typeof player.jerseyNumber === 'number'
+      ? player.jerseyNumber
+      : parseInt(player.jerseyNumber as string, 10),
+    displayName: player.name || `#${player.jerseyNumber}`,
+    teamId: player.teamId
   };
 }
 
 /**
- * Create a reference to a custom player (e.g., opponent team player)
+ * Create reference for custom player (jersey number fallback)
  */
-export function createCustomReference(jerseyNumber: number, name: string): PlayerReference {
+export function createCustomReference(
+  jerseyNumber: number,
+  customName?: string
+): CustomPlayerReference {
   return {
     type: 'custom',
     jerseyNumber,
-    name
+    customName,
+    displayName: customName || `#${jerseyNumber}`,
+    syntheticId: `CUSTOM:${jerseyNumber}`
   };
 }
 
+// ============== ACCESSOR FUNCTIONS ==============
+
 /**
- * Get the player ID from a reference (returns empty string for custom players)
+ * Get unique ID for any player reference
+ * Returns playerId for roster players, syntheticId for custom players
  */
-export function getPlayerId(ref: PlayerReference | null | undefined): string {
-  if (!ref) return '';
-  if (ref.type === 'roster') return ref.playerId;
-  return '';
+export function getPlayerId(ref: PlayerReference): string {
+  return ref.type === 'roster' ? ref.playerId : ref.syntheticId;
 }
 
 /**
- * Get the jersey number from a reference
+ * Get display name for any player reference
  */
-export function getJerseyNumber(ref: PlayerReference | null | undefined): number {
-  if (!ref) return 0;
-  if (ref.type === 'custom') return ref.jerseyNumber;
-  return 0;
+export function getPlayerDisplayName(ref: PlayerReference): string {
+  return ref.displayName;
 }
 
 /**
- * Get the display name for a player reference
- * For roster players, looks up the name from the roster
- * For custom players, returns the stored name
+ * Get jersey number for any player reference
  */
-export function getPlayerDisplayName(
-  ref: PlayerReference | null | undefined,
-  roster?: Player[]
-): string {
-  if (!ref) return '';
-
-  if (ref.type === 'custom') {
-    return ref.name || `#${ref.jerseyNumber}`;
-  }
-
-  if (ref.type === 'roster' && roster) {
-    const player = roster.find(p => p.id === ref.playerId);
-    return player?.name || '';
-  }
-
-  return '';
+export function getJerseyNumber(ref: PlayerReference): number {
+  return ref.jerseyNumber;
 }
 
+// ============== SERIALIZATION ==============
+
 /**
- * Serialize a player reference to a string for storage
+ * Serialize player reference for localStorage/database storage
+ * Stores only the minimal identifier (playerId or syntheticId)
  */
 export function serializePlayerReference(ref: PlayerReference): string {
-  return JSON.stringify(ref);
+  return ref.type === 'roster' ? ref.playerId : ref.syntheticId;
 }
 
 /**
- * Deserialize a player reference from a string
+ * Deserialize from storage with roster lookup
+ * Handles backward compatibility with legacy string-based player references
+ *
+ * Migration strategy:
+ * 1. Check if custom format (CUSTOM:7)
+ * 2. Try to find in roster by ID
+ * 3. Fallback: try to find by name (legacy data)
+ * 4. Last resort: parse as jersey number or create custom player
  */
-export function deserializePlayerReference(str: string): PlayerReference | null {
-  try {
-    const parsed = JSON.parse(str);
-    if (parsed.type === 'roster' || parsed.type === 'custom') {
-      return parsed as PlayerReference;
-    }
-    return null;
-  } catch {
-    return null;
+export function deserializePlayerReference(
+  stored: string,
+  roster: Player[]
+): PlayerReference {
+  // Check if custom format (CUSTOM:7)
+  if (stored.startsWith('CUSTOM:')) {
+    const jerseyNumber = parseInt(stored.split(':')[1], 10);
+    return createCustomReference(jerseyNumber);
   }
+
+  // Try to find in roster by ID (primary lookup)
+  const player = roster.find(p => p.id === stored);
+  if (player) {
+    return createRosterReference(player);
+  }
+
+  // Fallback: try to find by name (legacy data migration)
+  const playerByName = roster.find(p => p.name === stored);
+  if (playerByName) {
+    return createRosterReference(playerByName);
+  }
+
+  // Last resort: treat as jersey number (if numeric)
+  const jerseyNum = parseInt(stored, 10);
+  if (!isNaN(jerseyNum)) {
+    return createCustomReference(jerseyNum);
+  }
+
+  // Unknown format, create custom with jersey 0 and stored value as name
+  return createCustomReference(0, stored);
+}
+
+// ============== TYPE GUARDS ==============
+
+/**
+ * Type guard to check if roster player
+ * Use for conditional logic based on player source
+ */
+export function isRosterPlayer(ref: PlayerReference): ref is RosterPlayerReference {
+  return ref.type === 'roster';
 }
 
 /**
- * Check if a player reference is valid (has required data)
+ * Type guard to check if custom player
  */
-export function isValidPlayerReference(ref: PlayerReference | null | undefined): boolean {
-  if (!ref) return false;
-  if (ref.type === 'roster') return !!ref.playerId && !!ref.teamId;
-  if (ref.type === 'custom') return ref.jerseyNumber > 0 || !!ref.name;
-  return false;
+export function isCustomPlayer(ref: PlayerReference): ref is CustomPlayerReference {
+  return ref.type === 'custom';
 }

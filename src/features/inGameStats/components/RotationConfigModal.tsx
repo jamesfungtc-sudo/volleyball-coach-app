@@ -25,7 +25,6 @@ interface RotationConfigModalProps {
   opponentTeamName: string;
   homeRoster?: Player[];
   opponentRoster?: Player[];
-  onResetConfiguration?: () => void;
 }
 
 // Default empty configuration
@@ -57,8 +56,7 @@ export function RotationConfigModal({
   homeTeamName,
   opponentTeamName,
   homeRoster = [],
-  opponentRoster = [],
-  onResetConfiguration
+  opponentRoster = []
 }: RotationConfigModalProps) {
   const [homeConfig, setHomeConfig] = useState<TeamRotationConfig>(
     initialHomeConfig || createEmptyConfig('5-1 (OH>S)')
@@ -101,7 +99,7 @@ export function RotationConfigModal({
       const selectedPlayer = roster.find(p => p.name === value);
       if (selectedPlayer) {
         // Roster player selected - use their data (auto-fills jersey)
-        playerRef = createRosterReference(selectedPlayer.id, selectedPlayer.teamId);
+        playerRef = createRosterReference(selectedPlayer);
       } else {
         // Custom name - preserve existing jersey number
         const existingJersey = currentPlayerRef ? getJerseyNumber(currentPlayerRef) : 0;
@@ -186,7 +184,7 @@ export function RotationConfigModal({
     } else {
       const selectedPlayer = roster.find(p => p.name === value);
       if (selectedPlayer) {
-        playerRef = createRosterReference(selectedPlayer.id, selectedPlayer.teamId);
+        playerRef = createRosterReference(selectedPlayer);
       } else {
         const existingJersey = currentLiberoRef ? getJerseyNumber(currentLiberoRef) : 0;
         playerRef = createCustomReference(existingJersey, value);
@@ -377,13 +375,10 @@ export function RotationConfigModal({
             {roles.map((role: string) => {
               const playerRef = config.players[role as PlayerRole];
               const isRosterPlayer = playerRef?.type === 'roster';
-              const rosterPlayer = isRosterPlayer ? roster.find(p => p.id === playerRef.playerId) : null;
-              const playerName = isRosterPlayer
-                ? (rosterPlayer?.name || '')
-                : (playerRef?.type === 'custom' ? playerRef.name || '' : '');
-              const jerseyNum = isRosterPlayer
-                ? (rosterPlayer?.jerseyNumber ? Number(rosterPlayer.jerseyNumber) : 0)
-                : (playerRef ? getJerseyNumber(playerRef) : 0);
+              const playerName = playerRef?.type === 'roster'
+                ? (roster.find(p => p.id === playerRef.playerId)?.name || '')
+                : (playerRef?.customName || '');
+              const jerseyNum = playerRef ? getJerseyNumber(playerRef) : 0;
 
               return (
                 <React.Fragment key={role}>
@@ -450,7 +445,7 @@ export function RotationConfigModal({
                 value={
                   config.libero && config.libero.type === 'roster'
                     ? (roster.find(p => p.id === (config.libero as any).playerId)?.name || '')
-                    : (config.libero && config.libero.type === 'custom' ? config.libero.name || '' : '')
+                    : (config.libero && config.libero.type === 'custom' ? config.libero.customName || '' : '')
                 }
                 onChange={(e) => handleLiberoNameChange(team, e.target.value)}
                 placeholder="Enter or select Libero name"
@@ -475,15 +470,7 @@ export function RotationConfigModal({
 
             <input
               type="number"
-              value={(() => {
-                if (!config.libero) return '';
-                if (config.libero.type === 'roster') {
-                  const liberoPlayer = roster.find(p => p.id === config.libero!.playerId);
-                  return liberoPlayer?.jerseyNumber ? Number(liberoPlayer.jerseyNumber) : '';
-                }
-                const jerseyNum = getJerseyNumber(config.libero);
-                return jerseyNum === 0 ? '' : jerseyNum;
-              })()}
+              value={config.libero ? (getJerseyNumber(config.libero) === 0 ? '' : getJerseyNumber(config.libero)) : ''}
               onChange={(e) => {
                 // If libero is null, create empty custom reference first
                 if (!config.libero) {
@@ -655,41 +642,9 @@ export function RotationConfigModal({
         </div>
 
         <div className="modal-footer">
-          <div style={{ display: 'flex', gap: '8px', flex: 1 }}>
-            <button className="cancel-btn" onClick={onClose}>
-              Cancel
-            </button>
-            {onResetConfiguration && (
-              <button
-                className="reset-btn"
-                onClick={() => {
-                  if (window.confirm('This will clear all rotation data for all sets. Are you sure?')) {
-                    onResetConfiguration();
-                    onClose();
-                  }
-                }}
-                style={{
-                  padding: '10px 16px',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  background: '#dc3545',
-                  color: 'white',
-                  border: '2px solid #bd2130',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.background = '#bd2130';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.background = '#dc3545';
-                }}
-              >
-                🗑️ Clear All Rotations
-              </button>
-            )}
-          </div>
+          <button className="cancel-btn" onClick={onClose}>
+            Cancel
+          </button>
           <button className="save-btn" onClick={handleSave}>
             Start Set {currentSet}
           </button>
