@@ -30,6 +30,10 @@
   overflow: hidden;
 }
 
+.app:has(.visual-tracking-page) .navigation-bar {
+  display: none; /* Hide global nav on visual tracking page */
+}
+
 .app:has(.visual-tracking-page) .app-main {
   min-height: 0;
   height: 100vh;
