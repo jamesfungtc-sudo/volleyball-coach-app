@@ -9,10 +9,16 @@
 .visual-tracking-page {
   width: 100vw;
   height: 100vh;
+  height: 100dvh; /* Dynamic viewport height for mobile/tablet */
   overflow: hidden;
   display: flex;
   flex-direction: column;
   background: #f5f5f5;
+  position: fixed; /* Lock position on tablets */
+  top: 0;
+  left: 0;
+  touch-action: none; /* Prevent scroll on container */
+  overscroll-behavior: none;
 }
 
 /* ============================================
@@ -101,7 +107,8 @@
   grid-template-columns: 40% 60%;
   gap: 20px;
   padding: 20px;
-  height: 100vh;
+  flex: 1; /* Take remaining space after header */
+  min-height: 0; /* Allow shrinking */
   overflow: hidden;
 }
 
@@ -128,10 +135,11 @@
 
 .panel-section {
   display: grid;
-  grid-template-rows: auto auto 1fr;
+  grid-template-rows: minmax(100px, 35%) minmax(50px, auto) minmax(120px, 1fr);
   gap: 16px;
   overflow: hidden;
   height: 100%;
+  min-height: 0;
 }
 
 /* TOP SECTOR - Scoreboard + Stats (40%) */
@@ -324,6 +332,51 @@
   }
 
   .action-bar {
+    padding: 8px 16px;
+  }
+}
+
+/* ============================================
+   TABLET VIEWPORT LOCK
+   ============================================ */
+
+/* Tablet viewport lock */
+@media (min-width: 768px) and (max-width: 1366px) and (orientation: landscape) {
+  .visual-tracking-page {
+    position: fixed;
+    inset: 0;
+  }
+
+  .visual-tracking-content {
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .panel-section {
+    grid-template-rows: minmax(80px, 30%) minmax(45px, 60px) minmax(100px, 1fr);
+    gap: 10px;
+  }
+
+  .stats-panel,
+  .controls-panel {
+    padding: 8px;
+  }
+
+  .action-bar {
+    padding: 6px 10px;
+    gap: 8px;
+  }
+}
+
+/* Shorter tablet viewports (iPad Mini landscape ~600px height) */
+@media (max-height: 700px) and (orientation: landscape) {
+  .panel-section {
+    grid-template-rows: minmax(70px, 28%) minmax(40px, 55px) minmax(90px, 1fr);
+    gap: 8px;
+  }
+
+  .visual-tracking-header {
+    height: 45px;
     padding: 8px 16px;
   }
 }

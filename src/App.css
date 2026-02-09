@@ -24,3 +24,15 @@
     min-height: calc(100vh - 140px);
   }
 }
+
+/* Override for fullscreen pages like VisualTrackingPage */
+.app:has(.visual-tracking-page) {
+  overflow: hidden;
+}
+
+.app:has(.visual-tracking-page) .app-main {
+  min-height: 0;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
