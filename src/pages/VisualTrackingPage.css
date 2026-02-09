@@ -38,6 +38,7 @@
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
   height: 60px;
   flex-shrink: 0;
+  touch-action: none; /* Prevent touch scroll on header */
 }
 
 .visual-tracking-header .btn-back-arrow {
