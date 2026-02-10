@@ -48,6 +48,8 @@ import {
   getJerseyNumber,
   getPlayerDisplayName
 } from '../types/playerReference.types';
+import { PlayerStatsModal } from '../features/inGameStats/components/LocationMaps';
+import { saveTrajectory } from '../features/inGameStats/services/trajectoryStorage';
 import './VisualTrackingPage.css';
 
 /**
@@ -150,6 +152,9 @@ function VisualTrackingPageContent() {
 
   // Match info modal state
   const [matchInfoModalOpen, setMatchInfoModalOpen] = useState(false);
+
+  // Player stats modal state
+  const [statsModalOpen, setStatsModalOpen] = useState(false);
 
   // Rotation configuration modal state
   const [rotationConfigModalOpen, setRotationConfigModalOpen] = useState(false);
@@ -780,6 +785,28 @@ function VisualTrackingPageContent() {
 
     // Add to current point attempts
     setCurrentPointAttempts(prev => [...prev, attemptData]);
+
+    // Save trajectory to localStorage for stats display
+    if (matchId && (actionType === 'serve' || actionType === 'attack')) {
+      saveTrajectory(matchId, {
+        setNumber: currentSet,
+        pointNumber,
+        attemptNumber,
+        playerId: selectedPlayer.playerId || `custom_${selectedPlayer.jerseyNumber}`,
+        playerName: selectedPlayer.playerName,
+        jerseyNumber: selectedPlayer.jerseyNumber,
+        team: selectedTeam,
+        actionType,
+        result,
+        startX: currentTrajectory.startX,
+        startY: currentTrajectory.startY,
+        endX: currentTrajectory.endX,
+        endY: currentTrajectory.endY,
+        serveZone: trajectoryAnalysis.serveZone,
+        hitPosition: trajectoryAnalysis.hitPosition,
+        landingArea: trajectoryAnalysis.landingArea,
+      });
+    }
 
     console.log(`📝 Point ${pointNumber}, Attempt ${attemptNumber}:`, attemptData);
 
@@ -1651,6 +1678,33 @@ function VisualTrackingPageContent() {
                   </button>
                 ))}
               </div>
+
+              {/* Player Stats Button */}
+              <button
+                onClick={() => setStatsModalOpen(true)}
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  border: '2px solid #d1d5db',
+                  borderRadius: '6px',
+                  background: 'white',
+                  fontSize: '16px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+                title="Player Location Stats"
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = '#f3f4f6';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = 'white';
+                }}
+              >
+                📊
+              </button>
 
               {/* Settings Dropdown Button */}
               <div style={{ position: 'relative' }}>
@@ -3410,6 +3464,26 @@ function VisualTrackingPageContent() {
         opponentTeamName={opponentTeamName}
         homeRoster={homeRoster}
         opponentRoster={opponentRoster}
+      />
+
+      {/* Player Stats Modal */}
+      <PlayerStatsModal
+        isOpen={statsModalOpen}
+        onClose={() => setStatsModalOpen(false)}
+        matchId={matchId || 'unknown'}
+        currentSet={currentSet}
+        homeTeamName={homeTeamName}
+        opponentTeamName={opponentTeamName}
+        homeRoster={homeRoster.map(p => ({
+          playerId: p.Id,
+          playerName: p.Name,
+          jerseyNumber: parseInt(p.JerseyNumber) || 0
+        }))}
+        opponentRoster={opponentRoster.map(p => ({
+          playerId: p.Id,
+          playerName: p.Name,
+          jerseyNumber: parseInt(p.JerseyNumber) || 0
+        }))}
       />
     </div>
   );
