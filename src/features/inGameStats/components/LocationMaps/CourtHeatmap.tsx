@@ -52,13 +52,14 @@ interface CourtHeatmapProps {
 }
 
 /**
- * CourtHeatmap - A simplified volleyball court SVG showing trajectory landing points
+ * CourtHeatmap - A simplified volleyball court SVG showing trajectory lines
  *
  * Features:
  * - Correct 9m x 18m ratio (1:2 aspect)
  * - Net line at center
  * - Attack lines (3m from net)
- * - Colored dots for each trajectory landing point
+ * - Colored lines showing trajectory from start to end point
+ * - Arrow heads indicating direction
  * - Color coding: Blue=In Play, Red=Kill/Ace, Gray=Error
  */
 export const CourtHeatmap: React.FC<CourtHeatmapProps> = ({
@@ -82,8 +83,9 @@ export const CourtHeatmap: React.FC<CourtHeatmapProps> = ({
     attackLineBottom,
   } = COURT;
 
-  // Calculate dot size based on number of trajectories
-  const dotRadius = trajectories.length > 20 ? 8 : trajectories.length > 10 ? 10 : 12;
+  // Calculate sizes based on number of trajectories
+  const strokeWidth = trajectories.length > 20 ? 3 : trajectories.length > 10 ? 4 : 5;
+  const arrowSize = trajectories.length > 20 ? 8 : trajectories.length > 10 ? 10 : 12;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -180,19 +182,60 @@ export const CourtHeatmap: React.FC<CourtHeatmapProps> = ({
           opacity="0.7"
         />
 
-        {/* Trajectory landing points */}
-        {trajectories.map((t, index) => (
-          <circle
-            key={t.id || index}
-            cx={t.endX}
-            cy={t.endY}
-            r={dotRadius}
-            fill={getResultColor(t.result)}
-            stroke="white"
-            strokeWidth="2"
-            opacity="0.85"
-          />
-        ))}
+        {/* Trajectory lines with arrows */}
+        {trajectories.map((t, index) => {
+          const color = getResultColor(t.result);
+          // Calculate arrow head points
+          const dx = t.endX - t.startX;
+          const dy = t.endY - t.startY;
+          const length = Math.sqrt(dx * dx + dy * dy);
+          // Normalize direction
+          const nx = dx / length;
+          const ny = dy / length;
+          // Perpendicular for arrow wings
+          const px = -ny;
+          const py = nx;
+          // Arrow head points
+          const arrowTip = { x: t.endX, y: t.endY };
+          const arrowLeft = {
+            x: t.endX - nx * arrowSize - px * arrowSize * 0.5,
+            y: t.endY - ny * arrowSize - py * arrowSize * 0.5,
+          };
+          const arrowRight = {
+            x: t.endX - nx * arrowSize + px * arrowSize * 0.5,
+            y: t.endY - ny * arrowSize + py * arrowSize * 0.5,
+          };
+
+          return (
+            <g key={t.id || index}>
+              {/* Line from start to end */}
+              <line
+                x1={t.startX}
+                y1={t.startY}
+                x2={t.endX}
+                y2={t.endY}
+                stroke={color}
+                strokeWidth={strokeWidth}
+                strokeLinecap="round"
+                opacity="0.85"
+              />
+              {/* Arrow head */}
+              <polygon
+                points={`${arrowTip.x},${arrowTip.y} ${arrowLeft.x},${arrowLeft.y} ${arrowRight.x},${arrowRight.y}`}
+                fill={color}
+                opacity="0.85"
+              />
+              {/* Small circle at start point */}
+              <circle
+                cx={t.startX}
+                cy={t.startY}
+                r={strokeWidth}
+                fill={color}
+                opacity="0.6"
+              />
+            </g>
+          );
+        })}
 
         {/* Empty state message */}
         {trajectories.length === 0 && (
