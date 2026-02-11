@@ -32,6 +32,23 @@ function createEmptyConfig(system: VolleyballSystem): TeamRotationConfig {
   const roles = VOLLEYBALL_SYSTEMS[system];
   const players: Record<string, PlayerReference> = {};
 
+  // Defensive check - if system is invalid, use default
+  if (!roles || !Array.isArray(roles)) {
+    console.error(`❌ [createEmptyConfig] Invalid system "${system}". Using default 5-1 (OH>S)`);
+    const defaultRoles = VOLLEYBALL_SYSTEMS['5-1 (OH>S)'];
+    defaultRoles.forEach((role: string) => {
+      players[role] = createCustomReference(0, '');
+    });
+    return {
+      system: '5-1 (OH>S)',
+      players: players as Record<PlayerRole, PlayerReference>,
+      startingP1: defaultRoles[0] as PlayerRole,
+      libero: null,
+      liberoReplacementTargets: [],
+      currentRotation: 1
+    };
+  }
+
   roles.forEach((role: string) => {
     players[role] = createCustomReference(0, '');
   });

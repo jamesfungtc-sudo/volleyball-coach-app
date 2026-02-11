@@ -543,6 +543,12 @@ function migrateConfigToPlayerReference(
   const roles = VOLLEYBALL_SYSTEMS[config.system];
   const migratedPlayers: Record<string, PlayerReference> = {};
 
+  // Defensive check for roles
+  if (!roles || !Array.isArray(roles)) {
+    console.error(`❌ [migrateConfig] Invalid system "${config.system}". Returning config as-is.`);
+    return config as TeamRotationConfig;
+  }
+
   // Migrate each player role
   roles.forEach((role: string) => {
     const storedValue = config.players[role];
@@ -646,6 +652,21 @@ export function loadSetConfiguration(
   const config = parsed.setConfigurations?.[setNumber];
 
   if (!config) return null;
+
+  // Defensive check for team configs
+  if (!config.home || !config.opponent) {
+    console.error('❌ [loadSetConfiguration] Invalid config - missing home or opponent:', config);
+    return null;
+  }
+
+  // Defensive check for system property
+  if (!config.home.system || !config.opponent.system) {
+    console.error('❌ [loadSetConfiguration] Invalid config - missing system:', {
+      homeSystem: config.home.system,
+      opponentSystem: config.opponent.system
+    });
+    return null;
+  }
 
   // Migrate both team configs
   const migratedHome = migrateConfigToPlayerReference(config.home, homeRoster);
