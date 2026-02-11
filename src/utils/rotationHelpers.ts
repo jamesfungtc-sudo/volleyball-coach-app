@@ -41,7 +41,33 @@ export function initializeLineup(
   manualSwapRole?: PlayerRole | null,  // NEW: Optional manual swap override
   isServing?: boolean  // NEW: Whether this team is serving (affects P1 libero swap)
 ): TeamLineup {
+  // Defensive check for config
+  if (!config || !config.system) {
+    console.error('❌ [initializeLineup] Invalid config - missing system:', config);
+    // Return empty lineup
+    return {
+      P1: null, P2: null, P3: null, P4: null, P5: null, P6: null
+    };
+  }
+
   const systemOrder = VOLLEYBALL_SYSTEMS[config.system];
+
+  // Defensive check for systemOrder
+  if (!systemOrder) {
+    console.error(`❌ [initializeLineup] Unknown system "${config.system}". Valid systems:`, Object.keys(VOLLEYBALL_SYSTEMS));
+    return {
+      P1: null, P2: null, P3: null, P4: null, P5: null, P6: null
+    };
+  }
+
+  // Defensive check for startingP1
+  if (!config.startingP1 || !systemOrder.includes(config.startingP1)) {
+    console.error(`❌ [initializeLineup] Invalid startingP1 "${config.startingP1}" for system "${config.system}". Valid roles:`, systemOrder);
+    return {
+      P1: null, P2: null, P3: null, P4: null, P5: null, P6: null
+    };
+  }
+
   const rotationOrder = makeStartingOrder(systemOrder, config.startingP1);
 
   // Include libero in the team object for getRotations()
@@ -148,7 +174,32 @@ export function getLineupForRotation(
   manualSwapRole?: PlayerRole | null,  // NEW: Optional manual swap override
   isServing?: boolean  // NEW: Whether this team is serving (affects P1 libero swap)
 ): TeamLineup {
+  // Defensive check for config
+  if (!config || !config.system) {
+    console.error('❌ [getLineupForRotation] Invalid config - missing system:', config);
+    return {
+      P1: null, P2: null, P3: null, P4: null, P5: null, P6: null
+    };
+  }
+
   const systemOrder = VOLLEYBALL_SYSTEMS[config.system];
+
+  // Defensive check for systemOrder
+  if (!systemOrder) {
+    console.error(`❌ [getLineupForRotation] Unknown system "${config.system}". Valid systems:`, Object.keys(VOLLEYBALL_SYSTEMS));
+    return {
+      P1: null, P2: null, P3: null, P4: null, P5: null, P6: null
+    };
+  }
+
+  // Defensive check for startingP1
+  if (!config.startingP1 || !systemOrder.includes(config.startingP1)) {
+    console.error(`❌ [getLineupForRotation] Invalid startingP1 "${config.startingP1}" for system "${config.system}". Valid roles:`, systemOrder);
+    return {
+      P1: null, P2: null, P3: null, P4: null, P5: null, P6: null
+    };
+  }
+
   const rotationOrder = makeStartingOrder(systemOrder, config.startingP1);
 
   // Include libero in the team object for getRotations()
