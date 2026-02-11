@@ -50,6 +50,14 @@ export function initializeLineup(
     };
   }
 
+  // Defensive check for config.players
+  if (!config.players || typeof config.players !== 'object') {
+    console.error('❌ [initializeLineup] Invalid config - missing/invalid players:', config.players);
+    return {
+      P1: null, P2: null, P3: null, P4: null, P5: null, P6: null
+    };
+  }
+
   const systemOrder = VOLLEYBALL_SYSTEMS[config.system];
 
   // Defensive check for systemOrder
@@ -177,6 +185,14 @@ export function getLineupForRotation(
   // Defensive check for config
   if (!config || !config.system) {
     console.error('❌ [getLineupForRotation] Invalid config - missing system:', config);
+    return {
+      P1: null, P2: null, P3: null, P4: null, P5: null, P6: null
+    };
+  }
+
+  // Defensive check for config.players
+  if (!config.players || typeof config.players !== 'object') {
+    console.error('❌ [getLineupForRotation] Invalid config - missing/invalid players:', config.players);
     return {
       P1: null, P2: null, P3: null, P4: null, P5: null, P6: null
     };
@@ -526,6 +542,33 @@ export function saveSetConfiguration(
 }
 
 /**
+ * Create a fallback config when stored config is corrupted/invalid
+ */
+function createFallbackConfig(): TeamRotationConfig {
+  const defaultSystem = '5-1 (OH>S)';
+  const roles = VOLLEYBALL_SYSTEMS[defaultSystem];
+  const players: Record<string, PlayerReference> = {};
+
+  roles.forEach((role: string) => {
+    players[role] = {
+      type: 'custom',
+      jerseyNumber: 0,
+      displayName: '',
+      syntheticId: `FALLBACK:${role}`
+    } as PlayerReference;
+  });
+
+  return {
+    system: defaultSystem,
+    players: players as Record<PlayerRole, PlayerReference>,
+    startingP1: roles[0] as PlayerRole,
+    libero: null,
+    liberoReplacementTargets: [],
+    currentRotation: 1
+  };
+}
+
+/**
  * Migrate legacy config to use PlayerReference
  * Handles backward compatibility with old string-based player references
  */
@@ -534,19 +577,35 @@ function migrateConfigToPlayerReference(
   roster: Player[]
 ): TeamRotationConfig {
   console.log('🔄 [migrateConfig] Starting migration:', {
-    system: config.system,
-    playersRaw: config.players,
-    liberoRaw: config.libero,
-    rosterSize: roster.length
+    system: config?.system,
+    playersRaw: config?.players,
+    liberoRaw: config?.libero,
+    rosterSize: roster?.length
   });
+
+  // Comprehensive defensive checks BEFORE any processing
+  if (!config) {
+    console.error('❌ [migrateConfig] Config is null/undefined!');
+    return createFallbackConfig();
+  }
+
+  if (!config.system) {
+    console.error('❌ [migrateConfig] Config.system is undefined!');
+    return createFallbackConfig();
+  }
+
+  if (!config.players || typeof config.players !== 'object') {
+    console.error('❌ [migrateConfig] Config.players is invalid:', config.players);
+    return createFallbackConfig();
+  }
 
   const roles = VOLLEYBALL_SYSTEMS[config.system];
   const migratedPlayers: Record<string, PlayerReference> = {};
 
   // Defensive check for roles
   if (!roles || !Array.isArray(roles)) {
-    console.error(`❌ [migrateConfig] Invalid system "${config.system}". Returning config as-is.`);
-    return config as TeamRotationConfig;
+    console.error(`❌ [migrateConfig] Invalid system "${config.system}". Using fallback.`);
+    return createFallbackConfig();
   }
 
   // Migrate each player role
@@ -665,6 +724,16 @@ export function loadSetConfiguration(
       homeSystem: config.home.system,
       opponentSystem: config.opponent.system
     });
+    return null;
+  }
+
+  // Defensive check for players property
+  if (!config.home.players || typeof config.home.players !== 'object') {
+    console.error('❌ [loadSetConfiguration] Invalid config - missing home.players:', config.home);
+    return null;
+  }
+  if (!config.opponent.players || typeof config.opponent.players !== 'object') {
+    console.error('❌ [loadSetConfiguration] Invalid config - missing opponent.players:', config.opponent);
     return null;
   }
 
