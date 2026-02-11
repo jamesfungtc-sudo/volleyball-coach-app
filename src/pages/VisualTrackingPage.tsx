@@ -50,6 +50,19 @@ import {
 } from '../types/playerReference.types';
 import { PlayerStatsModal } from '../features/inGameStats/components/LocationMaps';
 import { saveTrajectory } from '../features/inGameStats/services/trajectoryStorage';
+import {
+  loadSession,
+  updateGameState,
+  saveTrajectoryWithSync,
+  saveRotationConfigForSet,
+  type MatchSession
+} from '../features/inGameStats/services/matchSessionService';
+import {
+  getSyncStatus,
+  onSyncStatusChange,
+  type SyncStatus
+} from '../features/inGameStats/services/syncService';
+import type { GameState } from '../services/googleSheetsAPI';
 import './VisualTrackingPage.css';
 
 /**
@@ -155,6 +168,10 @@ function VisualTrackingPageContent() {
 
   // Player stats modal state
   const [statsModalOpen, setStatsModalOpen] = useState(false);
+
+  // Sync status state
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('synced');
+  const [sessionLoaded, setSessionLoaded] = useState(false);
 
   // Rotation configuration modal state
   const [rotationConfigModalOpen, setRotationConfigModalOpen] = useState(false);
@@ -313,6 +330,61 @@ function VisualTrackingPageContent() {
 
     loadRosters();
   }, [matchId]);
+
+  /**
+   * Load session state from Google Sheets (scores, game state)
+   * This restores the game state after a page refresh
+   */
+  useEffect(() => {
+    async function restoreSession() {
+      if (!matchId || matchId === 'new' || loading || sessionLoaded) {
+        return;
+      }
+
+      try {
+        console.log('🔄 Loading session state from Google Sheets...');
+        const session = await loadSession(matchId);
+
+        if (session && session.gameState) {
+          console.log('📦 Session restored:', session.gameState);
+
+          // Restore game state
+          setCurrentSet(session.gameState.currentSet);
+          setHomeScore(session.gameState.homeScore);
+          setOpponentScore(session.gameState.opponentScore);
+          setPointNumber(session.gameState.pointNumber);
+          setServingTeam(session.gameState.servingTeam);
+
+          // Update URL to reflect current set
+          if (session.gameState.currentSet !== currentSet) {
+            setSearchParams({ set: session.gameState.currentSet.toString() });
+          }
+
+          console.log('✅ Session restored successfully');
+        } else {
+          console.log('📝 No existing session - starting fresh');
+        }
+
+        setSessionLoaded(true);
+      } catch (error) {
+        console.error('Failed to restore session:', error);
+        setSessionLoaded(true); // Mark as loaded even on error to prevent retry loops
+      }
+    }
+
+    restoreSession();
+  }, [matchId, loading, sessionLoaded]);
+
+  /**
+   * Subscribe to sync status changes
+   */
+  useEffect(() => {
+    const unsubscribe = onSyncStatusChange((status) => {
+      setSyncStatus(status);
+    });
+
+    return unsubscribe;
+  }, []);
 
   /**
    * Load or prompt for rotation configuration when set changes
@@ -786,8 +858,9 @@ function VisualTrackingPageContent() {
     // Add to current point attempts
     setCurrentPointAttempts(prev => [...prev, attemptData]);
 
-    // Save trajectory to localStorage for stats display
+    // Save trajectory to localStorage AND sync to Google Sheets
     if (matchId && (actionType === 'serve' || actionType === 'attack')) {
+      // Save to localStorage first (immediate)
       saveTrajectory(matchId, {
         setNumber: currentSet,
         pointNumber,
@@ -806,6 +879,30 @@ function VisualTrackingPageContent() {
         hitPosition: trajectoryAnalysis.hitPosition,
         landingArea: trajectoryAnalysis.landingArea,
       });
+
+      // Also sync to Google Sheets (async, non-blocking)
+      if (matchId !== 'new') {
+        saveTrajectoryWithSync(matchId, {
+          setNumber: currentSet,
+          pointNumber,
+          attemptNumber,
+          playerId: selectedPlayer.playerId || `custom_${selectedPlayer.jerseyNumber}`,
+          playerName: selectedPlayer.playerName,
+          jerseyNumber: selectedPlayer.jerseyNumber,
+          team: selectedTeam,
+          actionType,
+          result,
+          startX: currentTrajectory.startX,
+          startY: currentTrajectory.startY,
+          endX: currentTrajectory.endX,
+          endY: currentTrajectory.endY,
+          serveZone: trajectoryAnalysis.serveZone,
+          hitPosition: trajectoryAnalysis.hitPosition,
+          landingArea: trajectoryAnalysis.landingArea,
+        }).catch(err => {
+          console.error('Failed to sync trajectory:', err);
+        });
+      }
     }
 
     console.log(`📝 Point ${pointNumber}, Attempt ${attemptNumber}:`, attemptData);
@@ -988,6 +1085,9 @@ function VisualTrackingPageContent() {
         team: selectedTeam
       }]);
 
+      // Determine new serving team for game state sync
+      const newServingTeam = pointWinner === servingTeam ? servingTeam : pointWinner;
+
       // Start new point
       console.log(`🏐 Point ${pointNumber} ended. Starting Point ${pointNumber + 1}`);
       console.log('All attempts in point:', [...currentPointAttempts, attemptData]);
@@ -999,6 +1099,21 @@ function VisualTrackingPageContent() {
       setCurrentPointAttempts([]); // Clear attempts for new point
       setSelectedPlayer(null);
       setSelectedTeam(null);
+
+      // Sync game state to Google Sheets (async, non-blocking)
+      if (matchId && matchId !== 'new') {
+        const newGameState: GameState = {
+          currentSet,
+          homeScore: newHomeScore,
+          opponentScore: newOpponentScore,
+          pointNumber: pointNumber + 1,
+          servingTeam: newServingTeam,
+          status: 'in_progress'
+        };
+        updateGameState(matchId, newGameState).catch(err => {
+          console.error('Failed to sync game state:', err);
+        });
+      }
     } else {
       // Point continues - rally phase
       setAttemptNumber(prev => prev + 1);
@@ -1838,6 +1953,50 @@ function VisualTrackingPageContent() {
                     )}
                   </div>
                 )}
+              </div>
+
+              {/* Sync Status Indicator */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '4px 8px',
+                  borderRadius: '4px',
+                  fontSize: '11px',
+                  fontWeight: '500',
+                  background: syncStatus === 'synced' ? '#dcfce7' :
+                             syncStatus === 'syncing' ? '#fef9c3' :
+                             syncStatus === 'offline' ? '#fee2e2' :
+                             '#fee2e2',
+                  color: syncStatus === 'synced' ? '#166534' :
+                         syncStatus === 'syncing' ? '#854d0e' :
+                         syncStatus === 'offline' ? '#991b1b' :
+                         '#991b1b'
+                }}
+                title={
+                  syncStatus === 'synced' ? 'All data saved to cloud' :
+                  syncStatus === 'syncing' ? 'Saving...' :
+                  syncStatus === 'offline' ? 'Offline - data saved locally' :
+                  'Error saving - will retry'
+                }
+              >
+                <span style={{
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  background: syncStatus === 'synced' ? '#22c55e' :
+                             syncStatus === 'syncing' ? '#eab308' :
+                             syncStatus === 'offline' ? '#f87171' :
+                             '#ef4444',
+                  animation: syncStatus === 'syncing' ? 'pulse 1.5s infinite' : 'none'
+                }} />
+                <span>
+                  {syncStatus === 'synced' ? 'Saved' :
+                   syncStatus === 'syncing' ? 'Saving...' :
+                   syncStatus === 'offline' ? 'Offline' :
+                   'Error'}
+                </span>
               </div>
             </div>
 

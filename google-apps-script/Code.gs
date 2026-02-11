@@ -13,6 +13,16 @@
  * 8. Who has access: Anyone
  * 9. Click Deploy and copy the Web App URL
  * 10. Add the URL to your React app's .env file
+ *
+ * COLUMN STRUCTURE (InGameTrends - 8 columns):
+ * A: Id              - UUID match identifier
+ * B: Data            - JSON array of sets with points
+ * C: HomeTeam        - Team ID
+ * D: OpponentTeam    - Team ID
+ * E: GameDate        - Date string
+ * F: GameState       - JSON object with live game state
+ * G: RotationConfigs - JSON object with per-set rotation configs
+ * H: Trajectories    - JSON array of trajectory data
  */
 
 // ============================================================================
@@ -31,6 +41,18 @@ const SHEETS = {
   PLAYERS: 'PlayerInfo'
 };
 
+// Column indices (0-based) for InGameTrends
+const COLUMNS = {
+  ID: 0,
+  DATA: 1,
+  HOME_TEAM: 2,
+  OPPONENT_TEAM: 3,
+  GAME_DATE: 4,
+  GAME_STATE: 5,
+  ROTATION_CONFIGS: 6,
+  TRAJECTORIES: 7
+};
+
 // ============================================================================
 // MAIN WEB APP HANDLERS
 // ============================================================================
@@ -46,6 +68,9 @@ function doGet(e) {
     switch (action) {
       case 'getMatch':
         return getMatch(e.parameter.matchId);
+
+      case 'getMatchFull':
+        return getMatchFull(e.parameter.matchId);
 
       case 'getAllMatches':
         return getAllMatches();
@@ -65,6 +90,18 @@ function doGet(e) {
         // Parse JSON data from URL parameter
         const updateData = JSON.parse(e.parameter.data || '{}');
         return updateMatch(e.parameter.matchId, updateData);
+
+      case 'updateGameState':
+        const gameStateData = JSON.parse(e.parameter.data || '{}');
+        return updateGameState(e.parameter.matchId, gameStateData);
+
+      case 'updateRotationConfig':
+        const rotationData = JSON.parse(e.parameter.data || '{}');
+        return updateRotationConfig(e.parameter.matchId, rotationData.setNumber, rotationData.config);
+
+      case 'updateTrajectories':
+        const trajData = JSON.parse(e.parameter.data || '{}');
+        return updateTrajectories(e.parameter.matchId, trajData.trajectories);
 
       case 'health':
         return createResponse({ status: 'ok', timestamp: new Date() });
@@ -103,6 +140,18 @@ function doPost(e) {
       case 'undoLastPoint':
         return undoLastPoint(payload.matchId, payload.setNumber);
 
+      case 'updateGameState':
+        return updateGameState(payload.matchId, payload.gameState);
+
+      case 'updateRotationConfig':
+        return updateRotationConfig(payload.matchId, payload.setNumber, payload.config);
+
+      case 'updateTrajectories':
+        return updateTrajectories(payload.matchId, payload.trajectories);
+
+      case 'saveMatchFull':
+        return saveMatchFull(payload.data);
+
       default:
         return createResponse({ error: 'Invalid action' }, 400);
     }
@@ -116,7 +165,7 @@ function doPost(e) {
 // ============================================================================
 
 /**
- * Get a single match by ID
+ * Get a single match by ID (basic fields for backwards compatibility)
  */
 function getMatch(matchId) {
   if (!matchId) {
@@ -143,7 +192,11 @@ function getMatch(matchId) {
         homeTeam: rowData.HomeTeam,
         opponentTeam: rowData.OpponentTeam,
         gameDate: rowData.GameDate,
-        sets: JSON.parse(rowData.Data || '[]')
+        sets: parseJSON(rowData.Data, []),
+        // Include new fields if they exist
+        gameState: parseJSON(rowData.GameState, null),
+        rotationConfigs: parseJSON(rowData.RotationConfigs, null),
+        trajectories: parseJSON(rowData.Trajectories, [])
       };
 
       return createResponse(matchData);
@@ -154,7 +207,14 @@ function getMatch(matchId) {
 }
 
 /**
- * Get all matches
+ * Get a single match with all data (full session data)
+ */
+function getMatchFull(matchId) {
+  return getMatch(matchId);
+}
+
+/**
+ * Get all matches (includes gameState for resume functionality)
  */
 function getAllMatches() {
   const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEETS.IN_GAME_TRENDS);
@@ -171,12 +231,16 @@ function getAllMatches() {
       rowData[header] = row[index];
     });
 
+    // Skip rows with no ID
+    if (!rowData.Id) continue;
+
     matches.push({
       id: rowData.Id,
       homeTeam: rowData.HomeTeam,
       opponentTeam: rowData.OpponentTeam,
       gameDate: rowData.GameDate,
-      sets: JSON.parse(rowData.Data || '[]')
+      sets: parseJSON(rowData.Data, []),
+      gameState: parseJSON(rowData.GameState, null)
     });
   }
 
@@ -239,7 +303,7 @@ function getPlayers(teamId) {
 // ============================================================================
 
 /**
- * Save a new match
+ * Save a new match (8 columns)
  */
 function saveMatch(matchData) {
   const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEETS.IN_GAME_TRENDS);
@@ -247,13 +311,16 @@ function saveMatch(matchData) {
   // Generate new ID if not provided
   const matchId = matchData.id || Utilities.getUuid();
 
-  // Prepare row data
+  // Prepare row data (8 columns)
   const rowData = [
     matchId,
     JSON.stringify(matchData.sets || []),
     matchData.homeTeam,
     matchData.opponentTeam,
-    matchData.gameDate
+    matchData.gameDate,
+    JSON.stringify(matchData.gameState || null),
+    JSON.stringify(matchData.rotationConfigs || {}),
+    JSON.stringify(matchData.trajectories || [])
   ];
 
   // Append new row
@@ -267,7 +334,14 @@ function saveMatch(matchData) {
 }
 
 /**
- * Update an existing match
+ * Save a new match with all data
+ */
+function saveMatchFull(matchData) {
+  return saveMatch(matchData);
+}
+
+/**
+ * Update an existing match (all 8 columns)
  */
 function updateMatch(matchId, matchData) {
   const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEETS.IN_GAME_TRENDS);
@@ -276,18 +350,110 @@ function updateMatch(matchId, matchData) {
   // Find row with matching ID
   for (let i = 1; i < data.length; i++) {
     if (data[i][0] === matchId) {
-      // Update row
-      sheet.getRange(i + 1, 1, 1, 5).setValues([[
+      // Preserve existing values for new columns if not provided
+      const existingGameState = parseJSON(data[i][COLUMNS.GAME_STATE], null);
+      const existingRotationConfigs = parseJSON(data[i][COLUMNS.ROTATION_CONFIGS], {});
+      const existingTrajectories = parseJSON(data[i][COLUMNS.TRAJECTORIES], []);
+
+      // Update row (8 columns)
+      sheet.getRange(i + 1, 1, 1, 8).setValues([[
         matchId,
         JSON.stringify(matchData.sets || []),
         matchData.homeTeam,
         matchData.opponentTeam,
-        matchData.gameDate
+        matchData.gameDate,
+        JSON.stringify(matchData.gameState !== undefined ? matchData.gameState : existingGameState),
+        JSON.stringify(matchData.rotationConfigs !== undefined ? matchData.rotationConfigs : existingRotationConfigs),
+        JSON.stringify(matchData.trajectories !== undefined ? matchData.trajectories : existingTrajectories)
       ]]);
 
       return createResponse({
         success: true,
         message: 'Match updated successfully'
+      });
+    }
+  }
+
+  return createResponse({ error: 'Match not found' }, 404);
+}
+
+/**
+ * Update only the game state (quick update for live scoring)
+ */
+function updateGameState(matchId, gameState) {
+  const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEETS.IN_GAME_TRENDS);
+  const data = sheet.getDataRange().getValues();
+
+  // Find row with matching ID
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === matchId) {
+      // Update only GameState column (column F = index 6)
+      sheet.getRange(i + 1, COLUMNS.GAME_STATE + 1).setValue(JSON.stringify(gameState));
+
+      return createResponse({
+        success: true,
+        message: 'Game state updated successfully'
+      });
+    }
+  }
+
+  return createResponse({ error: 'Match not found' }, 404);
+}
+
+/**
+ * Update rotation config for a specific set
+ */
+function updateRotationConfig(matchId, setNumber, config) {
+  const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEETS.IN_GAME_TRENDS);
+  const data = sheet.getDataRange().getValues();
+
+  // Find row with matching ID
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === matchId) {
+      // Get existing rotation configs
+      const existingConfigs = parseJSON(data[i][COLUMNS.ROTATION_CONFIGS], {});
+
+      // Update config for this set
+      existingConfigs[setNumber] = config;
+
+      // Update RotationConfigs column (column G = index 7)
+      sheet.getRange(i + 1, COLUMNS.ROTATION_CONFIGS + 1).setValue(JSON.stringify(existingConfigs));
+
+      return createResponse({
+        success: true,
+        message: 'Rotation config updated successfully'
+      });
+    }
+  }
+
+  return createResponse({ error: 'Match not found' }, 404);
+}
+
+/**
+ * Update trajectories (append new trajectories)
+ */
+function updateTrajectories(matchId, newTrajectories) {
+  const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEETS.IN_GAME_TRENDS);
+  const data = sheet.getDataRange().getValues();
+
+  // Find row with matching ID
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === matchId) {
+      // Get existing trajectories
+      const existingTrajectories = parseJSON(data[i][COLUMNS.TRAJECTORIES], []);
+
+      // Append new trajectories (avoid duplicates by ID)
+      const existingIds = new Set(existingTrajectories.map(t => t.id));
+      const uniqueNewTrajectories = newTrajectories.filter(t => !existingIds.has(t.id));
+      const allTrajectories = existingTrajectories.concat(uniqueNewTrajectories);
+
+      // Update Trajectories column (column H = index 8)
+      sheet.getRange(i + 1, COLUMNS.TRAJECTORIES + 1).setValue(JSON.stringify(allTrajectories));
+
+      return createResponse({
+        success: true,
+        message: 'Trajectories updated successfully',
+        count: allTrajectories.length
       });
     }
   }
@@ -385,6 +551,20 @@ function undoLastPoint(matchId, setNumber) {
 // ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
+
+/**
+ * Safely parse JSON with a default value
+ */
+function parseJSON(jsonString, defaultValue) {
+  if (!jsonString || jsonString === '' || jsonString === 'null' || jsonString === 'undefined') {
+    return defaultValue;
+  }
+  try {
+    return JSON.parse(jsonString);
+  } catch (e) {
+    return defaultValue;
+  }
+}
 
 /**
  * Create JSON response

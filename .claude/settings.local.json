@@ -37,7 +37,9 @@
       "Bash(nvm install:*)",
       "Bash(npm run build:*)",
       "Bash(lsof:*)",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "Bash(gh run view:*)",
+      "Bash(source ~/.nvm/nvm.sh)"
     ],
     "deny": [],
     "ask": []

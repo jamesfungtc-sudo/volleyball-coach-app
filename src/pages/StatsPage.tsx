@@ -5,8 +5,9 @@ import { MatchProvider, useMatch } from '../features/inGameStats/context/MatchCo
 import { PointEntryForm } from '../features/inGameStats/components/PointEntryForm';
 import { PointByPointList } from '../features/inGameStats/components/PointByPointList';
 import { StatsDashboard } from '../features/inGameStats/components/StatsDashboard';
-import { getMatch, getPlayersByTeam, getTeams, type Player } from '../services/googleSheetsAPI';
+import { getMatch, getPlayersByTeam, getTeams, saveMatchFull, type Player, type GameState } from '../services/googleSheetsAPI';
 import type { MatchData } from '../types/inGameStats.types';
+import { createSession } from '../features/inGameStats/services/matchSessionService';
 import './StatsPage.css';
 
 /**
@@ -238,9 +239,19 @@ export default function StatsPage() {
             return;
           }
 
-          // Create new match with selected teams
+          // Create match in Google Sheets immediately to get a permanent ID
+          console.log('📝 Creating new match in Google Sheets...');
+          const { matchId: newMatchId, session } = await createSession(
+            homeTeamId,
+            opponentTeamId,
+            matchDate
+          );
+
+          console.log('✅ Match created with ID:', newMatchId);
+
+          // Create match data for the MatchProvider
           const newMatch: MatchData = {
-            id: 'new-match-' + Date.now(),
+            id: newMatchId,
             match_date: matchDate,
             home_team: {
               id: homeTeam.Id,
@@ -260,6 +271,9 @@ export default function StatsPage() {
               { set_number: 5, points: [] }
             ]
           };
+
+          // Navigate to the permanent match ID (replaces 'new' in URL)
+          navigate(`/in-game-stats/${newMatchId}?homeTeam=${homeTeamId}&opponentTeam=${opponentTeamId}&date=${matchDate}`, { replace: true });
 
           setMatch(newMatch);
           setHomeRoster(homePlayers);

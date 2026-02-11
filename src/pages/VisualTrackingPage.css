@@ -276,6 +276,16 @@
   }
 }
 
+/* Sync status pulse animation */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
 /* Show warning in portrait mode */
 @media (orientation: portrait) {
   .orientation-warning {

@@ -4,6 +4,7 @@
  */
 
 import type { MatchData, PointData, SetData } from '../types/inGameStats.types';
+import type { StoredTrajectory } from '../features/inGameStats/services/trajectoryStorage';
 
 // API Base URL from environment variable
 const API_URL = import.meta.env.VITE_GOOGLE_SHEETS_API_URL;
@@ -23,6 +24,26 @@ interface APIResponse<T> {
 
 interface APIError {
   error: string;
+}
+
+// ============================================================================
+// Game State Types
+// ============================================================================
+
+export interface GameState {
+  currentSet: number;
+  homeScore: number;
+  opponentScore: number;
+  pointNumber: number;
+  attemptNumber?: number;
+  servingTeam: 'home' | 'opponent';
+  status: 'in_progress' | 'completed';
+}
+
+export interface MatchDataFull extends MatchData {
+  gameState: GameState | null;
+  rotationConfigs: Record<string, any> | null;
+  trajectories: StoredTrajectory[];
 }
 
 // ============================================================================
@@ -74,6 +95,20 @@ function normalizeMatchData(rawMatch: any): MatchData {
   };
 }
 
+/**
+ * Normalize full match data including game state, rotation configs, and trajectories
+ */
+function normalizeMatchDataFull(rawMatch: any): MatchDataFull {
+  const baseMatch = normalizeMatchData(rawMatch);
+
+  return {
+    ...baseMatch,
+    gameState: rawMatch.gameState || null,
+    rotationConfigs: rawMatch.rotationConfigs || null,
+    trajectories: rawMatch.trajectories || []
+  };
+}
+
 // ============================================================================
 // GET Operations (Read)
 // ============================================================================
@@ -120,9 +155,9 @@ export async function getMatch(matchId: string): Promise<MatchData | null> {
 }
 
 /**
- * Get all matches
+ * Get all matches (includes gameState for resume functionality)
  */
-export async function getAllMatches(): Promise<MatchData[]> {
+export async function getAllMatches(): Promise<(MatchData & { gameState?: GameState | null })[]> {
   if (!API_URL) {
     console.warn('API URL not configured');
     return [];
@@ -136,10 +171,37 @@ export async function getAllMatches(): Promise<MatchData[]> {
       throw new Error((data.data as unknown as APIError).error);
     }
 
-    // Normalize all match data
-    return data.data.map(normalizeMatchData);
+    // Normalize all match data and include gameState
+    return data.data.map(rawMatch => ({
+      ...normalizeMatchData(rawMatch),
+      gameState: rawMatch.gameState || null
+    }));
   } catch (error) {
     console.error('Failed to get matches:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get a single match with all data (full session data including gameState, rotationConfigs, trajectories)
+ */
+export async function getMatchFull(matchId: string): Promise<MatchDataFull | null> {
+  if (!API_URL) {
+    console.warn('API URL not configured');
+    return null;
+  }
+
+  try {
+    const response = await fetch(`${API_URL}?action=getMatchFull&matchId=${matchId}`);
+    const data: APIResponse<any> = await response.json();
+
+    if (data.status !== 200) {
+      throw new Error((data.data as unknown as APIError).error);
+    }
+
+    return normalizeMatchDataFull(data.data);
+  } catch (error) {
+    console.error('Failed to get full match:', error);
     throw error;
   }
 }
@@ -407,6 +469,138 @@ export async function undoLastPoint(matchId: string, setNumber: number): Promise
     }
   } catch (error) {
     console.error('Failed to undo point:', error);
+    throw error;
+  }
+}
+
+// ============================================================================
+// Game State Operations
+// ============================================================================
+
+/**
+ * Update only the game state (quick update for live scoring)
+ */
+export async function updateGameState(matchId: string, gameState: GameState): Promise<void> {
+  if (!API_URL) {
+    console.warn('API URL not configured');
+    throw new Error('API not configured');
+  }
+
+  try {
+    const params = new URLSearchParams({
+      action: 'updateGameState',
+      matchId,
+      data: JSON.stringify(gameState)
+    });
+
+    const response = await fetch(`${API_URL}?${params}`);
+    const data: APIResponse<{ success: boolean }> = await response.json();
+
+    if (data.status !== 200) {
+      throw new Error((data.data as unknown as APIError).error);
+    }
+  } catch (error) {
+    console.error('Failed to update game state:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update rotation config for a specific set
+ */
+export async function updateRotationConfig(
+  matchId: string,
+  setNumber: number,
+  config: any
+): Promise<void> {
+  if (!API_URL) {
+    console.warn('API URL not configured');
+    throw new Error('API not configured');
+  }
+
+  try {
+    const params = new URLSearchParams({
+      action: 'updateRotationConfig',
+      matchId,
+      data: JSON.stringify({ setNumber, config })
+    });
+
+    const response = await fetch(`${API_URL}?${params}`);
+    const data: APIResponse<{ success: boolean }> = await response.json();
+
+    if (data.status !== 200) {
+      throw new Error((data.data as unknown as APIError).error);
+    }
+  } catch (error) {
+    console.error('Failed to update rotation config:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update trajectories (append new trajectories to existing)
+ */
+export async function updateTrajectories(
+  matchId: string,
+  trajectories: StoredTrajectory[]
+): Promise<void> {
+  if (!API_URL) {
+    console.warn('API URL not configured');
+    throw new Error('API not configured');
+  }
+
+  try {
+    const params = new URLSearchParams({
+      action: 'updateTrajectories',
+      matchId,
+      data: JSON.stringify({ trajectories })
+    });
+
+    const response = await fetch(`${API_URL}?${params}`);
+    const data: APIResponse<{ success: boolean; count?: number }> = await response.json();
+
+    if (data.status !== 200) {
+      throw new Error((data.data as unknown as APIError).error);
+    }
+  } catch (error) {
+    console.error('Failed to update trajectories:', error);
+    throw error;
+  }
+}
+
+/**
+ * Save a new match with full data (including gameState, rotationConfigs, trajectories)
+ */
+export async function saveMatchFull(matchData: {
+  homeTeam: string;
+  opponentTeam: string;
+  gameDate: string;
+  sets?: any[];
+  gameState?: GameState;
+  rotationConfigs?: Record<string, any>;
+  trajectories?: StoredTrajectory[];
+}): Promise<{ matchId: string }> {
+  if (!API_URL) {
+    console.warn('API URL not configured');
+    throw new Error('API not configured');
+  }
+
+  try {
+    const params = new URLSearchParams({
+      action: 'saveMatch',
+      data: JSON.stringify(matchData)
+    });
+
+    const response = await fetch(`${API_URL}?${params}`);
+    const data: APIResponse<{ success: boolean; matchId: string }> = await response.json();
+
+    if (data.status !== 200) {
+      throw new Error((data.data as unknown as APIError).error);
+    }
+
+    return { matchId: data.data.matchId };
+  } catch (error) {
+    console.error('Failed to save full match:', error);
     throw error;
   }
 }

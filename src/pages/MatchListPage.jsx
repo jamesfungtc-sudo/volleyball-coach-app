@@ -84,8 +84,18 @@ export default function MatchListPage() {
     navigate('/in-game-stats/setup');
   }
 
-  // Calculate match status from sets
-  function getMatchStatus(sets) {
+  // Calculate match status from gameState or sets
+  function getMatchStatus(match) {
+    // First, check gameState from Google Sheets (new 8-column format)
+    if (match.gameState) {
+      if (match.gameState.status === 'completed') return 'completed';
+      if (match.gameState.status === 'in_progress') return 'ongoing';
+      // If there are scores, it's ongoing
+      if (match.gameState.homeScore > 0 || match.gameState.opponentScore > 0) return 'ongoing';
+    }
+
+    // Fallback to calculating from sets
+    const sets = match.sets;
     if (!sets || sets.length === 0) return 'new';
 
     let homeWins = 0;
@@ -107,6 +117,13 @@ export default function MatchListPage() {
     if (homeWins >= 3 || opponentWins >= 3) return 'completed';
     if (homeWins > 0 || opponentWins > 0) return 'ongoing';
     return 'new';
+  }
+
+  // Resume match - navigate to visual tracking page
+  function resumeMatch(event, match) {
+    event.stopPropagation(); // Prevent card click
+    const currentSet = match.gameState?.currentSet || 1;
+    navigate(`/in-game-stats/${match.id}/visual?set=${currentSet}`);
   }
 
   // Format date
@@ -180,9 +197,10 @@ export default function MatchListPage() {
       ) : (
         <div className="match-list-grid">
           {matches.map((match) => {
-            const status = getMatchStatus(match.sets);
+            const status = getMatchStatus(match);
             const isOngoing = status === 'ongoing';
             const isCompleted = status === 'completed';
+            const hasGameState = match.gameState && (match.gameState.homeScore > 0 || match.gameState.opponentScore > 0);
 
             return (
               <div
@@ -199,7 +217,13 @@ export default function MatchListPage() {
                 </div>
 
                 <div className="match-card-info">
-                  {isOngoing ? (
+                  {isOngoing && hasGameState ? (
+                    <>
+                      <span className="match-status">
+                        Set {match.gameState.currentSet} • {match.gameState.homeScore}-{match.gameState.opponentScore}
+                      </span>
+                    </>
+                  ) : isOngoing ? (
                     <>
                       <span className="match-status">Live Match</span>
                       <span className="match-score">{getCurrentScore(match.sets)}</span>
@@ -214,9 +238,19 @@ export default function MatchListPage() {
                   )}
                 </div>
 
-                <button className={`btn-open ${status}`}>
-                  {isOngoing ? 'Continue' : isCompleted ? 'View Stats' : 'Start'}
-                </button>
+                <div className="match-card-actions">
+                  {isOngoing && (
+                    <button
+                      className="btn-resume"
+                      onClick={(e) => resumeMatch(e, match)}
+                    >
+                      ▶ Resume
+                    </button>
+                  )}
+                  <button className={`btn-open ${status}`}>
+                    {isOngoing ? 'View Stats' : isCompleted ? 'View Stats' : 'Start'}
+                  </button>
+                </div>
               </div>
             );
           })}
