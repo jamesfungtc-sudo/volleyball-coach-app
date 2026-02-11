@@ -524,9 +524,19 @@ function VisualTrackingPageContent() {
     setServingTeam(startingServer);
     setRotationEnabled(true);
 
-    // Save to localStorage
-    if (matchId) {
+    // Save to localStorage AND sync to Google Sheets
+    if (matchId && matchId !== 'new') {
       saveSetConfiguration(matchId, currentSet, homeConfig, opponentConfig, startingServer);
+
+      // Sync rotation config to Google Sheets
+      const fullConfig = {
+        home: homeConfig,
+        opponent: opponentConfig,
+        startingServer
+      };
+      saveRotationConfigForSet(matchId, currentSet, fullConfig, homeRoster, opponentRoster)
+        .then(() => console.log('✅ Rotation config synced to Google Sheets'))
+        .catch((err) => console.error('❌ Failed to sync rotation config:', err));
     }
 
     // Initialize lineups from configuration WITH ROSTER DATA
