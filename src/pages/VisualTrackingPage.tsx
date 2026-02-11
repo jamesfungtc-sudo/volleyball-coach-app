@@ -355,15 +355,64 @@ function VisualTrackingPageContent() {
           console.log('📦 Session restored:', session.gameState);
 
           // Restore game state
-          setCurrentSet(session.gameState.currentSet);
+          const restoredSet = session.gameState.currentSet;
+          setCurrentSet(restoredSet);
           setHomeScore(session.gameState.homeScore);
           setOpponentScore(session.gameState.opponentScore);
           setPointNumber(session.gameState.pointNumber);
           setServingTeam(session.gameState.servingTeam);
 
           // Update URL to reflect current set
-          if (session.gameState.currentSet !== currentSet) {
-            setSearchParams({ set: session.gameState.currentSet.toString() });
+          if (restoredSet !== currentSet) {
+            setSearchParams({ set: restoredSet.toString() });
+          }
+
+          // Restore rotation config from Google Sheets if available
+          if (session.rotationConfigs && Object.keys(session.rotationConfigs).length > 0) {
+            console.log('📋 Rotation configs found in session:', session.rotationConfigs);
+
+            // Get config for current set (key could be number or string)
+            const setConfig = session.rotationConfigs[restoredSet] || session.rotationConfigs[restoredSet.toString()];
+
+            if (setConfig && setConfig.home && setConfig.opponent) {
+              console.log('🔄 Restoring rotation config for set', restoredSet, ':', setConfig);
+
+              // Set rotation configs
+              setHomeRotationConfig(setConfig.home);
+              setOpponentRotationConfig(setConfig.opponent);
+              setServingTeam(setConfig.startingServer || session.gameState.servingTeam);
+              setRotationEnabled(true);
+
+              // Initialize lineups from config (rosters should be loaded at this point)
+              if (homeRoster.length > 0 && opponentRoster.length > 0) {
+                console.log('🏐 Initializing lineups from restored config...');
+                const isHomeServing = (setConfig.startingServer || session.gameState.servingTeam) === 'home';
+
+                const homeLineupData = initializeLineup(
+                  setConfig.home,
+                  'home',
+                  homeRoster,
+                  null,
+                  isHomeServing
+                );
+                const opponentLineupData = initializeLineup(
+                  setConfig.opponent,
+                  'opponent',
+                  opponentRoster,
+                  null,
+                  !isHomeServing
+                );
+
+                setHomeLineup(homeLineupData);
+                setOpponentLineup(opponentLineupData);
+
+                console.log('✅ Lineups restored:', { home: homeLineupData, opponent: opponentLineupData });
+              } else {
+                console.log('⏳ Rosters not loaded yet, lineups will be initialized later');
+              }
+            } else {
+              console.log('⚠️ No rotation config for set', restoredSet);
+            }
           }
 
           console.log('✅ Session restored successfully');
@@ -379,7 +428,7 @@ function VisualTrackingPageContent() {
     }
 
     restoreSession();
-  }, [matchId, loading, sessionLoaded]);
+  }, [matchId, loading, sessionLoaded, homeRoster.length, opponentRoster.length]);
 
   /**
    * Subscribe to sync status changes
