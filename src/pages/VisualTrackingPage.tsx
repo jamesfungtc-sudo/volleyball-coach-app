@@ -144,12 +144,16 @@ function VisualTrackingPageContent() {
   // Save attempts for current point (local storage until point ends)
   const [currentPointAttempts, setCurrentPointAttempts] = useState<any[]>([]);
 
-  // Scoring history for undo functionality
+  // Scoring history for undo functionality (includes rotation state)
   const [scoringHistory, setScoringHistory] = useState<Array<{
     pointNumber: number;
     homeScore: number;
     opponentScore: number;
     servingTeam: 'home' | 'opponent';
+    homeRotation: number;
+    opponentRotation: number;
+    homeLineup: TeamLineup;
+    opponentLineup: TeamLineup;
   }>>([]);
 
   // OLD: Player configuration modal removed - now using RotationConfigModal
@@ -1038,12 +1042,16 @@ function VisualTrackingPageContent() {
       setOpponentFormationType('serving');
       console.log('🏐 Both teams → Serving formation (point ended)');
 
-      // Save current state to history before updating
+      // Save current state to history before updating (including rotation state for undo)
       setScoringHistory(prev => [...prev, {
         pointNumber,
         homeScore,
         opponentScore,
-        servingTeam
+        servingTeam,
+        homeRotation: homeRotationConfig?.currentRotation || 1,
+        opponentRotation: opponentRotationConfig?.currentRotation || 1,
+        homeLineup: { ...homeLineup },
+        opponentLineup: { ...opponentLineup }
       }]);
 
       // Determine point winner and update score + serving team
@@ -1389,12 +1397,16 @@ function VisualTrackingPageContent() {
   const handleQuickScore = (scoringOpt: 'team_error' | 'opponent_error', playerId: string) => {
     if (!scoringTeam) return;
 
-    // Save current state to history before updating
+    // Save current state to history before updating (including rotation state for undo)
     setScoringHistory(prev => [...prev, {
       pointNumber,
       homeScore,
       opponentScore,
-      servingTeam
+      servingTeam,
+      homeRotation: homeRotationConfig?.currentRotation || 1,
+      opponentRotation: opponentRotationConfig?.currentRotation || 1,
+      homeLineup: { ...homeLineup },
+      opponentLineup: { ...opponentLineup }
     }]);
 
     let pointWinner: 'home' | 'opponent';
@@ -1497,6 +1509,102 @@ function VisualTrackingPageContent() {
   };
 
   /**
+   * Handle direct quick score - awards point directly without requiring outcome selection
+   * This is used when clicking the score buttons directly
+   */
+  const handleDirectQuickScore = (pointWinner: 'home' | 'opponent') => {
+    // Save current state to history before updating (including rotation state for undo)
+    setScoringHistory(prev => [...prev, {
+      pointNumber,
+      homeScore,
+      opponentScore,
+      servingTeam,
+      homeRotation: homeRotationConfig?.currentRotation || 1,
+      opponentRotation: opponentRotationConfig?.currentRotation || 1,
+      homeLineup: { ...homeLineup },
+      opponentLineup: { ...opponentLineup }
+    }]);
+
+    // Update score
+    if (pointWinner === 'home') {
+      setHomeScore(prev => prev + 1);
+      console.log('📊 Home scores! (Direct quick score)');
+    } else {
+      setOpponentScore(prev => prev + 1);
+      console.log('📊 Opponent scores! (Direct quick score)');
+    }
+
+    // Handle rotation if enabled
+    if (rotationEnabled && homeRotationConfig && opponentRotationConfig) {
+      const rotationUpdate = handlePointEnd(
+        pointWinner,
+        servingTeam,
+        homeLineup,
+        opponentLineup,
+        homeRotationConfig,
+        opponentRotationConfig,
+        homeRoster,
+        opponentRoster
+      );
+
+      if (rotationUpdate.rotationChanged) {
+        // Update lineups
+        setHomeLineup(rotationUpdate.homeLineup);
+        setOpponentLineup(rotationUpdate.opponentLineup);
+
+        // Update rotation numbers from the returned values
+        setHomeRotationConfig({
+          ...homeRotationConfig,
+          currentRotation: rotationUpdate.newHomeRotation
+        });
+        setOpponentRotationConfig({
+          ...opponentRotationConfig,
+          currentRotation: rotationUpdate.newOpponentRotation
+        });
+
+        console.log(`🔄 Rotation: ${rotationUpdate.servingTeam} team rotated to rotation ${rotationUpdate.servingTeam === 'home' ? rotationUpdate.newHomeRotation : rotationUpdate.newOpponentRotation}`);
+      }
+
+      setServingTeam(rotationUpdate.servingTeam);
+    } else {
+      // No rotation enabled - just update serving team
+      setServingTeam(pointWinner);
+    }
+
+    console.log(`🏐 ${pointWinner} wins the point and will serve next`);
+
+    // Calculate new scores for point history
+    const newHomeScore = pointWinner === 'home' ? homeScore + 1 : homeScore;
+    const newOpponentScore = pointWinner === 'opponent' ? opponentScore + 1 : opponentScore;
+
+    // Add to point history for trend display (outcome is null for direct quick score)
+    setPointHistory(prev => [...prev, {
+      pointNumber,
+      homeScore: newHomeScore,
+      opponentScore: newOpponentScore,
+      winningTeam: pointWinner,
+      actionType: null,  // No specific action type for direct quick score
+      playerId: null,    // No specific player
+      team: pointWinner
+    }]);
+
+    // Start new point
+    console.log(`🏐 Point ${pointNumber} ended (direct quick score). Starting Point ${pointNumber + 1}`);
+    setPointNumber(prev => prev + 1);
+    setAttemptNumber(1);
+    setIsServePhase(true);
+    setActionType('serve');
+    setCurrentPointAttempts([]);
+    setSelectedPlayer(null);
+    setSelectedTeam(null);
+    setCurrentTrajectory(null);
+
+    // Point ended - switch BOTH teams back to serving formation
+    setHomeFormationType('serving');
+    setOpponentFormationType('serving');
+  };
+
+  /**
    * Go back / Undo last point scored
    */
   const handleGoBack = () => {
@@ -1514,10 +1622,32 @@ function VisualTrackingPageContent() {
     setOpponentScore(lastState.opponentScore);
     setServingTeam(lastState.servingTeam);
 
+    // Restore rotation state (lineups and rotation numbers)
+    if (lastState.homeLineup && lastState.opponentLineup) {
+      setHomeLineup(lastState.homeLineup);
+      setOpponentLineup(lastState.opponentLineup);
+      console.log('⏮️ Undo: Restored lineups');
+    }
+
+    if (homeRotationConfig && lastState.homeRotation) {
+      setHomeRotationConfig({
+        ...homeRotationConfig,
+        currentRotation: lastState.homeRotation
+      });
+    }
+
+    if (opponentRotationConfig && lastState.opponentRotation) {
+      setOpponentRotationConfig({
+        ...opponentRotationConfig,
+        currentRotation: lastState.opponentRotation
+      });
+    }
+
+    console.log(`⏮️ Undo: Restored rotations - Home: ${lastState.homeRotation}, Opponent: ${lastState.opponentRotation}`);
+
     // ALWAYS reset to serving formation on undo
     setHomeFormationType('serving');
     setOpponentFormationType('serving');
-    console.log('⏮️ Undo: Both teams → Serving formation');
 
     // Remove the last entry from history
     setScoringHistory(prev => prev.slice(0, -1));
@@ -2194,13 +2324,10 @@ function VisualTrackingPageContent() {
               background: '#f9fafb',
               borderRadius: '8px'
             }}>
-              {/* Scoreboard Section */}
+              {/* Scoreboard Section - Direct quick score (no modal needed) */}
               <div style={{ display: 'flex', gap: '6px', alignItems: 'center', background: 'white', padding: '6px 8px', borderRadius: '6px', border: '2px solid #e5e7eb' }}>
                 <button
-                  onClick={() => {
-                    setScoringTeam('home');
-                    setScoringModalOpen(true);
-                  }}
+                  onClick={() => handleDirectQuickScore('home')}
                   style={{
                     background: '#7c3aed',
                     color: 'white',
@@ -2211,6 +2338,7 @@ function VisualTrackingPageContent() {
                     cursor: 'pointer',
                     minWidth: '60px'
                   }}
+                  title="Click to award point to Home"
                 >
                   <div style={{ fontSize: '9px', fontWeight: '500', opacity: 0.9, marginBottom: '2px' }}>
                     {servingTeam === 'home' ? '● HOME' : 'HOME'}
@@ -2236,10 +2364,7 @@ function VisualTrackingPageContent() {
                 </button>
 
                 <button
-                  onClick={() => {
-                    setScoringTeam('opponent');
-                    setScoringModalOpen(true);
-                  }}
+                  onClick={() => handleDirectQuickScore('opponent')}
                   style={{
                     background: '#ef4444',
                     color: 'white',
@@ -2250,6 +2375,7 @@ function VisualTrackingPageContent() {
                     cursor: 'pointer',
                     minWidth: '60px'
                   }}
+                  title="Click to award point to Opponent"
                 >
                   <div style={{ fontSize: '9px', fontWeight: '500', opacity: 0.9, marginBottom: '2px' }}>
                     {servingTeam === 'opponent' ? '● OPP' : 'OPP'}
@@ -2658,12 +2784,16 @@ function VisualTrackingPageContent() {
                     setOpponentFormationType('serving');
                     console.log('🏐 Both teams → Serving formation (point ended via error button)');
 
-                    // Save to scoring history
+                    // Save to scoring history (including rotation state for undo)
                     setScoringHistory(prev => [...prev, {
                       pointNumber,
                       homeScore,
                       opponentScore,
-                      servingTeam
+                      servingTeam,
+                      homeRotation: homeRotationConfig?.currentRotation || 1,
+                      opponentRotation: opponentRotationConfig?.currentRotation || 1,
+                      homeLineup: { ...homeLineup },
+                      opponentLineup: { ...opponentLineup }
                     }]);
 
                     // Determine winner (error means other team wins)
