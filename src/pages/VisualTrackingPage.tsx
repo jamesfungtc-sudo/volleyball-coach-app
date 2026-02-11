@@ -36,6 +36,7 @@ import type {
 } from '../features/inGameStats/types/rotation.types';
 import {
   initializeLineup,
+  getLineupForRotation,
   handlePointEnd,
   saveSetConfiguration,
   loadSetConfiguration,
@@ -385,18 +386,29 @@ function VisualTrackingPageContent() {
 
               // Initialize lineups from config (rosters should be loaded at this point)
               if (homeRoster.length > 0 && opponentRoster.length > 0) {
-                console.log('🏐 Initializing lineups from restored config...');
+                // Get the saved rotation numbers (default to 1 if not saved)
+                const homeRotation = setConfig.home.currentRotation || 1;
+                const opponentRotation = setConfig.opponent.currentRotation || 1;
                 const isHomeServing = (setConfig.startingServer || session.gameState.servingTeam) === 'home';
 
-                const homeLineupData = initializeLineup(
+                console.log('🏐 Restoring lineups with saved rotations:', {
+                  homeRotation,
+                  opponentRotation,
+                  isHomeServing
+                });
+
+                // Use getLineupForRotation to restore to the correct rotation, not initializeLineup (which always starts at rotation 1)
+                const homeLineupData = getLineupForRotation(
                   setConfig.home,
+                  homeRotation,
                   'home',
                   homeRoster,
                   null,
                   isHomeServing
                 );
-                const opponentLineupData = initializeLineup(
+                const opponentLineupData = getLineupForRotation(
                   setConfig.opponent,
+                  opponentRotation,
                   'opponent',
                   opponentRoster,
                   null,
@@ -406,7 +418,12 @@ function VisualTrackingPageContent() {
                 setHomeLineup(homeLineupData);
                 setOpponentLineup(opponentLineupData);
 
-                console.log('✅ Lineups restored:', { home: homeLineupData, opponent: opponentLineupData });
+                console.log('✅ Lineups restored to rotation:', {
+                  homeRotation,
+                  opponentRotation,
+                  home: homeLineupData,
+                  opponent: opponentLineupData
+                });
               } else {
                 console.log('⏳ Rosters not loaded yet, lineups will be initialized later');
               }
@@ -440,6 +457,46 @@ function VisualTrackingPageContent() {
 
     return unsubscribe;
   }, []);
+
+  /**
+   * Sync rotation config to Google Sheets when rotation number changes
+   * This ensures the current rotation is persisted for resume functionality
+   */
+  useEffect(() => {
+    // Only sync if we have valid configs and the match is active
+    if (!matchId || matchId === 'new' || !rotationEnabled || !homeRotationConfig || !opponentRotationConfig) {
+      return;
+    }
+
+    // Skip during initial load (wait for session to be restored first)
+    if (!sessionLoaded) {
+      return;
+    }
+
+    const fullConfig = {
+      home: homeRotationConfig,
+      opponent: opponentRotationConfig,
+      startingServer: servingTeam
+    };
+
+    console.log('📤 Syncing rotation config to Google Sheets (rotation changed):', {
+      homeRotation: homeRotationConfig.currentRotation,
+      opponentRotation: opponentRotationConfig.currentRotation
+    });
+
+    // Sync in background (don't await)
+    saveRotationConfigForSet(matchId, currentSet, fullConfig, homeRoster, opponentRoster)
+      .then(() => console.log('✅ Rotation config synced'))
+      .catch((err) => console.error('❌ Failed to sync rotation config:', err));
+  }, [
+    homeRotationConfig?.currentRotation,
+    opponentRotationConfig?.currentRotation,
+    matchId,
+    currentSet,
+    rotationEnabled,
+    sessionLoaded,
+    servingTeam
+  ]);
 
   /**
    * Load or prompt for rotation configuration when set changes
