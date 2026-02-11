@@ -355,7 +355,7 @@ export default function StatsPage() {
             ← Matches
           </button>
           <button
-            onClick={() => navigate(`/in-game-stats/${matchId}/visual`)}
+            onClick={() => navigate(`/in-game-stats/${match?.id || matchId}/visual`)}
             className="btn-visual-tracking"
             style={{
               marginLeft: '12px',

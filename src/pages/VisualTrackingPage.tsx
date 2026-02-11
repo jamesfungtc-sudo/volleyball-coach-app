@@ -25,7 +25,7 @@ import type {
   TrajectoryData,
   OpponentAttemptResult
 } from '../features/inGameStats/types/opponentTracking.types';
-import { getMatch, getPlayersByTeam, type Player } from '../services/googleSheetsAPI';
+import { getMatch, getPlayersByTeam, getTeams, type Player } from '../services/googleSheetsAPI';
 import type { MatchData } from '../types/inGameStats.types';
 import { RotationConfigModal } from '../features/inGameStats/components/RotationConfigModal';
 import { MatchInfoModal } from '../features/inGameStats/components/MatchInfoModal';
@@ -267,21 +267,27 @@ function VisualTrackingPageContent() {
         if (match) {
           console.log('Match loaded:', match);
 
-          // Load players for both teams
-          const [home, opp] = await Promise.all([
+          // Load teams, then players for both teams
+          const [teams, home, opp] = await Promise.all([
+            getTeams(),
             getPlayersByTeam(match.home_team.id),
             getPlayersByTeam(match.opponent_team.id)
           ]);
 
+          console.log('Teams:', teams);
           console.log('Home roster:', home);
           console.log('Opponent roster:', opp);
 
           setHomeRoster(home);
           setOpponentRoster(opp);
 
-          // Store team names
-          setHomeTeamName(match.home_team.name);
-          setOpponentTeamName(match.opponent_team.name);
+          // Look up actual team names from teams list
+          const homeTeam = teams.find((t: any) => t.Id === match.home_team.id);
+          const oppTeam = teams.find((t: any) => t.Id === match.opponent_team.id);
+
+          // Store team names (use actual names from Teams table, fallback to match data)
+          setHomeTeamName(homeTeam?.Name || match.home_team.name || 'Home');
+          setOpponentTeamName(oppTeam?.Name || match.opponent_team.name || 'Opponent');
 
           // SMART CONFIG LOADING - Don't clear if match has recorded data
           // Check if this match has any recorded points/data (indicating it's in progress)
