@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { cn } from '@/lib/utils';
 import type {
   TeamRotationConfig,
   VolleyballSystem,
@@ -12,7 +13,6 @@ import {
   getJerseyNumber,
   type PlayerReference
 } from '../../../types/playerReference.types';
-import './RotationConfigModal.css';
 
 interface RotationConfigModalProps {
   isOpen: boolean;
@@ -62,6 +62,19 @@ function createEmptyConfig(system: VolleyballSystem): TeamRotationConfig {
     currentRotation: 1
   };
 }
+
+// Shared input/select styles for dark theme
+const inputClasses =
+  'w-full px-3 py-2 text-sm bg-card text-foreground border-2 border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary placeholder:text-muted-foreground transition-colors';
+
+const numberInputClasses =
+  'w-20 px-3 py-2 text-sm bg-card text-foreground border-2 border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors';
+
+const selectClasses =
+  'w-full px-3 py-2.5 text-sm bg-card text-foreground border-2 border-border rounded-md cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors';
+
+const disabledInputClasses =
+  'w-20 px-3 py-2 text-sm bg-secondary text-muted-foreground border-2 border-border rounded-md cursor-not-allowed';
 
 export function RotationConfigModal({
   isOpen,
@@ -174,7 +187,6 @@ export function RotationConfigModal({
   // Get smart defaults for libero replacement targets (returns array of ALL MBs)
   const getSmartLiberoDefaults = (system: VolleyballSystem): PlayerRole[] => {
     const roles = VOLLEYBALL_SYSTEMS[system] as PlayerRole[];
-    // Find ALL middle blocker roles in the system
     const mbRoles = roles.filter(r =>
       r === 'MB' || r === 'MB (w.s)' || r === 'MB1' || r === 'MB2'
     );
@@ -183,7 +195,6 @@ export function RotationConfigModal({
       return mbRoles;
     }
 
-    // Fallback: first role that's not a setter
     const nonSetterRole = roles.find(r => r !== 'S' && !r.includes('S1') && !r.includes('S2'));
     return nonSetterRole ? [nonSetterRole] : [];
   };
@@ -208,13 +219,11 @@ export function RotationConfigModal({
       }
     }
 
-    // Set smart default for replacement target if not already set
     const updatedConfig: TeamRotationConfig = {
       ...config,
       libero: playerRef
     };
 
-    // Set smart defaults if libero is being added and no targets configured yet
     if ((!config.liberoReplacementTargets || config.liberoReplacementTargets.length === 0) && playerRef) {
       updatedConfig.liberoReplacementTargets = getSmartLiberoDefaults(config.system);
     }
@@ -258,13 +267,10 @@ export function RotationConfigModal({
     const config = team === 'home' ? homeConfig : opponentConfig;
     const currentTargets = config.liberoReplacementTargets || [];
 
-    // Toggle role in/out of selection
     let newTargets: PlayerRole[];
     if (currentTargets.includes(role)) {
-      // Remove role
       newTargets = currentTargets.filter(r => r !== role);
     } else {
-      // Add role
       newTargets = [...currentTargets, role];
     }
 
@@ -278,22 +284,18 @@ export function RotationConfigModal({
   // Get valid replacement targets for libero based on system
   const getValidReplacementTargets = (system: VolleyballSystem): PlayerRole[] => {
     const roles = VOLLEYBALL_SYSTEMS[system] as PlayerRole[];
-    // Return all roles (user can choose any player)
     return roles;
   };
 
   // Validate configuration
-  // UPDATED: Allow players with either name OR number filled (not both required)
   const validateConfig = (config: TeamRotationConfig): boolean => {
     const roles = VOLLEYBALL_SYSTEMS[config.system];
 
-    // Check all roles have at least name OR number filled
     for (const role of roles) {
       const playerRef = config.players[role as PlayerRole];
       if (!playerRef) {
         return false;
       }
-      // Must have EITHER a valid jersey number OR a display name
       const hasNumber = playerRef.jerseyNumber > 0;
       const hasName = playerRef.displayName !== '';
       if (!hasNumber && !hasName) {
@@ -301,7 +303,6 @@ export function RotationConfigModal({
       }
     }
 
-    // Check libero exists and has at least name OR number
     if (!config.libero) {
       return false;
     }
@@ -339,19 +340,17 @@ export function RotationConfigModal({
     const roster = team === 'home' ? homeRoster : opponentRoster;
 
     return (
-      <div className="team-config-section">
-        <h3>{teamName}</h3>
+      <div className="bg-secondary/50 border-2 border-border rounded-lg p-5">
+        <h3 className="m-0 mb-4 text-xl font-semibold text-foreground">{teamName}</h3>
 
         {/* System and Starting P1 - Compact row */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+        <div className="grid grid-cols-2 gap-3 mb-4">
           <div>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '6px' }}>
-              System:
-            </label>
+            <label className="block text-sm font-semibold text-foreground mb-1.5">System:</label>
             <select
               value={config.system}
               onChange={(e) => handleSystemChange(team, e.target.value as VolleyballSystem)}
-              className="system-select"
+              className={selectClasses}
             >
               <option value="5-1 (OH>S)">5-1 (OH&gt;S)</option>
               <option value="5-1 (MB>S)">5-1 (MB&gt;S)</option>
@@ -361,13 +360,11 @@ export function RotationConfigModal({
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '6px' }}>
-              Starting P1:
-            </label>
+            <label className="block text-sm font-semibold text-foreground mb-1.5">Starting P1:</label>
             <select
               value={config.startingP1}
               onChange={(e) => handleStartingP1Change(team, e.target.value as PlayerRole)}
-              className="starting-p1-select"
+              className={selectClasses}
             >
               {roles.map((role: string) => (
                 <option key={role} value={role}>
@@ -378,16 +375,16 @@ export function RotationConfigModal({
           </div>
         </div>
 
-        <div className="config-divider" style={{ margin: '12px 0' }}></div>
+        <div className="h-px bg-border my-3" />
 
         {/* Player Inputs - Compact */}
-        <div style={{ marginBottom: '12px' }}>
-          <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '10px', color: '#374151' }}>Players:</h4>
-          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: '10px 12px', alignItems: 'center' }}>
+        <div className="mb-3">
+          <h4 className="text-sm font-semibold mb-2.5 text-foreground">Players:</h4>
+          <div className="grid items-center gap-x-3 gap-y-2.5" style={{ gridTemplateColumns: 'auto 1fr auto' }}>
             {/* Header Row */}
-            <div style={{ fontWeight: 'bold', fontSize: '11px', color: '#6b7280' }}>Role</div>
-            <div style={{ fontWeight: 'bold', fontSize: '11px', color: '#6b7280' }}>Name</div>
-            <div style={{ fontWeight: 'bold', fontSize: '11px', color: '#6b7280', width: '80px' }}>Jersey #</div>
+            <div className="font-bold text-[11px] text-muted-foreground">Role</div>
+            <div className="font-bold text-[11px] text-muted-foreground">Name</div>
+            <div className="font-bold text-[11px] text-muted-foreground w-20">Jersey #</div>
 
             {roles.map((role: string) => {
               const playerRef = config.players[role as PlayerRole];
@@ -400,25 +397,17 @@ export function RotationConfigModal({
               return (
                 <React.Fragment key={role}>
                   {/* Role Label */}
-                  <div style={{ fontSize: '14px', fontWeight: '500' }}>{role}:</div>
+                  <div className="text-sm font-medium text-foreground">{role}:</div>
 
                   {/* Name Input with Datalist */}
-                  <div style={{ position: 'relative' }}>
+                  <div className="relative">
                     <input
                       type="text"
                       list={`${team}-${role}-players`}
                       value={playerName}
                       onChange={(e) => handlePlayerNameChange(team, role as PlayerRole, e.target.value)}
                       placeholder={`Enter or select ${role} name`}
-                      style={{
-                        width: '100%',
-                        padding: '6px 10px',
-                        fontSize: '14px',
-                        border: '2px solid #d1d5db',
-                        borderRadius: '6px',
-                        background: 'white',
-                        color: '#111827'
-                      }}
+                      className={inputClasses}
                     />
                     <datalist id={`${team}-${role}-players`}>
                       {roster.map((player) => (
@@ -436,16 +425,7 @@ export function RotationConfigModal({
                     onChange={(e) => handlePlayerNumberChange(team, role as PlayerRole, e.target.value)}
                     placeholder="#"
                     disabled={isRosterPlayer}
-                    style={{
-                      width: '80px',
-                      padding: '6px 10px',
-                      fontSize: '14px',
-                      border: '2px solid #d1d5db',
-                      borderRadius: '6px',
-                      background: isRosterPlayer ? '#f3f4f6' : 'white',
-                      color: '#111827',
-                      cursor: isRosterPlayer ? 'not-allowed' : 'text'
-                    }}
+                    className={isRosterPlayer ? disabledInputClasses : numberInputClasses}
                     title={isRosterPlayer ? 'Jersey number from roster (read-only)' : 'Enter jersey number'}
                   />
                 </React.Fragment>
@@ -453,9 +433,9 @@ export function RotationConfigModal({
             })}
 
             {/* Libero Row */}
-            <div style={{ fontSize: '14px', fontWeight: '500' }}>L (Libero):</div>
+            <div className="text-sm font-medium text-violet-400">L (Libero):</div>
 
-            <div style={{ position: 'relative' }}>
+            <div className="relative">
               <input
                 type="text"
                 list={`${team}-libero-players`}
@@ -466,15 +446,7 @@ export function RotationConfigModal({
                 }
                 onChange={(e) => handleLiberoNameChange(team, e.target.value)}
                 placeholder="Enter or select Libero name"
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  fontSize: '14px',
-                  border: '2px solid #d1d5db',
-                  borderRadius: '6px',
-                  background: 'white',
-                  color: '#111827'
-                }}
+                className={inputClasses}
               />
               <datalist id={`${team}-libero-players`}>
                 {roster.map((player) => (
@@ -489,7 +461,6 @@ export function RotationConfigModal({
               type="number"
               value={config.libero ? (getJerseyNumber(config.libero) === 0 ? '' : getJerseyNumber(config.libero)) : ''}
               onChange={(e) => {
-                // If libero is null, create empty custom reference first
                 if (!config.libero) {
                   const team2 = team;
                   const newLibero = createCustomReference(parseInt(e.target.value, 10) || 0, '');
@@ -504,41 +475,17 @@ export function RotationConfigModal({
               }}
               placeholder="#"
               disabled={config.libero?.type === 'roster'}
-              style={{
-                width: '80px',
-                padding: '8px 12px',
-                fontSize: '14px',
-                border: '2px solid #d1d5db',
-                borderRadius: '6px',
-                background: config.libero?.type === 'roster' ? '#f3f4f6' : 'white',
-                color: '#111827',
-                cursor: config.libero?.type === 'roster' ? 'not-allowed' : 'text'
-              }}
+              className={config.libero?.type === 'roster' ? disabledInputClasses : numberInputClasses}
               title={config.libero?.type === 'roster' ? 'Jersey number from roster (read-only)' : 'Enter jersey number'}
             />
 
             {/* Libero Replacement Targets - Compact checkboxes */}
             {config.libero && (
-              <div style={{ gridColumn: '1 / -1', marginTop: '8px' }}>
-                <label
-                  style={{
-                    display: 'block',
-                    fontSize: '12px',
-                    fontWeight: '500',
-                    color: '#6b7280',
-                    marginBottom: '4px'
-                  }}
-                >
+              <div className="col-span-full mt-2">
+                <label className="block text-xs font-medium text-muted-foreground mb-1">
                   Libero replaces:
                 </label>
-                <div style={{
-                  border: '2px solid #e5e7eb',
-                  borderRadius: '6px',
-                  padding: '8px 10px',
-                  background: '#ffffff',
-                  maxHeight: '120px',
-                  overflowY: 'auto'
-                }}>
+                <div className="border-2 border-border rounded-md px-2.5 py-2 bg-card max-h-[120px] overflow-y-auto">
                   {getValidReplacementTargets(config.system).map((role) => {
                     const playerRef = config.players[role];
                     const displayName = playerRef?.displayName || 'Not assigned';
@@ -548,45 +495,20 @@ export function RotationConfigModal({
                     return (
                       <label
                         key={role}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          padding: '6px 4px',
-                          cursor: 'pointer',
-                          borderRadius: '4px',
-                          transition: 'background-color 0.15s ease',
-                          backgroundColor: isSelected ? '#f0f9ff' : 'transparent',
-                          userSelect: 'none',
-                          WebkitTapHighlightColor: 'transparent'
-                        }}
-                        onMouseEnter={(e) => {
-                          if (!isSelected) e.currentTarget.style.backgroundColor = '#f9fafb';
-                        }}
-                        onMouseLeave={(e) => {
-                          if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';
-                        }}
+                        className={cn(
+                          'flex items-center px-1 py-1.5 cursor-pointer rounded transition-colors select-none',
+                          isSelected ? 'bg-primary/20' : 'hover:bg-accent'
+                        )}
                       >
                         <input
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => handleLiberoTargetChange(team, role)}
-                          style={{
-                            width: '16px',
-                            height: '16px',
-                            marginRight: '8px',
-                            cursor: 'pointer',
-                            accentColor: '#3b82f6',
-                            flexShrink: 0
-                          }}
+                          className="w-4 h-4 mr-2 cursor-pointer accent-primary shrink-0"
                         />
-                        <span style={{
-                          fontSize: '14px',
-                          color: '#111827',
-                          fontWeight: isSelected ? '600' : '400',
-                          flex: 1
-                        }}>
-                          <span style={{ fontWeight: '600' }}>{role}</span>
-                          <span style={{ color: '#6b7280', marginLeft: '6px' }}>
+                        <span className={cn('text-sm flex-1', isSelected ? 'text-foreground font-semibold' : 'text-foreground')}>
+                          <span className="font-semibold">{role}</span>
+                          <span className="text-muted-foreground ml-1.5">
                             {jerseyNum && `${jerseyNum} `}{displayName}
                           </span>
                         </span>
@@ -594,12 +516,7 @@ export function RotationConfigModal({
                     );
                   })}
                 </div>
-                <div style={{
-                  fontSize: '11px',
-                  color: '#9ca3af',
-                  marginTop: '4px',
-                  fontStyle: 'italic'
-                }}>
+                <div className="text-[11px] text-muted-foreground mt-1 italic">
                   Tap to select (typically both MBs)
                 </div>
               </div>
@@ -608,11 +525,11 @@ export function RotationConfigModal({
         </div>
 
         {/* Validation Status */}
-        <div className="validation-status">
+        <div className="mt-4 px-3 py-2.5 rounded-md text-sm font-semibold">
           {validateConfig(config) ? (
-            <span className="valid">✓ All positions filled</span>
+            <span className="text-emerald-400 flex items-center gap-1.5">✓ All positions filled</span>
           ) : (
-            <span className="invalid">⚠ Each player needs at least a name OR number</span>
+            <span className="text-red-400 flex items-center gap-1.5">⚠ Each player needs at least a name OR number</span>
           )}
         </div>
       </div>
@@ -620,49 +537,75 @@ export function RotationConfigModal({
   };
 
   return (
-    <div className="rotation-config-modal-overlay">
-      <div className="rotation-config-modal">
-        <div className="modal-header">
-          <h2>Rotation Configuration - Set {currentSet}</h2>
-          <button className="close-btn" onClick={onClose} title="Close">×</button>
+    <div
+      className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="bg-card border border-border rounded-xl shadow-2xl max-w-[900px] w-[90%] max-h-[90vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Modal Header */}
+        <div className="flex justify-between items-center px-6 py-5 border-b-2 border-border">
+          <h2 className="m-0 text-2xl text-foreground font-bold">
+            Rotation Configuration - Set {currentSet}
+          </h2>
+          <button
+            className="bg-transparent border-none text-3xl leading-none text-muted-foreground hover:text-foreground hover:bg-accent cursor-pointer w-8 h-8 flex items-center justify-center rounded transition-colors"
+            onClick={onClose}
+            title="Close"
+            aria-label="Close"
+          >
+            ×
+          </button>
         </div>
 
-        <div className="modal-body">
-          <div className="teams-container">
+        {/* Modal Body */}
+        <div className="px-6 py-6 overflow-y-auto flex-1">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             {renderTeamConfig('home', homeConfig, homeTeamName)}
             {renderTeamConfig('opponent', opponentConfig, opponentTeamName)}
           </div>
 
-          <div className="starting-server-section">
-            <label>Starting Serve:</label>
-            <div className="radio-group">
-              <label className="radio-label">
+          <div className="p-5 bg-secondary/50 border-2 border-border rounded-lg">
+            <label className="block text-base font-semibold text-foreground mb-3">Starting Serve:</label>
+            <div className="flex flex-col md:flex-row gap-3 md:gap-6">
+              <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer px-3 py-2 rounded-md hover:bg-accent transition-colors">
                 <input
                   type="radio"
                   value="home"
                   checked={startingServer === 'home'}
                   onChange={() => setStartingServer('home')}
+                  className="w-4 h-4 cursor-pointer accent-primary"
                 />
-                <span>{homeTeamName}</span>
+                <span className="font-medium">{homeTeamName}</span>
               </label>
-              <label className="radio-label">
+              <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer px-3 py-2 rounded-md hover:bg-accent transition-colors">
                 <input
                   type="radio"
                   value="opponent"
                   checked={startingServer === 'opponent'}
                   onChange={() => setStartingServer('opponent')}
+                  className="w-4 h-4 cursor-pointer accent-primary"
                 />
-                <span>{opponentTeamName}</span>
+                <span className="font-medium">{opponentTeamName}</span>
               </label>
             </div>
           </div>
         </div>
 
-        <div className="modal-footer">
-          <button className="cancel-btn" onClick={onClose}>
+        {/* Modal Footer */}
+        <div className="flex justify-end gap-3 px-6 py-5 border-t-2 border-border">
+          <button
+            className="px-6 py-3 text-base font-semibold bg-secondary hover:bg-accent text-foreground border-none rounded-md cursor-pointer transition-colors"
+            onClick={onClose}
+          >
             Cancel
           </button>
-          <button className="save-btn" onClick={handleSave}>
+          <button
+            className="px-6 py-3 text-base font-semibold bg-primary hover:bg-primary/90 text-primary-foreground border-none rounded-md cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0"
+            onClick={handleSave}
+          >
             Start Set {currentSet}
           </button>
         </div>

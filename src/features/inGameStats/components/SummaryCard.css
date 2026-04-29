@@ -1,5 +1,5 @@
 .summary-card {
-  background: white;
+  background: hsl(var(--card));
   border-radius: 6px;
   padding: 10px 12px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
@@ -14,7 +14,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: #6b7280;
+  color: hsl(var(--muted-foreground));
   margin: 0;
   text-align: center;
   line-height: 1.2;
@@ -51,7 +51,7 @@
 .value-label {
   font-size: 9px;
   font-weight: 500;
-  color: #9ca3af;
+  color: hsl(var(--muted-foreground));
   text-transform: uppercase;
   letter-spacing: 0.3px;
 }

@@ -20,7 +20,7 @@
   gap: 0.5rem;
   font-size: 0.9rem;
   font-weight: 500;
-  color: #555;
+  color: hsl(var(--muted-foreground));
 }
 
 .legend-item.serving {
@@ -39,9 +39,11 @@
   gap: 1rem;
   margin-bottom: 2rem;
   padding: 1rem;
-  background: white;
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  border: 1px solid hsl(var(--border));
   border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 .rotation-btn {
@@ -74,9 +76,9 @@
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  border: 2px solid #dee2e6;
-  background: white;
-  color: #6c757d;
+  border: 2px solid hsl(var(--border));
+  background: hsl(var(--card));
+  color: hsl(var(--muted-foreground));
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -108,11 +110,12 @@
 }
 
 .formation-section {
-  background: white;
+  background: hsl(var(--card));
+  color: hsl(var(--card-foreground));
   border-radius: 12px;
   padding: 1.5rem;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  border: 1px solid #e0e6ed;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  border: 1px solid hsl(var(--border));
 }
 
 .formation-title {
@@ -120,8 +123,9 @@
   margin: 0 0 1rem 0;
   font-size: 1.3rem;
   font-weight: 600;
+  color: hsl(var(--foreground));
   padding-bottom: 0.5rem;
-  border-bottom: 2px solid #e0e6ed;
+  border-bottom: 2px solid hsl(var(--border));
 }
 
 .formation-title.serving {

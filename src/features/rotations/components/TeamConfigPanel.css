@@ -1,8 +1,10 @@
 .team-config-panel {
-  background: white;
+  background: hsl(var(--card));
+  color: hsl(var(--card-foreground));
+  border: 1px solid hsl(var(--border));
   border-radius: 12px;
   padding: 20px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   margin-bottom: 20px;
   max-width: 600px;
 }
@@ -14,7 +16,7 @@
 
 .config-header h2 {
   margin: 0;
-  color: #1976d2;
+  color: hsl(var(--primary));
   font-size: 1.8em;
 }
 
@@ -30,7 +32,7 @@
   gap: 15px;
   align-items: center;
   padding: 8px 0;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid hsl(var(--border));
 }
 
 .config-row:last-child {
@@ -39,15 +41,16 @@
 
 .header-row {
   font-weight: bold;
-  background: #f8f9fa;
+  background: hsl(var(--secondary));
   padding: 12px 0;
   border-radius: 8px;
   margin-bottom: 5px;
+  border-bottom: none;
 }
 
 .position-label {
   font-weight: 600;
-  color: #333;
+  color: hsl(var(--foreground));
   text-align: center;
   font-size: 14px;
 }
@@ -56,27 +59,34 @@
   display: flex;
   justify-content: center;
   align-items: center;
+  color: hsl(var(--foreground));
 }
 
 .player-input {
   width: 100%;
   max-width: 140px;
   padding: 8px 12px;
-  border: 2px solid #e0e0e0;
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  border: 2px solid hsl(var(--border));
   border-radius: 6px;
   font-size: 14px;
   text-align: center;
   transition: all 0.3s ease;
 }
 
+.player-input::placeholder {
+  color: hsl(var(--muted-foreground));
+}
+
 .player-input:focus {
   outline: none;
-  border-color: #1976d2;
-  box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.1);
+  border-color: hsl(var(--primary));
+  box-shadow: 0 0 0 3px hsla(var(--primary) / 0.2);
 }
 
 .system-row {
-  background: #fff3e0;
+  background: rgba(255, 152, 0, 0.10);
   padding: 12px 0;
   border-radius: 8px;
   margin: 10px 0;
@@ -91,14 +101,15 @@
   border-radius: 6px;
   font-size: 14px;
   text-align: center;
-  background: white;
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
   cursor: pointer;
 }
 
 .system-select:focus {
   outline: none;
   border-color: #f57c00;
-  box-shadow: 0 0 0 3px rgba(255, 152, 0, 0.1);
+  box-shadow: 0 0 0 3px rgba(255, 152, 0, 0.2);
 }
 
 .starting-rotation {
@@ -109,7 +120,7 @@
 
 .sr-label {
   font-weight: bold;
-  color: #1976d2;
+  color: hsl(var(--primary));
   font-size: 14px;
   min-width: 20px;
 }
@@ -119,7 +130,8 @@
   border: 2px solid #4caf50;
   border-radius: 6px;
   font-size: 14px;
-  background: white;
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
   cursor: pointer;
   min-width: 100px;
 }
@@ -127,21 +139,21 @@
 .rotation-select:focus {
   outline: none;
   border-color: #388e3c;
-  box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+  box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.2);
 }
 
 .config-info {
   margin-top: 20px;
   padding: 15px;
-  background: #f8f9fa;
+  background: hsl(var(--secondary));
   border-radius: 8px;
-  border-left: 4px solid #1976d2;
+  border-left: 4px solid hsl(var(--primary));
 }
 
 .system-info {
   margin: 0;
   font-size: 14px;
-  color: #333;
+  color: hsl(var(--foreground));
   line-height: 1.6;
 }
 
@@ -151,11 +163,11 @@
     grid-template-columns: 80px 1fr 1fr;
     gap: 10px;
   }
-  
+
   .position-label {
     font-size: 12px;
   }
-  
+
   .player-input,
   .system-select,
   .rotation-select {
@@ -163,7 +175,7 @@
     font-size: 13px;
     padding: 6px 8px;
   }
-  
+
   .config-header h2 {
     font-size: 1.5em;
   }
@@ -174,7 +186,7 @@
   .team-config-panel {
     max-width: 700px;
   }
-  
+
   .player-input,
   .system-select,
   .rotation-select {

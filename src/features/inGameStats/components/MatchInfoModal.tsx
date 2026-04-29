@@ -1,4 +1,5 @@
 import React from 'react';
+import { cn } from '@/lib/utils';
 import type { TeamRotationConfig } from '../types/rotation.types';
 import type { Player } from '../../../services/googleSheetsAPI';
 
@@ -56,61 +57,29 @@ export function MatchInfoModal({
   const hasRecordedPoints = pointHistoryLength > 0;
   const hasScore = homeScore > 0 || opponentScore > 0;
 
+  const sectionHeading = 'm-0 mb-3 text-lg font-bold text-foreground';
+  const sectionCard = 'bg-secondary/50 p-4 rounded-lg border border-border';
+
   return (
     <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '100vw',
-        height: '100vh',
-        background: 'rgba(0, 0, 0, 0.6)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 2000
-      }}
+      className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/70 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        style={{
-          background: 'white',
-          borderRadius: '12px',
-          width: '90%',
-          maxWidth: '700px',
-          maxHeight: '85vh',
-          overflow: 'auto',
-          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)'
-        }}
+        className="bg-card border border-border rounded-xl w-[90%] max-w-[700px] max-h-[85vh] overflow-auto shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div style={{
-          padding: '24px',
-          borderBottom: '2px solid #e5e7eb',
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          color: 'white',
-          borderRadius: '12px 12px 0 0'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '700' }}>
-              📊 Match Info & Summary
-            </h2>
+        <div
+          className="p-6 border-b border-border rounded-t-xl text-white"
+          style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}
+        >
+          <div className="flex justify-between items-center">
+            <h2 className="m-0 text-2xl font-bold">📊 Match Info & Summary</h2>
             <button
               onClick={onClose}
-              style={{
-                background: 'rgba(255, 255, 255, 0.2)',
-                border: 'none',
-                borderRadius: '6px',
-                color: 'white',
-                fontSize: '24px',
-                width: '36px',
-                height: '36px',
-                cursor: 'pointer',
-                transition: 'background 0.2s'
-              }}
-              onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'}
-              onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
+              className="bg-white/20 hover:bg-white/30 border-none rounded-md text-white text-2xl w-9 h-9 cursor-pointer transition-colors flex items-center justify-center"
+              aria-label="Close"
             >
               ×
             </button>
@@ -118,55 +87,43 @@ export function MatchInfoModal({
         </div>
 
         {/* Content */}
-        <div style={{ padding: '24px' }}>
+        <div className="p-6">
           {/* Match Details Section */}
-          <section style={{ marginBottom: '24px' }}>
-            <h3 style={{ margin: '0 0 12px 0', fontSize: '18px', fontWeight: '700', color: '#333' }}>
-              🏐 Match Details
-            </h3>
-            <div style={{ background: '#f9fafb', padding: '16px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
-              <div style={{ marginBottom: '8px' }}>
+          <section className="mb-6">
+            <h3 className={sectionHeading}>🏐 Match Details</h3>
+            <div className={sectionCard}>
+              <div className="mb-2 text-foreground">
                 <strong>Match ID:</strong> {matchId}
               </div>
-              <div style={{ marginBottom: '8px' }}>
+              <div className="mb-2 text-foreground">
                 <strong>Home Team:</strong> {homeTeamName} ({homeRoster.length} players)
               </div>
-              <div>
+              <div className="text-foreground">
                 <strong>Opponent Team:</strong> {opponentTeamName} ({opponentRoster.length} players)
               </div>
             </div>
           </section>
 
           {/* Current Set Progress */}
-          <section style={{ marginBottom: '24px' }}>
-            <h3 style={{ margin: '0 0 12px 0', fontSize: '18px', fontWeight: '700', color: '#333' }}>
-              📈 Set {currentSet} Progress
-            </h3>
-            <div style={{ background: '#f9fafb', padding: '16px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-around', marginBottom: '12px' }}>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '32px', fontWeight: '700', color: '#7c3aed' }}>{homeScore}</div>
-                  <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>{homeTeamName}</div>
+          <section className="mb-6">
+            <h3 className={sectionHeading}>📈 Set {currentSet} Progress</h3>
+            <div className={sectionCard}>
+              <div className="flex justify-around mb-3">
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-violet-400">{homeScore}</div>
+                  <div className="text-xs text-muted-foreground mt-1">{homeTeamName}</div>
                 </div>
-                <div style={{ fontSize: '24px', color: '#999', display: 'flex', alignItems: 'center' }}>-</div>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '32px', fontWeight: '700', color: '#ef4444' }}>{opponentScore}</div>
-                  <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>{opponentTeamName}</div>
+                <div className="text-2xl text-muted-foreground flex items-center">-</div>
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-red-400">{opponentScore}</div>
+                  <div className="text-xs text-muted-foreground mt-1">{opponentTeamName}</div>
                 </div>
               </div>
-              <div style={{ textAlign: 'center', fontSize: '14px', color: '#666' }}>
+              <div className="text-center text-sm text-muted-foreground">
                 {pointHistoryLength} points recorded
               </div>
               {!hasRecordedPoints && !hasScore && (
-                <div style={{
-                  marginTop: '12px',
-                  padding: '8px',
-                  background: '#fef3c7',
-                  borderRadius: '6px',
-                  fontSize: '13px',
-                  color: '#92400e',
-                  textAlign: 'center'
-                }}>
+                <div className="mt-3 p-2 bg-amber-500/15 border border-amber-500/40 rounded-md text-sm text-amber-300 text-center">
                   ⚠️ No points recorded yet - Set has not started
                 </div>
               )}
@@ -174,63 +131,53 @@ export function MatchInfoModal({
           </section>
 
           {/* Rotation Configuration Status */}
-          <section style={{ marginBottom: '24px' }}>
-            <h3 style={{ margin: '0 0 12px 0', fontSize: '18px', fontWeight: '700', color: '#333' }}>
-              🔄 Rotation Configuration
-            </h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <section className="mb-6">
+            <h3 className={sectionHeading}>🔄 Rotation Configuration</h3>
+            <div className="grid grid-cols-2 gap-3">
               {/* Home Team Config */}
-              <div style={{
-                padding: '16px',
-                borderRadius: '8px',
-                border: `2px solid ${hasHomeConfig ? '#10b981' : '#ef4444'}`,
-                background: hasHomeConfig ? '#f0fdf4' : '#fef2f2'
-              }}>
-                <div style={{ fontWeight: '700', marginBottom: '8px', color: '#333' }}>
-                  🏠 {homeTeamName}
-                </div>
-                <div style={{ fontSize: '13px', color: '#666' }}>
+              <div
+                className={cn(
+                  'p-4 rounded-lg border-2',
+                  hasHomeConfig
+                    ? 'border-emerald-500/60 bg-emerald-500/10'
+                    : 'border-destructive/60 bg-destructive/10'
+                )}
+              >
+                <div className="font-bold mb-2 text-foreground">🏠 {homeTeamName}</div>
+                <div className="text-sm text-muted-foreground">
                   {hasHomeConfig ? (
                     <>
-                      <div style={{ color: '#10b981', fontWeight: '600', marginBottom: '4px' }}>
-                        ✅ Configured
-                      </div>
+                      <div className="text-emerald-400 font-semibold mb-1">✅ Configured</div>
                       <div>System: {homeRotationConfig.system}</div>
                       <div>Rotation: {homeRotationConfig.currentRotation}/6</div>
                       <div>Libero: {homeRotationConfig.libero ? 'Yes' : 'No'}</div>
                     </>
                   ) : (
-                    <div style={{ color: '#ef4444', fontWeight: '600' }}>
-                      ❌ Not Configured
-                    </div>
+                    <div className="text-red-400 font-semibold">❌ Not Configured</div>
                   )}
                 </div>
               </div>
 
               {/* Opponent Team Config */}
-              <div style={{
-                padding: '16px',
-                borderRadius: '8px',
-                border: `2px solid ${hasOpponentConfig ? '#10b981' : '#ef4444'}`,
-                background: hasOpponentConfig ? '#f0fdf4' : '#fef2f2'
-              }}>
-                <div style={{ fontWeight: '700', marginBottom: '8px', color: '#333' }}>
-                  🔴 {opponentTeamName}
-                </div>
-                <div style={{ fontSize: '13px', color: '#666' }}>
+              <div
+                className={cn(
+                  'p-4 rounded-lg border-2',
+                  hasOpponentConfig
+                    ? 'border-emerald-500/60 bg-emerald-500/10'
+                    : 'border-destructive/60 bg-destructive/10'
+                )}
+              >
+                <div className="font-bold mb-2 text-foreground">🔴 {opponentTeamName}</div>
+                <div className="text-sm text-muted-foreground">
                   {hasOpponentConfig ? (
                     <>
-                      <div style={{ color: '#10b981', fontWeight: '600', marginBottom: '4px' }}>
-                        ✅ Configured
-                      </div>
+                      <div className="text-emerald-400 font-semibold mb-1">✅ Configured</div>
                       <div>System: {opponentRotationConfig.system}</div>
                       <div>Rotation: {opponentRotationConfig.currentRotation}/6</div>
                       <div>Libero: {opponentRotationConfig.libero ? 'Yes' : 'No'}</div>
                     </>
                   ) : (
-                    <div style={{ color: '#ef4444', fontWeight: '600' }}>
-                      ❌ Not Configured
-                    </div>
+                    <div className="text-red-400 font-semibold">❌ Not Configured</div>
                   )}
                 </div>
               </div>
@@ -238,28 +185,26 @@ export function MatchInfoModal({
           </section>
 
           {/* Data Completeness Indicators */}
-          <section style={{ marginBottom: '24px' }}>
-            <h3 style={{ margin: '0 0 12px 0', fontSize: '18px', fontWeight: '700', color: '#333' }}>
-              ✅ Data Completeness
-            </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px' }}>
+          <section className="mb-6">
+            <h3 className={sectionHeading}>✅ Data Completeness</h3>
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2 text-sm text-foreground">
                 <span>{rotationEnabled ? '✅' : '❌'}</span>
                 <span>Rotation Tracking {rotationEnabled ? 'Enabled' : 'Disabled'}</span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px' }}>
+              <div className="flex items-center gap-2 text-sm text-foreground">
                 <span>{hasHomeConfig && hasOpponentConfig ? '✅' : '❌'}</span>
                 <span>Both Teams Configured</span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px' }}>
+              <div className="flex items-center gap-2 text-sm text-foreground">
                 <span>{homeRoster.length > 0 ? '✅' : '❌'}</span>
                 <span>Home Roster Loaded ({homeRoster.length} players)</span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px' }}>
+              <div className="flex items-center gap-2 text-sm text-foreground">
                 <span>{opponentRoster.length > 0 ? '✅' : '❌'}</span>
                 <span>Opponent Roster Loaded ({opponentRoster.length} players)</span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px' }}>
+              <div className="flex items-center gap-2 text-sm text-foreground">
                 <span>{hasRecordedPoints ? '✅' : '⬜'}</span>
                 <span>Points Recorded ({pointHistoryLength})</span>
               </div>
@@ -268,10 +213,8 @@ export function MatchInfoModal({
 
           {/* Action Buttons */}
           <section>
-            <h3 style={{ margin: '0 0 12px 0', fontSize: '18px', fontWeight: '700', color: '#333' }}>
-              ⚡ Actions
-            </h3>
-            <div style={{ display: 'flex', gap: '12px' }}>
+            <h3 className={sectionHeading}>⚡ Actions</h3>
+            <div className="flex gap-3">
               <button
                 onClick={() => {
                   if (window.confirm('Are you sure you want to reset the rotation configuration? This will clear all player assignments for this set.')) {
@@ -279,26 +222,7 @@ export function MatchInfoModal({
                     onClose();
                   }
                 }}
-                style={{
-                  flex: 1,
-                  padding: '12px 20px',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  background: '#ef4444',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.background = '#dc2626';
-                  e.currentTarget.style.transform = 'scale(1.02)';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.background = '#ef4444';
-                  e.currentTarget.style.transform = 'scale(1)';
-                }}
+                className="flex-1 px-5 py-3 text-sm font-semibold bg-destructive hover:bg-destructive/90 text-destructive-foreground border-none rounded-lg cursor-pointer transition-all hover:scale-[1.02]"
               >
                 🔄 Reset Configuration
               </button>

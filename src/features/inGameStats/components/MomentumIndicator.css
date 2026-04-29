@@ -1,5 +1,5 @@
 .momentum-indicator {
-  background: white;
+  background: hsl(var(--card));
   border-radius: 8px;
   padding: 16px 20px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -18,7 +18,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: #374151;
+  color: hsl(var(--foreground));
   margin: 0;
 }
 
@@ -59,7 +59,7 @@
 .last-points-label {
   font-size: 12px;
   font-weight: 500;
-  color: #6b7280;
+  color: hsl(var(--muted-foreground));
   white-space: nowrap;
 }
 

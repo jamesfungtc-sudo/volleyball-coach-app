@@ -19,13 +19,13 @@
 .page-header h1 {
   margin: 0 0 0.5rem 0;
   font-size: 2rem;
-  color: #333;
+  color: hsl(var(--foreground));
   font-weight: 600;
 }
 
 .page-header p {
   margin: 0;
-  color: #666;
+  color: hsl(var(--muted-foreground));
   font-size: 1rem;
 }
 
@@ -38,11 +38,11 @@
 
 .coming-soon {
   text-align: center;
-  background: white;
+  background: hsl(var(--card));
   border-radius: 16px;
   padding: 3rem 2rem;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
-  border: 1px solid #e0e6ed;
+  border: 1px solid hsl(var(--border));
   max-width: 600px;
   width: 100%;
 }
@@ -56,12 +56,12 @@
 .coming-soon h2 {
   margin: 0 0 1rem 0;
   font-size: 1.8rem;
-  color: #333;
+  color: hsl(var(--foreground));
   font-weight: 600;
 }
 
 .coming-soon p {
-  color: #666;
+  color: hsl(var(--muted-foreground));
   font-size: 1rem;
   margin-bottom: 1.5rem;
   line-height: 1.5;
@@ -69,7 +69,7 @@
 
 .coming-soon ul {
   text-align: left;
-  color: #555;
+  color: hsl(var(--muted-foreground));
   margin-bottom: 2rem;
   padding-left: 1rem;
 }
@@ -100,7 +100,7 @@
 }
 
 .phase-indicator span:last-child {
-  color: #666;
+  color: hsl(var(--muted-foreground));
   font-size: 0.9rem;
   font-style: italic;
 }

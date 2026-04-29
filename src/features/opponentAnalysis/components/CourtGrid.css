@@ -12,7 +12,7 @@
 .label-bottom {
   font-size: 0.6875rem;
   font-weight: 600;
-  color: #6b7280;
+  color: hsl(var(--muted-foreground));
   letter-spacing: 0.3px;
 }
 
@@ -32,7 +32,7 @@
   max-width: 500px;
   margin: 0 auto;
   padding: 10px;
-  background: #f9fafb;
+  background: hsl(var(--secondary));
   border: 2px solid #3b82f6;
   border-radius: 6px;
 }
@@ -51,8 +51,8 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: white;
-  border: 1px solid #e5e7eb;
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.12s ease;
@@ -79,7 +79,7 @@
 
 .cell-coord {
   font-size: 0.625rem;
-  color: #9ca3af;
+  color: hsl(var(--muted-foreground));
   font-weight: 500;
 }
 
@@ -89,7 +89,7 @@
   right: 2px;
   font-size: 1rem;
   font-weight: 700;
-  color: #1f2937;
+  color: hsl(var(--foreground));
   background: rgba(255, 255, 255, 0.95);
   padding: 1px 6px;
   border-radius: 10px;
@@ -101,16 +101,16 @@
 .court-legend {
   margin-top: 10px;
   padding: 10px;
-  background: #f9fafb;
+  background: hsl(var(--secondary));
   border-radius: 6px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid hsl(var(--border));
 }
 
 .legend-label {
   display: block;
   font-size: 0.6875rem;
   font-weight: 600;
-  color: #374151;
+  color: hsl(var(--foreground));
   margin-bottom: 6px;
 }
 
@@ -123,7 +123,7 @@
 .legend-min,
 .legend-max {
   font-size: 0.625rem;
-  color: #6b7280;
+  color: hsl(var(--muted-foreground));
   font-weight: 500;
 }
 
@@ -136,7 +136,7 @@
     rgba(59, 130, 246, 0.8)
   );
   border-radius: 3px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid hsl(var(--border));
 }
 
 /* Instructions - Compact */
@@ -144,7 +144,7 @@
   margin-top: 10px;
   text-align: center;
   font-size: 0.6875rem;
-  color: #6b7280;
+  color: hsl(var(--muted-foreground));
   font-style: italic;
 }
 

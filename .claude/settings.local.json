@@ -39,7 +39,10 @@
       "Bash(lsof:*)",
       "Bash(pkill:*)",
       "Bash(gh run view:*)",
-      "Bash(source ~/.nvm/nvm.sh)"
+      "Bash(source ~/.nvm/nvm.sh)",
+      "Read(//Users/jamesfung/Desktop/personal/ClaudeProject/volleyball-coach-app/node_modules/**)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(git fetch:*)"
     ],
     "deny": [],
     "ask": []

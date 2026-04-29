@@ -7,7 +7,6 @@ import {
   getPlayerStats,
   type StoredTrajectory,
 } from '../../services/trajectoryStorage';
-import './PlayerStatsModal.css';
 
 interface PlayerStatsModalProps {
   /** Whether the modal is open */
@@ -150,22 +149,39 @@ export const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({
 
   if (!isOpen) return null;
 
+  const selectClasses =
+    'w-full max-w-[200px] px-3 py-2 text-sm bg-card text-foreground border border-border rounded-md cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary';
+
+  const filterSelectClasses =
+    'px-2.5 py-1.5 text-xs bg-card text-foreground border border-border rounded-md cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary';
+
   return (
-    <div className="player-stats-modal-overlay" onClick={onClose}>
-      <div className="player-stats-modal" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="fixed inset-0 z-[2000] flex items-center justify-center p-5 bg-black/70 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="bg-card border border-border rounded-xl shadow-2xl w-full max-w-[900px] max-h-[90vh] overflow-y-auto flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
-        <div className="player-stats-modal-header">
-          <h2>Player Location Stats</h2>
-          <button className="close-button" onClick={onClose}>
+        <div className="flex justify-between items-center px-5 py-4 border-b border-border bg-secondary rounded-t-xl">
+          <h2 className="m-0 text-lg font-bold text-foreground">Player Location Stats</h2>
+          <button
+            className="w-8 h-8 flex items-center justify-center bg-accent text-foreground border-none rounded-md text-xl cursor-pointer hover:bg-accent/80 transition-colors"
+            onClick={onClose}
+            aria-label="Close"
+          >
             &times;
           </button>
         </div>
 
         {/* Filters */}
-        <div className="player-stats-filters">
-          <div className="filter-group">
-            <label>Set:</label>
+        <div className="flex flex-wrap gap-4 px-5 py-3 bg-secondary/50 border-b border-border">
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-semibold text-muted-foreground">Set:</label>
             <select
+              className={filterSelectClasses}
               value={setFilter}
               onChange={(e) => setSetFilter(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
             >
@@ -178,9 +194,10 @@ export const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({
             </select>
           </div>
 
-          <div className="filter-group">
-            <label>Result:</label>
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-semibold text-muted-foreground">Result:</label>
             <select
+              className={filterSelectClasses}
               value={resultFilter}
               onChange={(e) => setResultFilter(e.target.value as ResultFilter)}
             >
@@ -193,14 +210,17 @@ export const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({
         </div>
 
         {/* Content - 2 columns for Home and Opponent */}
-        <div className="player-stats-content">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-5">
           {/* Home Team Section */}
-          <div className="team-section">
-            <h3 className="team-title">{homeTeamName || 'HOME TEAM'}</h3>
+          <div className="bg-secondary/50 border border-border rounded-lg p-4">
+            <h3 className="m-0 mb-3 text-sm font-bold text-foreground uppercase tracking-wider text-center">
+              {homeTeamName || 'HOME TEAM'}
+            </h3>
 
-            <div className="player-selector">
-              <label>Player:</label>
+            <div className="flex items-center gap-2 mb-4 justify-center">
+              <label className="text-xs font-semibold text-muted-foreground">Player:</label>
               <select
+                className={selectClasses}
                 value={selectedHomePlayer}
                 onChange={(e) => setSelectedHomePlayer(e.target.value)}
               >
@@ -221,41 +241,41 @@ export const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({
               </select>
             </div>
 
-            <div className="maps-row">
-              <div className="map-container">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col items-center bg-card border border-border rounded-md p-2">
                 <CourtHeatmap
                   trajectories={homeServes}
                   actionType="serve"
                   title="SERVES"
                 />
-                <div className="map-stats">
+                <div className="flex flex-wrap gap-2 justify-center mt-2 text-[11px]">
                   {(() => {
                     const stats = getStats(homeServes, 'serve');
                     return (
                       <>
-                        <span className="stat">Total: {stats.total}</span>
-                        <span className="stat ace">Aces: {stats.aces}</span>
-                        <span className="stat error">Errors: {stats.errors}</span>
+                        <span className="px-1.5 py-0.5 bg-secondary text-muted-foreground rounded">Total: {stats.total}</span>
+                        <span className="px-1.5 py-0.5 bg-amber-500/20 text-amber-300 rounded">Aces: {stats.aces}</span>
+                        <span className="px-1.5 py-0.5 bg-secondary text-muted-foreground rounded">Errors: {stats.errors}</span>
                       </>
                     );
                   })()}
                 </div>
               </div>
 
-              <div className="map-container">
+              <div className="flex flex-col items-center bg-card border border-border rounded-md p-2">
                 <CourtHeatmap
                   trajectories={homeAttacks}
                   actionType="attack"
                   title="ATTACKS"
                 />
-                <div className="map-stats">
+                <div className="flex flex-wrap gap-2 justify-center mt-2 text-[11px]">
                   {(() => {
                     const stats = getStats(homeAttacks, 'attack');
                     return (
                       <>
-                        <span className="stat">Total: {stats.total}</span>
-                        <span className="stat kill">Kills: {stats.kills}</span>
-                        <span className="stat error">Errors: {stats.errors}</span>
+                        <span className="px-1.5 py-0.5 bg-secondary text-muted-foreground rounded">Total: {stats.total}</span>
+                        <span className="px-1.5 py-0.5 bg-destructive/20 text-red-300 rounded">Kills: {stats.kills}</span>
+                        <span className="px-1.5 py-0.5 bg-secondary text-muted-foreground rounded">Errors: {stats.errors}</span>
                       </>
                     );
                   })()}
@@ -265,12 +285,15 @@ export const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({
           </div>
 
           {/* Opponent Team Section */}
-          <div className="team-section">
-            <h3 className="team-title">{opponentTeamName || 'OPPONENT TEAM'}</h3>
+          <div className="bg-secondary/50 border border-border rounded-lg p-4">
+            <h3 className="m-0 mb-3 text-sm font-bold text-foreground uppercase tracking-wider text-center">
+              {opponentTeamName || 'OPPONENT TEAM'}
+            </h3>
 
-            <div className="player-selector">
-              <label>Player:</label>
+            <div className="flex items-center gap-2 mb-4 justify-center">
+              <label className="text-xs font-semibold text-muted-foreground">Player:</label>
               <select
+                className={selectClasses}
                 value={selectedOpponentPlayer}
                 onChange={(e) => setSelectedOpponentPlayer(e.target.value)}
               >
@@ -291,41 +314,41 @@ export const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({
               </select>
             </div>
 
-            <div className="maps-row">
-              <div className="map-container">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col items-center bg-card border border-border rounded-md p-2">
                 <CourtHeatmap
                   trajectories={opponentServes}
                   actionType="serve"
                   title="SERVES"
                 />
-                <div className="map-stats">
+                <div className="flex flex-wrap gap-2 justify-center mt-2 text-[11px]">
                   {(() => {
                     const stats = getStats(opponentServes, 'serve');
                     return (
                       <>
-                        <span className="stat">Total: {stats.total}</span>
-                        <span className="stat ace">Aces: {stats.aces}</span>
-                        <span className="stat error">Errors: {stats.errors}</span>
+                        <span className="px-1.5 py-0.5 bg-secondary text-muted-foreground rounded">Total: {stats.total}</span>
+                        <span className="px-1.5 py-0.5 bg-amber-500/20 text-amber-300 rounded">Aces: {stats.aces}</span>
+                        <span className="px-1.5 py-0.5 bg-secondary text-muted-foreground rounded">Errors: {stats.errors}</span>
                       </>
                     );
                   })()}
                 </div>
               </div>
 
-              <div className="map-container">
+              <div className="flex flex-col items-center bg-card border border-border rounded-md p-2">
                 <CourtHeatmap
                   trajectories={opponentAttacks}
                   actionType="attack"
                   title="ATTACKS"
                 />
-                <div className="map-stats">
+                <div className="flex flex-wrap gap-2 justify-center mt-2 text-[11px]">
                   {(() => {
                     const stats = getStats(opponentAttacks, 'attack');
                     return (
                       <>
-                        <span className="stat">Total: {stats.total}</span>
-                        <span className="stat kill">Kills: {stats.kills}</span>
-                        <span className="stat error">Errors: {stats.errors}</span>
+                        <span className="px-1.5 py-0.5 bg-secondary text-muted-foreground rounded">Total: {stats.total}</span>
+                        <span className="px-1.5 py-0.5 bg-destructive/20 text-red-300 rounded">Kills: {stats.kills}</span>
+                        <span className="px-1.5 py-0.5 bg-secondary text-muted-foreground rounded">Errors: {stats.errors}</span>
                       </>
                     );
                   })()}
@@ -336,17 +359,17 @@ export const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({
         </div>
 
         {/* Legend */}
-        <div className="player-stats-legend">
-          <span className="legend-item">
-            <span className="legend-dot" style={{ background: '#3b82f6' }}></span>
+        <div className="flex justify-center gap-6 px-5 py-3 bg-secondary/50 border-t border-border rounded-b-xl">
+          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span className="w-3 h-3 rounded-full border-2 border-card shadow-sm" style={{ background: '#3b82f6' }} />
             In Play
           </span>
-          <span className="legend-item">
-            <span className="legend-dot" style={{ background: '#ef4444' }}></span>
+          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span className="w-3 h-3 rounded-full border-2 border-card shadow-sm" style={{ background: '#ef4444' }} />
             Kill / Ace
           </span>
-          <span className="legend-item">
-            <span className="legend-dot" style={{ background: '#9ca3af' }}></span>
+          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span className="w-3 h-3 rounded-full border-2 border-card shadow-sm" style={{ background: '#9ca3af' }} />
             Error
           </span>
         </div>

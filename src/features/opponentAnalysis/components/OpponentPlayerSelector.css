@@ -1,8 +1,8 @@
 .opponent-player-selector {
-  background: white;
+  background: hsl(var(--card));
   padding: 20px;
   border-radius: 10px;
-  border: 2px solid #e5e7eb;
+  border: 2px solid hsl(var(--border));
   margin-bottom: 20px;
 }
 
@@ -17,13 +17,13 @@
   margin: 0;
   font-size: 1rem;
   font-weight: 600;
-  color: #111827;
+  color: hsl(var(--foreground));
 }
 
 .clear-selection-btn {
   padding: 4px 10px;
   font-size: 1rem;
-  color: #6b7280;
+  color: hsl(var(--muted-foreground));
   background: transparent;
   border: none;
   cursor: pointer;
@@ -32,7 +32,7 @@
 }
 
 .clear-selection-btn:hover {
-  background: #f3f4f6;
+  background: hsl(var(--secondary));
   color: #ef4444;
 }
 
@@ -51,9 +51,9 @@
   padding: 10px 16px;
   font-size: 0.875rem;
   font-weight: 600;
-  color: #374151;
-  background: #f3f4f6;
-  border: 2px solid #e5e7eb;
+  color: hsl(var(--foreground));
+  background: hsl(var(--secondary));
+  border: 2px solid hsl(var(--border));
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -62,7 +62,7 @@
 .player-chip:hover {
   background: #e5e7eb;
   border-color: #3b82f6;
-  color: #1f2937;
+  color: hsl(var(--foreground));
 }
 
 .player-chip.selected {
@@ -104,7 +104,7 @@
   width: 100%;
   padding: 12px;
   font-size: 0.875rem;
-  border: 2px solid #e5e7eb;
+  border: 2px solid hsl(var(--border));
   border-radius: 8px;
   outline: none;
   transition: border-color 0.2s ease;
@@ -146,13 +146,13 @@
 }
 
 .btn-cancel {
-  background: #f3f4f6;
-  color: #6b7280;
+  background: hsl(var(--secondary));
+  color: hsl(var(--muted-foreground));
 }
 
 .btn-cancel:hover {
   background: #e5e7eb;
-  color: #374151;
+  color: hsl(var(--foreground));
 }
 
 /* Selected Player Display */

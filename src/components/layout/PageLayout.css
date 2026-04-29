@@ -1,51 +1,11 @@
-.page-layout {
-  padding: 1rem;
-  margin: 0 auto;
-  min-height: calc(100vh - 80px);
-  width: 100%;
-  box-sizing: border-box;
-}
-
-.page-header {
-  text-align: center;
-  margin-bottom: 2rem;
-  padding: 1.5rem;
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  width: 100%;
-  box-sizing: border-box;
-}
-
-.page-header h1 {
-  margin: 0 0 0.5rem 0;
-  font-size: 2rem;
-  color: #333;
-  font-weight: 600;
-}
-
-.page-header p {
-  margin: 0;
-  color: #666;
-  font-size: 1rem;
-  line-height: 1.4;
-}
-
-.page-content {
-  display: flex;
-  flex-direction: column;
-  gap: 2rem;
-  width: 100%;
-  box-sizing: border-box;
-}
-
-/* Shared section styles */
+/* Shared section styles (dark theme) — used across legacy pages */
 .page-section {
-  background: white;
+  background: hsl(var(--card));
+  color: hsl(var(--card-foreground));
   border-radius: 12px;
   padding: 1.5rem;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  border: 1px solid #e0e6ed;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  border: 1px solid hsl(var(--border));
   width: 100%;
   box-sizing: border-box;
 }
@@ -53,27 +13,28 @@
 .page-section h2 {
   margin: 0 0 1rem 0;
   font-size: 1.5rem;
-  color: #333;
+  color: hsl(var(--foreground));
   font-weight: 600;
-  border-bottom: 2px solid #667eea;
+  border-bottom: 2px solid hsl(var(--primary));
   padding-bottom: 0.5rem;
 }
 
 .page-section h3 {
   margin: 0 0 0.75rem 0;
   font-size: 1.25rem;
-  color: #444;
+  color: hsl(var(--foreground));
   font-weight: 500;
 }
 
 /* Coming soon shared styles */
 .coming-soon {
   text-align: center;
-  background: white;
+  background: hsl(var(--card));
+  color: hsl(var(--card-foreground));
   border-radius: 16px;
   padding: 3rem 2rem;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
-  border: 1px solid #e0e6ed;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  border: 1px solid hsl(var(--border));
   max-width: 600px;
   width: 100%;
   margin: 0 auto;
@@ -89,14 +50,14 @@
 .coming-soon h2 {
   margin: 0 0 1rem 0;
   font-size: 1.8rem;
-  color: #333;
+  color: hsl(var(--foreground));
   font-weight: 600;
   border: none;
   padding: 0;
 }
 
 .coming-soon p {
-  color: #666;
+  color: hsl(var(--muted-foreground));
   font-size: 1rem;
   margin-bottom: 1.5rem;
   line-height: 1.5;
@@ -104,7 +65,7 @@
 
 .coming-soon ul {
   text-align: left;
-  color: #555;
+  color: hsl(var(--muted-foreground));
   margin-bottom: 2rem;
   padding-left: 1rem;
 }
@@ -120,7 +81,7 @@
   align-items: center;
   gap: 0.5rem;
   padding-top: 1.5rem;
-  border-top: 1px solid #e0e6ed;
+  border-top: 1px solid hsl(var(--border));
 }
 
 .phase-badge {
@@ -135,74 +96,7 @@
 }
 
 .phase-indicator span:last-child {
-  color: #666;
+  color: hsl(var(--muted-foreground));
   font-size: 0.9rem;
   font-style: italic;
-}
-
-/* Mobile optimizations */
-@media (max-width: 768px) {
-  .page-layout {
-    padding: 0.5rem;
-    min-height: calc(100vh - 70px);
-  }
-  
-  .page-header {
-    margin-bottom: 1rem;
-    padding: 1rem;
-  }
-  
-  .page-header h1 {
-    font-size: 1.5rem;
-  }
-  
-  .page-section {
-    padding: 1rem;
-  }
-  
-  .page-section h2 {
-    font-size: 1.25rem;
-  }
-  
-  .coming-soon {
-    padding: 2rem 1rem;
-  }
-  
-  .coming-soon-icon {
-    font-size: 3rem;
-  }
-  
-  .coming-soon h2 {
-    font-size: 1.5rem;
-  }
-}
-
-/* Tablet optimizations */
-@media (min-width: 769px) and (max-width: 1024px) {
-  .page-layout {
-    padding: 1.5rem;
-  }
-}
-
-/* iPad specific optimizations */
-@media (min-width: 768px) and (max-width: 1024px) and (orientation: portrait) {
-  .page-layout {
-    padding: 1rem;
-    width: 100%;
-  }
-}
-
-@media (min-width: 768px) and (max-width: 1024px) and (orientation: landscape) {
-  .page-layout {
-    padding: 1rem;
-    width: 100%;
-  }
-}
-
-/* Desktop optimizations */
-@media (min-width: 1025px) {
-  .page-layout {
-    padding: 2rem;
-    width: 100%;
-  }
 }

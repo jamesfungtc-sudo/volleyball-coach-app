@@ -1,5 +1,5 @@
 .player-hit-ace-ratio-chart {
-  background: white;
+  background: hsl(var(--card));
   border-radius: 12px;
   padding: 20px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
@@ -9,7 +9,7 @@
   font-size: 18px;
   font-weight: 600;
   margin: 0 0 20px 0;
-  color: #1f2937;
+  color: hsl(var(--foreground));
   text-align: center;
 }
 
@@ -27,7 +27,7 @@
   font-size: 14px;
   font-weight: 600;
   margin: 0 0 12px 0;
-  color: #4b5563;
+  color: hsl(var(--muted-foreground));
 }
 
 .player-hit-ace-ratio-chart .ratio-row {
@@ -41,7 +41,7 @@
   min-width: 60px;
   font-size: 13px;
   font-weight: 500;
-  color: #6b7280;
+  color: hsl(var(--muted-foreground));
   text-align: right;
 }
 
@@ -55,7 +55,7 @@
   min-width: 40px;
   font-size: 13px;
   font-weight: 600;
-  color: #1f2937;
+  color: hsl(var(--foreground));
   text-align: left;
   padding-left: 8px;
 }
@@ -64,7 +64,7 @@
   display: flex;
   width: 100%;
   height: 100%;
-  background: #f3f4f6;
+  background: hsl(var(--secondary));
   border-radius: 4px;
   overflow: hidden;
 }
@@ -96,10 +96,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f3f4f6;
+  background: hsl(var(--secondary));
   border-radius: 4px;
   font-size: 12px;
-  color: #9ca3af;
+  color: hsl(var(--muted-foreground));
   font-style: italic;
 }
 
@@ -109,7 +109,7 @@
   gap: 12px;
   margin-top: 12px;
   padding-top: 12px;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid hsl(var(--border));
 }
 
 .player-hit-ace-ratio-chart .legend-item {
@@ -126,13 +126,13 @@
 
 .player-hit-ace-ratio-chart .legend-label {
   font-size: 12px;
-  color: #6b7280;
+  color: hsl(var(--muted-foreground));
 }
 
 /* Recharts custom tooltip */
 .player-hit-ace-ratio-chart .custom-tooltip {
-  background: white;
-  border: 1px solid #e5e7eb;
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
   border-radius: 8px;
   padding: 12px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
@@ -141,15 +141,15 @@
 .player-hit-ace-ratio-chart .custom-tooltip .tooltip-name {
   font-weight: 600;
   font-size: 13px;
-  color: #1f2937;
+  color: hsl(var(--foreground));
   margin: 0 0 8px 0;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid hsl(var(--border));
   padding-bottom: 6px;
 }
 
 .player-hit-ace-ratio-chart .custom-tooltip .tooltip-stat {
   font-size: 12px;
-  color: #6b7280;
+  color: hsl(var(--muted-foreground));
   margin: 4px 0;
 }
 
@@ -159,7 +159,7 @@
   justify-content: center;
   height: 200px;
   font-size: 14px;
-  color: #9ca3af;
+  color: hsl(var(--muted-foreground));
   font-style: italic;
 }
 

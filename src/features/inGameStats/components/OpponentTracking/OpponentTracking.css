@@ -3,8 +3,8 @@
    ============================================ */
 
 .opponent-tracking-module {
-  background: #ffffff;
-  border: 2px solid #e0e0e0;
+  background: hsl(var(--card));
+  border: 2px solid hsl(var(--border));
   border-radius: 12px;
   padding: 20px;
   margin-bottom: 24px;
@@ -23,7 +23,7 @@
 .opponent-tracking-title {
   font-size: 18px;
   font-weight: 600;
-  color: #333;
+  color: hsl(var(--foreground));
   margin: 0;
 }
 
@@ -66,7 +66,7 @@
 .serve-section-label {
   font-size: 14px;
   font-weight: 600;
-  color: #555;
+  color: hsl(var(--muted-foreground));
   margin-bottom: 4px;
 }
 
@@ -81,7 +81,7 @@
   padding: 8px 12px;
   border: 2px solid #ddd;
   border-radius: 6px;
-  background: #ffffff;
+  background: hsl(var(--card));
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -124,7 +124,7 @@
 .hitting-section-label {
   font-size: 14px;
   font-weight: 600;
-  color: #555;
+  color: hsl(var(--muted-foreground));
   margin-bottom: 4px;
 }
 
@@ -153,7 +153,7 @@
   padding: 12px 16px;
   border: 2px solid #ddd;
   border-radius: 6px;
-  background: #ffffff;
+  background: hsl(var(--card));
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -200,7 +200,7 @@
   text-align: center;
   font-size: 12px;
   font-weight: 600;
-  color: #666;
+  color: hsl(var(--muted-foreground));
   letter-spacing: 0.5px;
 }
 
@@ -232,7 +232,7 @@
   width: 60px;
   height: 60px;
   border: 1px solid #ccc;
-  background: #ffffff;
+  background: hsl(var(--card));
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
@@ -292,7 +292,7 @@
 }
 
 .grid-cell.selected .cell-count {
-  background: #ffffff;
+  background: hsl(var(--card));
   color: #FF9800;
 }
 
@@ -307,13 +307,13 @@
   padding: 16px;
   background: #fafafa;
   border-radius: 8px;
-  border: 2px solid #e0e0e0;
+  border: 2px solid hsl(var(--border));
 }
 
 .lineup-label {
   font-size: 14px;
   font-weight: 600;
-  color: #555;
+  color: hsl(var(--muted-foreground));
   text-align: center;
   margin-bottom: 8px;
 }
@@ -333,7 +333,7 @@
 .row-label {
   font-size: 12px;
   font-weight: 600;
-  color: #666;
+  color: hsl(var(--muted-foreground));
   min-width: 40px;
   text-align: right;
 }
@@ -353,7 +353,7 @@
   padding: 8px;
   border: 2px solid #ddd;
   border-radius: 6px;
-  background: #ffffff;
+  background: hsl(var(--card));
   cursor: pointer;
   transition: all 0.2s ease;
   min-height: 60px;
@@ -423,11 +423,11 @@
 
 .net-label {
   display: inline-block;
-  background: #ffffff;
+  background: hsl(var(--card));
   padding: 2px 12px;
   font-size: 11px;
   font-weight: 600;
-  color: #333;
+  color: hsl(var(--foreground));
   border: 1px solid #333;
   border-radius: 4px;
   position: relative;
@@ -516,7 +516,7 @@
 
 .selection-display {
   background: #f9f9f9;
-  border: 1px solid #e0e0e0;
+  border: 1px solid hsl(var(--border));
   border-radius: 8px;
   padding: 12px;
   display: flex;
@@ -533,11 +533,11 @@
 
 .selection-label {
   font-weight: 600;
-  color: #666;
+  color: hsl(var(--muted-foreground));
 }
 
 .selection-value {
-  color: #333;
+  color: hsl(var(--foreground));
   font-weight: 500;
 }
 
@@ -559,7 +559,7 @@
   margin: 0;
   padding-left: 20px;
   font-size: 12px;
-  color: #666;
+  color: hsl(var(--muted-foreground));
   line-height: 1.6;
 }
 

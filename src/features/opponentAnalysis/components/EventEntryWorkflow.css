@@ -59,7 +59,7 @@
 }
 
 .result-selection {
-  background: white;
+  background: hsl(var(--card));
   padding: 24px;
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
@@ -70,14 +70,14 @@
   margin: 0 0 8px 0;
   font-size: 1.125rem;
   font-weight: 700;
-  color: #111827;
+  color: hsl(var(--foreground));
 }
 
 .result-subtitle {
   margin: 0 0 16px 0;
   font-size: 0.875rem;
   font-weight: 600;
-  color: #6b7280;
+  color: hsl(var(--muted-foreground));
 }
 
 .result-buttons {
@@ -143,9 +143,9 @@
   padding: 12px;
   font-size: 0.875rem;
   font-weight: 600;
-  color: #6b7280;
-  background: #f3f4f6;
-  border: 2px solid #e5e7eb;
+  color: hsl(var(--muted-foreground));
+  background: hsl(var(--secondary));
+  border: 2px solid hsl(var(--border));
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -153,7 +153,7 @@
 
 .cancel-btn:hover {
   background: #e5e7eb;
-  color: #374151;
+  color: hsl(var(--foreground));
   border-color: #d1d5db;
 }
 
@@ -162,9 +162,9 @@
   display: flex;
   gap: 20px;
   padding: 16px;
-  background: #f9fafb;
+  background: hsl(var(--secondary));
   border-radius: 10px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid hsl(var(--border));
 }
 
 .stat-item {
@@ -176,13 +176,13 @@
 .stat-label {
   font-size: 0.875rem;
   font-weight: 600;
-  color: #6b7280;
+  color: hsl(var(--muted-foreground));
 }
 
 .stat-value {
   font-size: 1.25rem;
   font-weight: 700;
-  color: #111827;
+  color: hsl(var(--foreground));
 }
 
 /* Responsive */

@@ -110,7 +110,7 @@
   width: 60px;
   height: 60px;
   border-radius: 50%;
-  background: white;
+  background: hsl(var(--card));
   border: 3px solid #2196f3;
   display: flex;
   flex-direction: column;
@@ -213,7 +213,7 @@
   top: 12%;
   left: 50%;
   transform: translateX(-50%);
-  color: #666;
+  color: hsl(var(--muted-foreground));
   font-size: 10px;
   font-weight: bold;
   background: rgba(255, 255, 255, 0.8);
@@ -226,7 +226,7 @@
   top: 88%;
   left: 50%;
   transform: translateX(-50%);
-  color: #666;
+  color: hsl(var(--muted-foreground));
   font-size: 10px;
   font-weight: bold;
   background: rgba(255, 255, 255, 0.8);
@@ -239,7 +239,7 @@
   top: 50%;
   right: 8px;
   transform: translateY(-50%);
-  color: #333;
+  color: hsl(var(--foreground));
   font-size: 8px;
   font-weight: bold;
   background: rgba(255, 255, 255, 0.9);

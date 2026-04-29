@@ -1,5 +1,5 @@
 .action-breakdown-chart {
-  background: white;
+  background: hsl(var(--card));
   border-radius: 8px;
   padding: 16px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -7,7 +7,7 @@
 
 .breakdown-subtitle {
   font-size: 11px;
-  color: #9ca3af;
+  color: hsl(var(--muted-foreground));
   margin-bottom: 16px;
 }
 
@@ -61,17 +61,17 @@
 
 .action-name {
   font-weight: 500;
-  color: #374151;
+  color: hsl(var(--foreground));
 }
 
 .action-count {
-  color: #9ca3af;
+  color: hsl(var(--muted-foreground));
   font-size: 10px;
 }
 
 .breakdown-bar-track {
   height: 20px;
-  background: #f3f4f6;
+  background: hsl(var(--secondary));
   border-radius: 4px;
   overflow: hidden;
   position: relative;
@@ -98,7 +98,7 @@
 .no-data {
   padding: 20px;
   text-align: center;
-  color: #9ca3af;
+  color: hsl(var(--muted-foreground));
   font-size: 11px;
   font-style: italic;
 }

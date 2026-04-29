@@ -1,38 +1,89 @@
+@import "tailwindcss";
+
+/* =====================================================
+   Tailwind v4: map CSS variables → utility classes
+   @theme inline generates bg-background, text-foreground,
+   border-border, etc. from the :root variables below.
+===================================================== */
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+
+  /* Volleyball-specific tokens */
+  --color-success: hsl(var(--success));
+  --color-warning: hsl(var(--warning));
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 4px);
+}
+
+/* =====================================================
+   Dark theme CSS variables (single theme — always dark)
+===================================================== */
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
+  --background: 222 47% 7%;
+  --foreground: 213 31% 95%;
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  --card: 222 47% 11%;
+  --card-foreground: 213 31% 95%;
 
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  --popover: 222 47% 14%;
+  --popover-foreground: 213 31% 95%;
+
+  --primary: 217 91% 60%;
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 222 47% 18%;
+  --secondary-foreground: 213 31% 95%;
+
+  --muted: 222 47% 18%;
+  --muted-foreground: 215 20% 65%;
+
+  --accent: 222 47% 18%;
+  --accent-foreground: 213 31% 95%;
+
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+
+  --border: 222 47% 20%;
+  --input: 222 47% 20%;
+  --ring: 217 91% 60%;
+
+  --radius: 0.5rem;
+
+  --success: 160 84% 39%;
+  --warning: 38 92% 50%;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
-}
-
-body {
-  margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
-  width: 100%;
-  box-sizing: border-box;
-}
-
-/* Ensure full width on all devices */
+/* =====================================================
+   Base styles
+===================================================== */
 *, *::before, *::after {
   box-sizing: border-box;
 }
@@ -42,44 +93,33 @@ html {
   overflow-x: hidden;
 }
 
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  width: 100%;
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
 #root {
   width: 100%;
   min-height: 100vh;
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
-}
-
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
+a {
   font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  color: hsl(var(--primary));
+  text-decoration: inherit;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
+a:hover {
+  opacity: 0.8;
 }

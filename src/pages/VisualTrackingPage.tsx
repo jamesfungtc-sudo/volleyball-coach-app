@@ -2009,7 +2009,7 @@ function VisualTrackingPageContent() {
               alignItems: 'center',
               gap: '8px',
               marginBottom: '12px',
-              borderBottom: '2px solid #e5e7eb',
+              borderBottom: '2px solid hsl(var(--border))',
               paddingBottom: '8px'
             }}>
               {/* Set Tab Buttons */}
@@ -2023,21 +2023,21 @@ function VisualTrackingPageContent() {
                       padding: '8px 4px',
                       fontSize: '13px',
                       fontWeight: '700',
-                      background: currentSet === setNum ? '#7c3aed' : '#f3f4f6',
-                      color: currentSet === setNum ? 'white' : '#666',
-                      border: currentSet === setNum ? '2px solid #5b21b6' : '2px solid #e5e7eb',
+                      background: currentSet === setNum ? '#7c3aed' : 'hsl(var(--secondary))',
+                      color: currentSet === setNum ? 'white' : 'hsl(var(--muted-foreground))',
+                      border: currentSet === setNum ? '2px solid #5b21b6' : '2px solid hsl(var(--border))',
                       borderRadius: '6px',
                       cursor: 'pointer',
                       transition: 'all 0.2s'
                     }}
                     onMouseOver={(e) => {
                       if (currentSet !== setNum) {
-                        e.currentTarget.style.background = '#e5e7eb';
+                        e.currentTarget.style.background = 'hsl(var(--accent))';
                       }
                     }}
                     onMouseOut={(e) => {
                       if (currentSet !== setNum) {
-                        e.currentTarget.style.background = '#f3f4f6';
+                        e.currentTarget.style.background = 'hsl(var(--accent))';
                       }
                     }}
                   >
@@ -2052,9 +2052,9 @@ function VisualTrackingPageContent() {
                 style={{
                   width: '32px',
                   height: '32px',
-                  border: '2px solid #d1d5db',
+                  border: '2px solid hsl(var(--border))',
                   borderRadius: '6px',
-                  background: 'white',
+                  background: 'hsl(var(--card))',
                   fontSize: '16px',
                   cursor: 'pointer',
                   transition: 'all 0.2s',
@@ -2064,10 +2064,10 @@ function VisualTrackingPageContent() {
                 }}
                 title="Player Location Stats"
                 onMouseOver={(e) => {
-                  e.currentTarget.style.background = '#f3f4f6';
+                  e.currentTarget.style.background = 'hsl(var(--accent))';
                 }}
                 onMouseOut={(e) => {
-                  e.currentTarget.style.background = 'white';
+                  e.currentTarget.style.background = 'hsl(var(--card))';
                 }}
               >
                 📊
@@ -2080,7 +2080,7 @@ function VisualTrackingPageContent() {
                   style={{
                     width: '32px',
                     height: '32px',
-                    border: '2px solid #d1d5db',
+                    border: '2px solid hsl(var(--border))',
                     borderRadius: '6px',
                     background: settingsDropdownOpen ? '#e5e7eb' : 'white',
                     fontSize: '16px',
@@ -2093,12 +2093,12 @@ function VisualTrackingPageContent() {
                   title="Settings & Info"
                   onMouseOver={(e) => {
                     if (!settingsDropdownOpen) {
-                      e.currentTarget.style.background = '#f3f4f6';
+                      e.currentTarget.style.background = 'hsl(var(--accent))';
                     }
                   }}
                   onMouseOut={(e) => {
                     if (!settingsDropdownOpen) {
-                      e.currentTarget.style.background = 'white';
+                      e.currentTarget.style.background = 'hsl(var(--card))';
                     }
                   }}
                 >
@@ -2112,8 +2112,8 @@ function VisualTrackingPageContent() {
                       position: 'absolute',
                       top: '38px',
                       right: 0,
-                      background: 'white',
-                      border: '2px solid #d1d5db',
+                      background: 'hsl(var(--card))',
+                      border: '2px solid hsl(var(--border))',
                       borderRadius: '8px',
                       boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
                       zIndex: 1000,
@@ -2131,7 +2131,7 @@ function VisualTrackingPageContent() {
                         width: '100%',
                         padding: '12px 16px',
                         border: 'none',
-                        background: 'white',
+                        background: 'hsl(var(--card))',
                         textAlign: 'left',
                         fontSize: '14px',
                         fontWeight: '500',
@@ -2159,7 +2159,7 @@ function VisualTrackingPageContent() {
                         padding: '12px 16px',
                         border: 'none',
                         borderTop: '1px solid #e5e7eb',
-                        background: 'white',
+                        background: 'hsl(var(--card))',
                         textAlign: 'left',
                         fontSize: '14px',
                         fontWeight: '500',
@@ -2187,7 +2187,7 @@ function VisualTrackingPageContent() {
                           padding: '12px 16px',
                           border: 'none',
                           borderTop: '1px solid #e5e7eb',
-                          background: 'white',
+                          background: 'hsl(var(--card))',
                           textAlign: 'left',
                           fontSize: '14px',
                           fontWeight: '500',
@@ -2256,7 +2256,7 @@ function VisualTrackingPageContent() {
             {!firstPlayerSelected && (
               <div style={{
                 padding: '12px',
-                background: '#fef3c7',
+                background: 'rgba(245, 158, 11, 0.15)',
                 border: '2px solid #f59e0b',
                 borderRadius: '8px',
                 marginBottom: '12px'
@@ -2281,9 +2281,9 @@ function VisualTrackingPageContent() {
                       padding: '8px',
                       fontSize: '14px',
                       fontWeight: '600',
-                      background: servingTeam === 'home' ? '#7c3aed' : '#f3f4f6',
-                      color: servingTeam === 'home' ? 'white' : '#333',
-                      border: servingTeam === 'home' ? '2px solid #5b21b6' : '2px solid #d1d5db',
+                      background: servingTeam === 'home' ? '#7c3aed' : 'hsl(var(--secondary))',
+                      color: servingTeam === 'home' ? 'white' : 'hsl(var(--foreground))',
+                      border: servingTeam === 'home' ? '2px solid #5b21b6' : '2px solid hsl(var(--border))',
                       borderRadius: '6px',
                       cursor: 'pointer',
                       transition: 'all 0.2s'
@@ -2297,9 +2297,9 @@ function VisualTrackingPageContent() {
                       padding: '8px',
                       fontSize: '14px',
                       fontWeight: '600',
-                      background: servingTeam === 'opponent' ? '#ef4444' : '#f3f4f6',
-                      color: servingTeam === 'opponent' ? 'white' : '#333',
-                      border: servingTeam === 'opponent' ? '2px solid #dc2626' : '2px solid #d1d5db',
+                      background: servingTeam === 'opponent' ? '#ef4444' : 'hsl(var(--secondary))',
+                      color: servingTeam === 'opponent' ? 'white' : 'hsl(var(--foreground))',
+                      border: servingTeam === 'opponent' ? '2px solid #dc2626' : '2px solid hsl(var(--border))',
                       borderRadius: '6px',
                       cursor: 'pointer',
                       transition: 'all 0.2s'
@@ -2321,11 +2321,11 @@ function VisualTrackingPageContent() {
               gap: '12px',
               alignItems: 'center',
               padding: '10px 12px',
-              background: '#f9fafb',
+              background: 'hsl(var(--secondary))',
               borderRadius: '8px'
             }}>
               {/* Scoreboard Section - Direct quick score (no modal needed) */}
-              <div style={{ display: 'flex', gap: '6px', alignItems: 'center', background: 'white', padding: '6px 8px', borderRadius: '6px', border: '2px solid #e5e7eb' }}>
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center', background: 'hsl(var(--card))', padding: '6px 8px', borderRadius: '6px', border: '2px solid hsl(var(--border))' }}>
                 <button
                   onClick={() => handleDirectQuickScore('home')}
                   style={{
@@ -2352,8 +2352,8 @@ function VisualTrackingPageContent() {
                   style={{
                     padding: '6px 10px',
                     fontSize: '16px',
-                    background: scoringHistory.length === 0 ? '#e5e7eb' : '#f3f4f6',
-                    border: '2px solid #d1d5db',
+                    background: scoringHistory.length === 0 ? '#e5e7eb' : 'hsl(var(--secondary))',
+                    border: '2px solid hsl(var(--border))',
                     borderRadius: '5px',
                     cursor: scoringHistory.length === 0 ? 'not-allowed' : 'pointer',
                     opacity: scoringHistory.length === 0 ? 0.5 : 1
@@ -2392,7 +2392,7 @@ function VisualTrackingPageContent() {
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '4px',
-                    background: '#ede9fe',
+                    background: 'rgba(124, 58, 237, 0.15)',
                     padding: '6px 10px',
                     borderRadius: '6px',
                     border: '2px solid #c4b5fd'
@@ -2408,8 +2408,8 @@ function VisualTrackingPageContent() {
                           padding: '6px 8px',
                           fontSize: '14px',
                           fontWeight: '600',
-                          background: 'white',
-                          border: '2px solid #d1d5db',
+                          background: 'hsl(var(--card))',
+                          border: '2px solid hsl(var(--border))',
                           borderRadius: '4px',
                           cursor: 'pointer'
                         }}
@@ -2442,7 +2442,7 @@ function VisualTrackingPageContent() {
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '4px',
-                    background: '#fee2e2',
+                    background: 'rgba(239, 68, 68, 0.15)',
                     padding: '6px 10px',
                     borderRadius: '6px',
                     border: '2px solid #fecaca'
@@ -2458,8 +2458,8 @@ function VisualTrackingPageContent() {
                           padding: '6px 8px',
                           fontSize: '14px',
                           fontWeight: '600',
-                          background: 'white',
-                          border: '2px solid #d1d5db',
+                          background: 'hsl(var(--card))',
+                          border: '2px solid hsl(var(--border))',
                           borderRadius: '4px',
                           cursor: 'pointer'
                         }}
@@ -2536,8 +2536,8 @@ function VisualTrackingPageContent() {
             {pointHistory.length > 0 && (
               <div style={{
                 marginTop: '20px',
-                background: '#ffffff',
-                border: '2px solid #e5e7eb',
+                background: 'hsl(var(--card))',
+                border: '2px solid hsl(var(--border))',
                 borderRadius: '8px',
                 overflow: 'hidden'
               }}>
@@ -2547,10 +2547,10 @@ function VisualTrackingPageContent() {
                   justifyContent: 'space-between',
                   alignItems: 'center',
                   padding: '12px 16px',
-                  background: '#f9fafb',
-                  borderBottom: '2px solid #e5e7eb'
+                  background: 'hsl(var(--secondary))',
+                  borderBottom: '2px solid hsl(var(--border))'
                 }}>
-                  <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: '#333' }}>
+                  <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: 'hsl(var(--foreground))' }}>
                     📊 Recent Points
                   </h4>
                   <button
@@ -2577,11 +2577,11 @@ function VisualTrackingPageContent() {
                   gridTemplateColumns: '80px 1fr 1fr',
                   gap: '8px',
                   padding: '8px 12px',
-                  background: '#f3f4f6',
+                  background: 'hsl(var(--secondary))',
                   borderBottom: '1px solid #e5e7eb',
                   fontSize: '11px',
                   fontWeight: '700',
-                  color: '#666',
+                  color: 'hsl(var(--muted-foreground))',
                   textTransform: 'uppercase'
                 }}>
                   <div>Score</div>
@@ -2643,7 +2643,7 @@ function VisualTrackingPageContent() {
                           fontSize: '13px'
                         }}
                       >
-                        <div style={{ fontWeight: '700', color: '#666' }}>
+                        <div style={{ fontWeight: '700', color: 'hsl(var(--muted-foreground))' }}>
                           {point.homeScore} - {point.opponentScore}
                         </div>
                         <div style={{
@@ -2706,8 +2706,8 @@ function VisualTrackingPageContent() {
                 alignItems: 'center',
                 padding: '8px 16px',
                 fontSize: '14px',
-                color: '#999',
-                background: '#f3f4f6',
+                color: 'hsl(var(--muted-foreground))',
+                background: 'hsl(var(--secondary))',
                 borderRadius: '6px',
                 minWidth: '120px',
                 justifyContent: 'center'
@@ -2730,9 +2730,9 @@ function VisualTrackingPageContent() {
                     padding: '10px',
                     fontSize: '14px',
                     fontWeight: '600',
-                    border: actionType === 'attack' ? '3px solid #059669' : '2px solid #e5e7eb',
+                    border: actionType === 'attack' ? '3px solid #059669' : '2px solid hsl(var(--border))',
                     background: actionType === 'attack' ? '#059669' : 'white',
-                    color: actionType === 'attack' ? 'white' : '#333',
+                    color: actionType === 'attack' ? 'white' : 'hsl(var(--foreground))',
                     borderRadius: '6px',
                     cursor: 'pointer',
                     transition: 'all 0.2s'
@@ -2747,9 +2747,9 @@ function VisualTrackingPageContent() {
                     padding: '10px',
                     fontSize: '14px',
                     fontWeight: '600',
-                    border: actionType === 'block' ? '3px solid #7c3aed' : '2px solid #e5e7eb',
+                    border: actionType === 'block' ? '3px solid #7c3aed' : '2px solid hsl(var(--border))',
                     background: actionType === 'block' ? '#7c3aed' : 'white',
-                    color: actionType === 'block' ? 'white' : '#333',
+                    color: actionType === 'block' ? 'white' : 'hsl(var(--foreground))',
                     borderRadius: '6px',
                     cursor: 'pointer',
                     transition: 'all 0.2s'
@@ -2764,9 +2764,9 @@ function VisualTrackingPageContent() {
                     padding: '10px',
                     fontSize: '14px',
                     fontWeight: '600',
-                    border: actionType === 'dig' ? '3px solid #0891b2' : '2px solid #e5e7eb',
+                    border: actionType === 'dig' ? '3px solid #0891b2' : '2px solid hsl(var(--border))',
                     background: actionType === 'dig' ? '#0891b2' : 'white',
-                    color: actionType === 'dig' ? 'white' : '#333',
+                    color: actionType === 'dig' ? 'white' : 'hsl(var(--foreground))',
                     borderRadius: '6px',
                     cursor: 'pointer',
                     transition: 'all 0.2s'
@@ -2840,7 +2840,7 @@ function VisualTrackingPageContent() {
                     padding: '10px',
                     fontSize: '14px',
                     fontWeight: '600',
-                    border: '2px solid #e5e7eb',
+                    border: '2px solid hsl(var(--border))',
                     background: '#ef4444',
                     color: 'white',
                     borderRadius: '6px',
@@ -2906,7 +2906,7 @@ function VisualTrackingPageContent() {
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '6px',
-                      background: isBackRow ? '#f59e0b' : '#f3f4f6',
+                      background: isBackRow ? '#f59e0b' : 'hsl(var(--secondary))',
                       color: isBackRow ? 'white' : '#9ca3af',
                       borderColor: isBackRow ? '#f59e0b' : '#d1d5db',
                       transition: 'all 0.2s'
@@ -2959,7 +2959,7 @@ function VisualTrackingPageContent() {
                       fontSize: '14px',
                       fontWeight: '600',
                       borderRadius: '6px',
-                      border: '2px solid #d1d5db',
+                      border: '2px solid hsl(var(--border))',
                       cursor: 'not-allowed',
                       opacity: 0.5,
                       minWidth: '140px',
@@ -2967,7 +2967,7 @@ function VisualTrackingPageContent() {
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '6px',
-                      background: '#f3f4f6',
+                      background: 'hsl(var(--secondary))',
                       color: '#9ca3af'
                     }}
                   >
@@ -2991,7 +2991,7 @@ function VisualTrackingPageContent() {
                 fontSize: '16px',
                 fontWeight: '600',
                 color: '#92400e',
-                background: '#fef3c7',
+                background: 'rgba(245, 158, 11, 0.15)',
                 borderRadius: '6px',
                 padding: '10px',
                 border: '2px solid #f59e0b'
@@ -3008,8 +3008,8 @@ function VisualTrackingPageContent() {
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: '14px',
-                color: '#999',
-                background: '#f9fafb',
+                color: 'hsl(var(--muted-foreground))',
+                background: 'hsl(var(--secondary))',
                 borderRadius: '6px',
                 padding: '10px',
                 border: '2px dashed #d1d5db'
@@ -3024,8 +3024,8 @@ function VisualTrackingPageContent() {
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: '14px',
-                color: '#999',
-                background: '#f9fafb',
+                color: 'hsl(var(--muted-foreground))',
+                background: 'hsl(var(--secondary))',
                 borderRadius: '6px',
                 padding: '10px',
                 border: '2px dashed #d1d5db'
@@ -3041,7 +3041,7 @@ function VisualTrackingPageContent() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', height: '100%' }}>
                 {/* Left: Result Buttons (Vertical Stack) */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <h3 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600', color: '#666' }}>
+                  <h3 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600', color: 'hsl(var(--muted-foreground))' }}>
                     📝 Result
                   </h3>
                   {getResultButtons().map((btn) => (
@@ -3070,14 +3070,14 @@ function VisualTrackingPageContent() {
                       {btn.label}
                     </button>
                   ))}
-                  <p style={{ fontSize: '11px', color: '#999', textAlign: 'center', marginTop: 'auto' }}>
+                  <p style={{ fontSize: '11px', color: 'hsl(var(--muted-foreground))', textAlign: 'center', marginTop: 'auto' }}>
                     💡 Press Space for "In Play"
                   </p>
                 </div>
 
                 {/* Right: Hit Zone Grid (3x3) - Only show for attacks */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <h3 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600', color: '#666' }}>
+                  <h3 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600', color: 'hsl(var(--muted-foreground))' }}>
                     🎯 Hit Zone
                   </h3>
                   {actionType === 'attack' ? (
@@ -3100,21 +3100,21 @@ function VisualTrackingPageContent() {
                               padding: '12px',
                               fontSize: '18px',
                               fontWeight: '700',
-                              background: isSelected ? '#7c3aed' : '#f3f4f6',
-                              color: isSelected ? 'white' : '#666',
-                              border: isSelected ? '3px solid #5b21b6' : '2px solid #d1d5db',
+                              background: isSelected ? '#7c3aed' : 'hsl(var(--secondary))',
+                              color: isSelected ? 'white' : 'hsl(var(--muted-foreground))',
+                              border: isSelected ? '3px solid #5b21b6' : '2px solid hsl(var(--border))',
                               borderRadius: '8px',
                               cursor: 'pointer',
                               transition: 'all 0.2s'
                             }}
                             onMouseOver={(e) => {
                               if (!isSelected) {
-                                e.currentTarget.style.background = '#e5e7eb';
+                                e.currentTarget.style.background = 'hsl(var(--accent))';
                               }
                             }}
                             onMouseOut={(e) => {
                               if (!isSelected) {
-                                e.currentTarget.style.background = '#f3f4f6';
+                                e.currentTarget.style.background = 'hsl(var(--accent))';
                               }
                             }}
                           >
@@ -3129,9 +3129,9 @@ function VisualTrackingPageContent() {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      background: '#f9fafb',
+                      background: 'hsl(var(--secondary))',
                       borderRadius: '8px',
-                      color: '#999',
+                      color: 'hsl(var(--muted-foreground))',
                       fontSize: '14px',
                       border: '2px dashed #d1d5db'
                     }}>
@@ -3147,7 +3147,7 @@ function VisualTrackingPageContent() {
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#999'
+                color: 'hsl(var(--muted-foreground))'
               }}>
                 <p style={{ fontSize: '16px', marginBottom: '8px' }}>Draw a trajectory to see result buttons</p>
                 <p style={{ fontSize: '12px' }}>Select a player and draw on the court</p>
@@ -3188,7 +3188,7 @@ function VisualTrackingPageContent() {
         >
           <div
             style={{
-              background: 'white',
+              background: 'hsl(var(--card))',
               borderRadius: '12px',
               padding: '24px',
               maxWidth: '400px',
@@ -3203,7 +3203,7 @@ function VisualTrackingPageContent() {
               alignItems: 'center',
               marginBottom: '16px'
             }}>
-              <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: '#333' }}>
+              <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: 'hsl(var(--foreground))' }}>
                 Quick Score: {scoringTeam === 'home' ? 'Home' : 'Opponent'}
               </h3>
               <button
@@ -3215,9 +3215,9 @@ function VisualTrackingPageContent() {
                   width: '32px',
                   height: '32px',
                   borderRadius: '50%',
-                  border: '2px solid #d1d5db',
-                  background: '#f3f4f6',
-                  color: '#666',
+                  border: '2px solid hsl(var(--border))',
+                  background: 'hsl(var(--secondary))',
+                  color: 'hsl(var(--muted-foreground))',
                   fontSize: '18px',
                   fontWeight: '700',
                   cursor: 'pointer',
@@ -3233,7 +3233,7 @@ function VisualTrackingPageContent() {
             {/* Show either error type selection or player selection */}
             {!scoringOption ? (
               <>
-                <p style={{ fontSize: '14px', color: '#666', marginBottom: '20px' }}>
+                <p style={{ fontSize: '14px', color: 'hsl(var(--muted-foreground))', marginBottom: '20px' }}>
                   Select a scoring option to award a point:
                 </p>
 
@@ -3307,8 +3307,8 @@ function VisualTrackingPageContent() {
                   style={{
                     padding: '8px 12px',
                     fontSize: '14px',
-                    background: '#f3f4f6',
-                    border: '1px solid #d1d5db',
+                    background: 'hsl(var(--secondary))',
+                    border: '1px solid hsl(var(--border))',
                     borderRadius: '6px',
                     cursor: 'pointer',
                     marginBottom: '16px'
@@ -3317,7 +3317,7 @@ function VisualTrackingPageContent() {
                   ← Back
                 </button>
 
-                <p style={{ fontSize: '14px', color: '#666', marginBottom: '12px' }}>
+                <p style={{ fontSize: '14px', color: 'hsl(var(--muted-foreground))', marginBottom: '12px' }}>
                   {scoringOption === 'team_error'
                     ? `Which ${scoringTeam} player made the error?`
                     : `Which ${scoringTeam === 'home' ? 'Opponent' : 'Home'} player made the error?`
@@ -3338,24 +3338,24 @@ function VisualTrackingPageContent() {
                           padding: '12px 8px',
                           fontSize: '14px',
                           fontWeight: '600',
-                          background: '#ffffff',
-                          border: '2px solid #e5e7eb',
+                          background: 'hsl(var(--card))',
+                          border: '2px solid hsl(var(--border))',
                           borderRadius: '6px',
                           cursor: 'pointer',
                           transition: 'all 0.2s',
                           textAlign: 'center'
                         }}
                         onMouseOver={(e) => {
-                          e.currentTarget.style.background = '#f3f4f6';
+                          e.currentTarget.style.background = 'hsl(var(--accent))';
                           e.currentTarget.style.borderColor = '#7c3aed';
                         }}
                         onMouseOut={(e) => {
-                          e.currentTarget.style.background = '#ffffff';
+                          e.currentTarget.style.background = 'hsl(var(--card))';
                           e.currentTarget.style.borderColor = '#e5e7eb';
                         }}
                       >
                         <div style={{ fontSize: '18px', marginBottom: '4px' }}>#{player.jerseyNumber}</div>
-                        <div style={{ fontSize: '12px', color: '#666' }}>{player.name}</div>
+                        <div style={{ fontSize: '12px', color: 'hsl(var(--muted-foreground))' }}>{player.name}</div>
                       </button>
                     ));
                   })()}
@@ -3386,7 +3386,7 @@ function VisualTrackingPageContent() {
         >
           <div
             style={{
-              background: 'white',
+              background: 'hsl(var(--card))',
               borderRadius: '12px',
               padding: '24px',
               maxWidth: '900px',
@@ -3404,10 +3404,10 @@ function VisualTrackingPageContent() {
               justifyContent: 'space-between',
               alignItems: 'center',
               marginBottom: '16px',
-              borderBottom: '2px solid #e5e7eb',
+              borderBottom: '2px solid hsl(var(--border))',
               paddingBottom: '12px'
             }}>
-              <h3 style={{ margin: 0, fontSize: '24px', fontWeight: '700', color: '#333' }}>
+              <h3 style={{ margin: 0, fontSize: '24px', fontWeight: '700', color: 'hsl(var(--foreground))' }}>
                 📊 Full Point History
               </h3>
               <button
@@ -3416,9 +3416,9 @@ function VisualTrackingPageContent() {
                   width: '32px',
                   height: '32px',
                   borderRadius: '50%',
-                  border: '2px solid #d1d5db',
-                  background: '#f3f4f6',
-                  color: '#666',
+                  border: '2px solid hsl(var(--border))',
+                  background: 'hsl(var(--secondary))',
+                  color: 'hsl(var(--muted-foreground))',
                   fontSize: '18px',
                   fontWeight: '700',
                   cursor: 'pointer',
@@ -3435,13 +3435,13 @@ function VisualTrackingPageContent() {
               <div style={{
                 padding: '40px',
                 textAlign: 'center',
-                color: '#999'
+                color: 'hsl(var(--muted-foreground))'
               }}>
                 <p style={{ fontSize: '16px', margin: 0 }}>No points recorded yet. Start playing to see history!</p>
               </div>
             ) : (
               <>
-                <p style={{ fontSize: '14px', color: '#666', marginBottom: '16px' }}>
+                <p style={{ fontSize: '14px', color: 'hsl(var(--muted-foreground))', marginBottom: '16px' }}>
                   Showing all {pointHistory.length} point{pointHistory.length !== 1 ? 's' : ''} in chronological order (newest first).
                 </p>
 
@@ -3451,13 +3451,13 @@ function VisualTrackingPageContent() {
                   gridTemplateColumns: '80px 1fr 1fr',
                   gap: '12px',
                   padding: '12px 16px',
-                  background: '#f3f4f6',
+                  background: 'hsl(var(--secondary))',
                   borderRadius: '8px 8px 0 0',
                   fontSize: '12px',
                   fontWeight: '700',
-                  color: '#666',
+                  color: 'hsl(var(--muted-foreground))',
                   textTransform: 'uppercase',
-                  borderBottom: '2px solid #e5e7eb'
+                  borderBottom: '2px solid hsl(var(--border))'
                 }}>
                   <div>Score</div>
                   <div>Home Team Action</div>
@@ -3468,7 +3468,7 @@ function VisualTrackingPageContent() {
                 <div style={{
                   flex: 1,
                   overflowY: 'auto',
-                  border: '1px solid #e5e7eb',
+                  border: '1px solid hsl(var(--border))',
                   borderRadius: '0 0 8px 8px'
                 }}>
                   {pointHistory.slice().reverse().map((point, index) => {
@@ -3523,7 +3523,7 @@ function VisualTrackingPageContent() {
                           fontSize: '14px'
                         }}
                       >
-                        <div style={{ fontWeight: '700', color: '#666' }}>
+                        <div style={{ fontWeight: '700', color: 'hsl(var(--muted-foreground))' }}>
                           {point.homeScore} - {point.opponentScore}
                         </div>
                         <div style={{
@@ -3575,7 +3575,7 @@ function VisualTrackingPageContent() {
         >
           <div
             style={{
-              background: 'white',
+              background: 'hsl(var(--card))',
               borderRadius: '12px',
               padding: '24px',
               maxWidth: '700px',
@@ -3592,7 +3592,7 @@ function VisualTrackingPageContent() {
               alignItems: 'center',
               marginBottom: '16px'
             }}>
-              <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: '#333' }}>
+              <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: 'hsl(var(--foreground))' }}>
                 Debug Information
               </h3>
               <button
@@ -3601,9 +3601,9 @@ function VisualTrackingPageContent() {
                   width: '32px',
                   height: '32px',
                   borderRadius: '50%',
-                  border: '2px solid #d1d5db',
-                  background: '#f3f4f6',
-                  color: '#666',
+                  border: '2px solid hsl(var(--border))',
+                  background: 'hsl(var(--secondary))',
+                  color: 'hsl(var(--muted-foreground))',
                   fontSize: '18px',
                   fontWeight: '700',
                   cursor: 'pointer',
@@ -3616,7 +3616,7 @@ function VisualTrackingPageContent() {
               </button>
             </div>
 
-            <div style={{ fontSize: '14px', color: '#666' }}>
+            <div style={{ fontSize: '14px', color: 'hsl(var(--muted-foreground))' }}>
               {/* Grid Layout for top section */}
               <div style={{
                 display: 'grid',
@@ -3624,11 +3624,11 @@ function VisualTrackingPageContent() {
                 gap: '16px',
                 marginBottom: '16px',
                 paddingBottom: '16px',
-                borderBottom: '2px solid #e5e7eb'
+                borderBottom: '2px solid hsl(var(--border))'
               }}>
                 {/* Point/Attempt Info */}
                 <div>
-                  <p style={{ fontWeight: '700', color: '#333', marginBottom: '8px' }}>Point & Phase</p>
+                  <p style={{ fontWeight: '700', color: 'hsl(var(--foreground))', marginBottom: '8px' }}>Point & Phase</p>
                   <p><strong>Point:</strong> #{pointNumber}</p>
                   <p><strong>Attempt:</strong> #{attemptNumber}</p>
                   <p><strong>Phase:</strong> {isServePhase ? 'SERVE' : 'RALLY'}</p>
@@ -3637,15 +3637,15 @@ function VisualTrackingPageContent() {
                 {/* Player Info */}
                 {selectedPlayer ? (
                   <div>
-                    <p style={{ fontWeight: '700', color: '#333', marginBottom: '8px' }}>Selected Player</p>
+                    <p style={{ fontWeight: '700', color: 'hsl(var(--foreground))', marginBottom: '8px' }}>Selected Player</p>
                     <p><strong>Player:</strong> #{selectedPlayer.jerseyNumber} {selectedPlayer.playerName}</p>
                     <p><strong>Position:</strong> {selectedPlayer.position}</p>
                     <p><strong>Team:</strong> {selectedTeam === 'home' ? 'Home' : 'Opponent'}</p>
                   </div>
                 ) : (
                   <div>
-                    <p style={{ fontWeight: '700', color: '#333', marginBottom: '8px' }}>Selected Player</p>
-                    <p style={{ color: '#999' }}>No player selected</p>
+                    <p style={{ fontWeight: '700', color: 'hsl(var(--foreground))', marginBottom: '8px' }}>Selected Player</p>
+                    <p style={{ color: 'hsl(var(--muted-foreground))' }}>No player selected</p>
                   </div>
                 )}
               </div>
@@ -3653,40 +3653,40 @@ function VisualTrackingPageContent() {
               {/* Trajectory Analysis */}
               {trajectoryAnalysis && currentTrajectory && (
                 <>
-                  <div style={{ marginBottom: '16px', paddingBottom: '16px', borderBottom: '2px solid #e5e7eb' }}>
-                    <p style={{ fontWeight: '700', color: '#333', marginBottom: '8px' }}>Bounds Check</p>
+                  <div style={{ marginBottom: '16px', paddingBottom: '16px', borderBottom: '2px solid hsl(var(--border))' }}>
+                    <p style={{ fontWeight: '700', color: 'hsl(var(--foreground))', marginBottom: '8px' }}>Bounds Check</p>
                     <p><strong>Start:</strong> {trajectoryAnalysis.startInBounds ? '✅ In bounds' : '❌ Out of bounds'}</p>
                     <p><strong>Landing:</strong> {trajectoryAnalysis.endInBounds ? '✅ In bounds' : '❌ Out of bounds'}</p>
                   </div>
 
-                  <div style={{ marginBottom: '16px', paddingBottom: '16px', borderBottom: '2px solid #e5e7eb' }}>
-                    <p style={{ fontWeight: '700', color: '#333', marginBottom: '8px' }}>Trajectory Metrics</p>
+                  <div style={{ marginBottom: '16px', paddingBottom: '16px', borderBottom: '2px solid hsl(var(--border))' }}>
+                    <p style={{ fontWeight: '700', color: 'hsl(var(--foreground))', marginBottom: '8px' }}>Trajectory Metrics</p>
                     <p><strong>Distance:</strong> {Math.round(trajectoryAnalysis.distance)}px</p>
                     <p><strong>Speed:</strong> {trajectoryAnalysis.speed.toUpperCase()}</p>
                     <p><strong>Landing Area:</strong> {trajectoryAnalysis.landingArea} court</p>
                   </div>
 
                   {actionType === 'serve' && trajectoryAnalysis.serveZone && (
-                    <div style={{ marginBottom: '16px', paddingBottom: '16px', borderBottom: '2px solid #e5e7eb' }}>
-                      <p style={{ fontWeight: '700', color: '#333', marginBottom: '8px' }}>Serve Info</p>
+                    <div style={{ marginBottom: '16px', paddingBottom: '16px', borderBottom: '2px solid hsl(var(--border))' }}>
+                      <p style={{ fontWeight: '700', color: 'hsl(var(--foreground))', marginBottom: '8px' }}>Serve Info</p>
                       <p><strong>Serve Zone:</strong> {trajectoryAnalysis.serveZone}</p>
                     </div>
                   )}
 
                   {actionType === 'attack' && trajectoryAnalysis.hitPosition && (
-                    <div style={{ marginBottom: '16px', paddingBottom: '16px', borderBottom: '2px solid #e5e7eb' }}>
-                      <p style={{ fontWeight: '700', color: '#333', marginBottom: '8px' }}>Attack Info</p>
+                    <div style={{ marginBottom: '16px', paddingBottom: '16px', borderBottom: '2px solid hsl(var(--border))' }}>
+                      <p style={{ fontWeight: '700', color: 'hsl(var(--foreground))', marginBottom: '8px' }}>Attack Info</p>
                       <p><strong>Hit Position:</strong> {trajectoryAnalysis.hitPosition}</p>
                     </div>
                   )}
 
-                  <div style={{ marginBottom: '16px', paddingBottom: '16px', borderBottom: '2px solid #e5e7eb' }}>
-                    <p style={{ fontWeight: '700', color: '#333', marginBottom: '8px' }}>Grid Cell</p>
+                  <div style={{ marginBottom: '16px', paddingBottom: '16px', borderBottom: '2px solid hsl(var(--border))' }}>
+                    <p style={{ fontWeight: '700', color: 'hsl(var(--foreground))', marginBottom: '8px' }}>Grid Cell</p>
                     <p><strong>Location:</strong> Row {trajectoryAnalysis.gridCell.row + 1}, Col {trajectoryAnalysis.gridCell.col + 1}</p>
                   </div>
 
                   <div>
-                    <p style={{ fontWeight: '700', color: '#333', marginBottom: '8px' }}>Raw Coordinates</p>
+                    <p style={{ fontWeight: '700', color: 'hsl(var(--foreground))', marginBottom: '8px' }}>Raw Coordinates</p>
                     <p><strong>Start:</strong> ({Math.round(currentTrajectory.startX)}, {Math.round(currentTrajectory.startY)})</p>
                     <p><strong>End:</strong> ({Math.round(currentTrajectory.endX)}, {Math.round(currentTrajectory.endY)})</p>
                     <p><strong>Start X%:</strong> {Math.round((currentTrajectory.startX - 40) / 340 * 100)}%</p>
@@ -3695,7 +3695,7 @@ function VisualTrackingPageContent() {
               )}
 
               {!trajectoryAnalysis && !currentTrajectory && (
-                <p style={{ textAlign: 'center', color: '#999', padding: '20px' }}>
+                <p style={{ textAlign: 'center', color: 'hsl(var(--muted-foreground))', padding: '20px' }}>
                   Draw a trajectory to see debug information
                 </p>
               )}
@@ -3722,7 +3722,7 @@ function VisualTrackingPageContent() {
         >
           <div
             style={{
-              background: 'white',
+              background: 'hsl(var(--card))',
               borderRadius: '16px',
               padding: '32px',
               maxWidth: '500px',
@@ -3743,7 +3743,7 @@ function VisualTrackingPageContent() {
               margin: '0 0 12px 0',
               fontSize: '28px',
               fontWeight: '700',
-              color: '#333'
+              color: 'hsl(var(--foreground))'
             }}>
               Set {currentSet} Complete!
             </h2>
@@ -3760,7 +3760,7 @@ function VisualTrackingPageContent() {
             <div style={{
               fontSize: '48px',
               fontWeight: '700',
-              color: '#666',
+              color: 'hsl(var(--muted-foreground))',
               marginBottom: '24px',
               letterSpacing: '4px'
             }}>
@@ -3769,7 +3769,7 @@ function VisualTrackingPageContent() {
 
             <p style={{
               fontSize: '14px',
-              color: '#666',
+              color: 'hsl(var(--muted-foreground))',
               marginBottom: '32px'
             }}>
               {currentSet < 5
@@ -3817,19 +3817,19 @@ function VisualTrackingPageContent() {
                   padding: '14px 24px',
                   fontSize: '16px',
                   fontWeight: '700',
-                  background: '#f3f4f6',
-                  color: '#333',
-                  border: '2px solid #d1d5db',
+                  background: 'hsl(var(--secondary))',
+                  color: 'hsl(var(--foreground))',
+                  border: '2px solid hsl(var(--border))',
                   borderRadius: '8px',
                   cursor: 'pointer',
                   transition: 'all 0.2s'
                 }}
                 onMouseOver={(e) => {
-                  e.currentTarget.style.background = '#e5e7eb';
+                  e.currentTarget.style.background = 'hsl(var(--accent))';
                   e.currentTarget.style.borderColor = '#9ca3af';
                 }}
                 onMouseOut={(e) => {
-                  e.currentTarget.style.background = '#f3f4f6';
+                  e.currentTarget.style.background = 'hsl(var(--accent))';
                   e.currentTarget.style.borderColor = '#d1d5db';
                 }}
               >

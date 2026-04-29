@@ -11,7 +11,7 @@
 
 /* Unified Header Container */
 .unified-header {
-  background: white;
+  background: hsl(var(--card));
   padding: 8px 12px;
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -33,13 +33,13 @@
   margin: 0;
   font-size: 1.125rem;
   font-weight: 700;
-  color: #111827;
+  color: hsl(var(--foreground));
 }
 
 .match-info {
   margin: 0;
   font-size: 0.75rem;
-  color: #6b7280;
+  color: hsl(var(--muted-foreground));
 }
 
 /* Set Navigation - Inline */
@@ -57,8 +57,8 @@
   padding: 6px 12px;
   font-size: 0.75rem;
   font-weight: 600;
-  color: #4b5563;
-  background: #f3f4f6;
+  color: hsl(var(--muted-foreground));
+  background: hsl(var(--secondary));
   border: 2px solid transparent;
   border-radius: 6px;
   cursor: pointer;
@@ -67,7 +67,7 @@
 
 .set-tab:hover {
   background: #e5e7eb;
-  color: #1f2937;
+  color: hsl(var(--foreground));
 }
 
 .set-tab.active {
@@ -87,8 +87,8 @@
   padding: 6px 16px;
   font-size: 0.875rem;
   font-weight: 600;
-  color: #4b5563;
-  background: #f3f4f6;
+  color: hsl(var(--muted-foreground));
+  background: hsl(var(--secondary));
   border: 2px solid transparent;
   border-radius: 6px;
   cursor: pointer;
@@ -118,7 +118,7 @@
 
 /* Main workflow area */
 .workflow-area {
-  background: white;
+  background: hsl(var(--card));
   padding: 12px;
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -136,7 +136,7 @@
 .location-map-section,
 .events-summary,
 .events-list {
-  background: white;
+  background: hsl(var(--card));
   padding: 12px;
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -149,7 +149,7 @@
   margin: 0 0 12px 0;
   font-size: 0.9375rem;
   font-weight: 700;
-  color: #111827;
+  color: hsl(var(--foreground));
 }
 
 /* Line-up Display */
@@ -170,7 +170,7 @@
 
 .empty-state p {
   margin: 0 0 16px 0;
-  color: #6b7280;
+  color: hsl(var(--muted-foreground));
   font-size: 0.875rem;
 }
 
@@ -192,7 +192,7 @@
 
 .lineup-display {
   text-align: center;
-  color: #6b7280;
+  color: hsl(var(--muted-foreground));
 }
 
 /* Placeholder Styling */
@@ -200,7 +200,7 @@
   margin: 0 0 8px 0;
   font-size: 1.125rem;
   font-weight: 600;
-  color: #9ca3af;
+  color: hsl(var(--muted-foreground));
 }
 
 .placeholder-hint {
@@ -221,22 +221,22 @@
   flex-direction: column;
   align-items: center;
   padding: 10px;
-  background: #f9fafb;
+  background: hsl(var(--secondary));
   border-radius: 6px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid hsl(var(--border));
 }
 
 .stat-label {
   font-size: 0.6875rem;
   font-weight: 600;
-  color: #6b7280;
+  color: hsl(var(--muted-foreground));
   margin-bottom: 4px;
 }
 
 .stat-value {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #111827;
+  color: hsl(var(--foreground));
 }
 
 /* Events List - Compact */
@@ -253,15 +253,15 @@
   flex-direction: column;
   gap: 4px;
   padding: 8px;
-  background: #f9fafb;
+  background: hsl(var(--secondary));
   border-radius: 4px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid hsl(var(--border));
 }
 
 .event-player {
   font-weight: 600;
   font-size: 0.8125rem;
-  color: #111827;
+  color: hsl(var(--foreground));
 }
 
 .event-details {
@@ -272,7 +272,7 @@
 
 .event-location {
   font-size: 0.6875rem;
-  color: #6b7280;
+  color: hsl(var(--muted-foreground));
 }
 
 .event-result {

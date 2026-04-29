@@ -1,5 +1,5 @@
 .scoring-runs-chart {
-  background: white;
+  background: hsl(var(--card));
   border-radius: 8px;
   padding: 16px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -21,7 +21,7 @@
 .run-label {
   min-width: 80px;
   font-size: 10px;
-  color: #6b7280;
+  color: hsl(var(--muted-foreground));
   text-align: right;
 }
 
@@ -32,7 +32,7 @@
 .run-bar-track {
   flex: 1;
   height: 24px;
-  background: #f3f4f6;
+  background: hsl(var(--secondary));
   border-radius: 4px;
   position: relative;
   overflow: hidden;
