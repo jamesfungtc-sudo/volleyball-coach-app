@@ -184,7 +184,6 @@ function VisualTrackingPageContent() {
 
   // Rotation configuration modal state
   const [rotationConfigModalOpen, setRotationConfigModalOpen] = useState(false);
-  const [rotationConfigDismissed, setRotationConfigDismissed] = useState(false);
 
   // Rotation state
   const [rotationEnabled, setRotationEnabled] = useState(false);
@@ -532,14 +531,10 @@ function VisualTrackingPageContent() {
    * Load or prompt for rotation configuration when set changes
    */
   useEffect(() => {
-    // Reset dismissed flag when set changes
-    setRotationConfigDismissed(false);
-
     console.log('🔍 Rotation config check:', {
       matchId,
       loading,
       currentSet,
-      rotationConfigModalOpen,
       rotationEnabled
     });
 
@@ -569,11 +564,7 @@ function VisualTrackingPageContent() {
       isValid: isValidConfig
     });
 
-    if (!isValidConfig && !rotationConfigModalOpen && !rotationConfigDismissed) {
-      // No valid config for this set - open modal (unless user dismissed it)
-      console.log(`✨ No valid rotation config for set ${currentSet}, opening modal`);
-      setRotationConfigModalOpen(true);
-    } else if (isValidConfig && existingConfig) {
+    if (isValidConfig && existingConfig) {
       // Load existing configuration
       console.log(`📥 Loading existing rotation config for set ${currentSet}`);
       setHomeRotationConfig(existingConfig.home);
@@ -601,10 +592,11 @@ function VisualTrackingPageContent() {
 
       setHomeLineup(homeLineupData);
       setOpponentLineup(opponentLineupData);
-    } else {
-      console.log('⚠️ Config validation failed OR modal already open - not opening modal');
+
+      // Config loaded — serving team is known, so skip "who serves first" prompt
+      setFirstPlayerSelected(true);
     }
-  }, [currentSet, matchId, loading, rotationConfigModalOpen, homeRoster, opponentRoster]);
+  }, [currentSet, matchId, loading, homeRoster, opponentRoster]);
 
   /**
    * Helper function: Look up player by ID from rosters
@@ -1903,8 +1895,9 @@ function VisualTrackingPageContent() {
    * Handle continuing to next set after set ends
    */
   const handleContinueToNextSet = () => {
-    // Close the modal
+    // Close modals
     setSetEndModalOpen(false);
+    setRotationConfigModalOpen(false);
 
     // Move to next set if not already at set 5
     if (currentSet < 5) {
@@ -3913,10 +3906,7 @@ function VisualTrackingPageContent() {
       {/* Rotation Configuration Modal */}
       <RotationConfigModal
         isOpen={rotationConfigModalOpen}
-        onClose={() => {
-          setRotationConfigModalOpen(false);
-          setRotationConfigDismissed(true);
-        }}
+        onClose={() => setRotationConfigModalOpen(false)}
         onSave={handleRotationConfigSave}
         initialHomeConfig={homeRotationConfig || undefined}
         initialOpponentConfig={opponentRotationConfig || undefined}
