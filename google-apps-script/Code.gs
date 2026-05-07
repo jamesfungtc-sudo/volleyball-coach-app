@@ -103,6 +103,28 @@ function doGet(e) {
         const trajData = JSON.parse(e.parameter.data || '{}');
         return updateTrajectories(e.parameter.matchId, trajData.trajectories);
 
+      case 'createTeam':
+        const newTeamData = JSON.parse(e.parameter.data || '{}');
+        return createTeam(newTeamData);
+
+      case 'updateTeam':
+        const updTeamData = JSON.parse(e.parameter.data || '{}');
+        return updateTeam(e.parameter.teamId, updTeamData);
+
+      case 'deleteTeam':
+        return deleteTeam(e.parameter.teamId);
+
+      case 'createPlayer':
+        const newPlayerData = JSON.parse(e.parameter.data || '{}');
+        return createPlayer(newPlayerData);
+
+      case 'updatePlayer':
+        const updPlayerData = JSON.parse(e.parameter.data || '{}');
+        return updatePlayer(e.parameter.playerId, updPlayerData);
+
+      case 'deletePlayer':
+        return deletePlayer(e.parameter.playerId);
+
       case 'health':
         return createResponse({ status: 'ok', timestamp: new Date() });
 
@@ -546,6 +568,90 @@ function undoLastPoint(matchId, setNumber) {
     gameDate: match.gameDate,
     sets: sets
   });
+}
+
+// ============================================================================
+// TEAM & PLAYER CRUD
+// ============================================================================
+
+function createTeam(teamData) {
+  const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEETS.TEAMS);
+  const id = Utilities.getUuid();
+  sheet.appendRow([id, teamData.name]);
+  return createResponse({ success: true, teamId: id });
+}
+
+function updateTeam(teamId, teamData) {
+  const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEETS.TEAMS);
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === teamId) {
+      sheet.getRange(i + 1, 2).setValue(teamData.name);
+      return createResponse({ success: true });
+    }
+  }
+  return createResponse({ error: 'Team not found' }, 404);
+}
+
+function deleteTeam(teamId) {
+  const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEETS.TEAMS);
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === teamId) {
+      sheet.deleteRow(i + 1);
+      return createResponse({ success: true });
+    }
+  }
+  return createResponse({ error: 'Team not found' }, 404);
+}
+
+function createPlayer(playerData) {
+  const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEETS.PLAYERS);
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const id = Utilities.getUuid();
+  const row = headers.map(function(h) {
+    if (h === 'Id') return id;
+    if (h === 'PreferredName') return playerData.preferredName || '';
+    if (h === 'FirstName') return '';
+    if (h === 'LastName') return '';
+    if (h === 'MainPosition') return playerData.mainPosition || '';
+    if (h === 'SecondaryPosition') return playerData.secondaryPosition || '';
+    if (h === 'TeamId') return playerData.teamId || '';
+    if (h === 'JerseyNumber') return playerData.jerseyNumber || 0;
+    return '';
+  });
+  sheet.appendRow(row);
+  return createResponse({ success: true, playerId: id });
+}
+
+function updatePlayer(playerId, playerData) {
+  const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEETS.PLAYERS);
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const colMap = {};
+  headers.forEach(function(h, i) { colMap[h] = i; });
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][colMap['Id']] === playerId) {
+      if (playerData.preferredName !== undefined) sheet.getRange(i + 1, colMap['PreferredName'] + 1).setValue(playerData.preferredName);
+      if (playerData.jerseyNumber !== undefined) sheet.getRange(i + 1, colMap['JerseyNumber'] + 1).setValue(playerData.jerseyNumber);
+      if (playerData.mainPosition !== undefined) sheet.getRange(i + 1, colMap['MainPosition'] + 1).setValue(playerData.mainPosition);
+      if (playerData.secondaryPosition !== undefined) sheet.getRange(i + 1, colMap['SecondaryPosition'] + 1).setValue(playerData.secondaryPosition);
+      return createResponse({ success: true });
+    }
+  }
+  return createResponse({ error: 'Player not found' }, 404);
+}
+
+function deletePlayer(playerId) {
+  const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEETS.PLAYERS);
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === playerId) {
+      sheet.deleteRow(i + 1);
+      return createResponse({ success: true });
+    }
+  }
+  return createResponse({ error: 'Player not found' }, 404);
 }
 
 // ============================================================================

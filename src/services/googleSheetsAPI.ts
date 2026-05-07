@@ -606,6 +606,76 @@ export async function saveMatchFull(matchData: {
 }
 
 // ============================================================================
+// Team & Player CRUD
+// ============================================================================
+
+export interface TeamRecord {
+  Id: string;
+  Name: string;
+}
+
+export async function createTeam(name: string): Promise<{ teamId: string }> {
+  if (!API_URL) throw new Error('API not configured');
+  const params = new URLSearchParams({ action: 'createTeam', data: JSON.stringify({ name }) });
+  const response = await fetch(`${API_URL}?${params}`);
+  const data: APIResponse<any> = await response.json();
+  if (data.status !== 200) throw new Error(data.data.error);
+  return data.data;
+}
+
+export async function updateTeam(teamId: string, name: string): Promise<void> {
+  if (!API_URL) throw new Error('API not configured');
+  const params = new URLSearchParams({ action: 'updateTeam', teamId, data: JSON.stringify({ name }) });
+  const response = await fetch(`${API_URL}?${params}`);
+  const data: APIResponse<any> = await response.json();
+  if (data.status !== 200) throw new Error(data.data.error);
+}
+
+export async function deleteTeam(teamId: string): Promise<void> {
+  if (!API_URL) throw new Error('API not configured');
+  const params = new URLSearchParams({ action: 'deleteTeam', teamId });
+  const response = await fetch(`${API_URL}?${params}`);
+  const data: APIResponse<any> = await response.json();
+  if (data.status !== 200) throw new Error(data.data.error);
+}
+
+export async function createPlayer(player: {
+  preferredName: string;
+  jerseyNumber: number;
+  mainPosition: string;
+  secondaryPosition: string;
+  teamId: string;
+}): Promise<{ playerId: string }> {
+  if (!API_URL) throw new Error('API not configured');
+  const params = new URLSearchParams({ action: 'createPlayer', data: JSON.stringify(player) });
+  const response = await fetch(`${API_URL}?${params}`);
+  const data: APIResponse<any> = await response.json();
+  if (data.status !== 200) throw new Error(data.data.error);
+  return data.data;
+}
+
+export async function updatePlayer(playerId: string, player: {
+  preferredName?: string;
+  jerseyNumber?: number;
+  mainPosition?: string;
+  secondaryPosition?: string;
+}): Promise<void> {
+  if (!API_URL) throw new Error('API not configured');
+  const params = new URLSearchParams({ action: 'updatePlayer', playerId, data: JSON.stringify(player) });
+  const response = await fetch(`${API_URL}?${params}`);
+  const data: APIResponse<any> = await response.json();
+  if (data.status !== 200) throw new Error(data.data.error);
+}
+
+export async function deletePlayer(playerId: string): Promise<void> {
+  if (!API_URL) throw new Error('API not configured');
+  const params = new URLSearchParams({ action: 'deletePlayer', playerId });
+  const response = await fetch(`${API_URL}?${params}`);
+  const data: APIResponse<any> = await response.json();
+  if (data.status !== 200) throw new Error(data.data.error);
+}
+
+// ============================================================================
 // Utility Functions
 // ============================================================================
 
