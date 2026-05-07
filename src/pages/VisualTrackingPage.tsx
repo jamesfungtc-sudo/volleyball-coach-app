@@ -387,11 +387,20 @@ function VisualTrackingPageContent() {
           console.log('📦 Session restored:', session.gameState);
 
           const restoredSet = session.gameState.currentSet;
+          const restoredHome = session.gameState.homeScore ?? 0;
+          const restoredOpponent = session.gameState.opponentScore ?? 0;
+
           setCurrentSet(restoredSet);
-          setHomeScore(session.gameState.homeScore);
-          setOpponentScore(session.gameState.opponentScore);
+          setHomeScore(restoredHome);
+          setOpponentScore(restoredOpponent);
           setPointNumber(session.gameState.pointNumber);
           setServingTeam(session.gameState.servingTeam);
+
+          // If at least one point has been played, serving is already decided —
+          // skip the "Who serves first?" prompt
+          if (restoredHome + restoredOpponent > 0) {
+            setFirstPlayerSelected(true);
+          }
 
           if (restoredSet !== currentSet) {
             setSearchParams({ set: restoredSet.toString() });
