@@ -402,6 +402,21 @@ function VisualTrackingPageContent() {
             setFirstPlayerSelected(true);
           }
 
+          // Seed the per-set score cache so set-switching works after resume
+          if (matchId && matchId !== 'new' && restoredHome + restoredOpponent > 0) {
+            const setScoresKey = `match_${matchId}_set_scores`;
+            const existing = JSON.parse(localStorage.getItem(setScoresKey) || '{}');
+            if (!existing[restoredSet]) {
+              existing[restoredSet] = {
+                homeScore: restoredHome,
+                opponentScore: restoredOpponent,
+                servingTeam: session.gameState.servingTeam,
+                pointNumber: session.gameState.pointNumber,
+              };
+              localStorage.setItem(setScoresKey, JSON.stringify(existing));
+            }
+          }
+
           if (restoredSet !== currentSet) {
             setSearchParams({ set: restoredSet.toString() });
           }
@@ -1295,6 +1310,17 @@ function VisualTrackingPageContent() {
         updateGameState(matchId, newGameState).catch(err => {
           console.error('Failed to sync game state:', err);
         });
+
+        // Persist per-set scores to localStorage so switching sets doesn't lose data
+        const setScoresKey = `match_${matchId}_set_scores`;
+        const existing = JSON.parse(localStorage.getItem(setScoresKey) || '{}');
+        existing[currentSet] = {
+          homeScore: newHomeScore,
+          opponentScore: newOpponentScore,
+          servingTeam: newServingTeam,
+          pointNumber: pointNumber + 1,
+        };
+        localStorage.setItem(setScoresKey, JSON.stringify(existing));
       }
     } else {
       // Point continues - rally phase
@@ -1542,6 +1568,15 @@ function VisualTrackingPageContent() {
       team: errorTeam
     }]);
 
+    // Persist per-set scores
+    if (matchId && matchId !== 'new') {
+      const newServingTeam = pointWinner === servingTeam ? servingTeam : pointWinner;
+      const setScoresKey = `match_${matchId}_set_scores`;
+      const existing = JSON.parse(localStorage.getItem(setScoresKey) || '{}');
+      existing[currentSet] = { homeScore: newHomeScore, opponentScore: newOpponentScore, servingTeam: newServingTeam, pointNumber: pointNumber + 1 };
+      localStorage.setItem(setScoresKey, JSON.stringify(existing));
+    }
+
     // Start new point
     console.log(`🏐 Point ${pointNumber} ended (quick score). Starting Point ${pointNumber + 1}`);
     setPointNumber(prev => prev + 1);
@@ -1639,6 +1674,14 @@ function VisualTrackingPageContent() {
       playerId: null,    // No specific player
       team: pointWinner
     }]);
+
+    // Persist per-set scores
+    if (matchId && matchId !== 'new') {
+      const setScoresKey = `match_${matchId}_set_scores`;
+      const existing = JSON.parse(localStorage.getItem(setScoresKey) || '{}');
+      existing[currentSet] = { homeScore: newHomeScore, opponentScore: newOpponentScore, servingTeam: pointWinner, pointNumber: pointNumber + 1 };
+      localStorage.setItem(setScoresKey, JSON.stringify(existing));
+    }
 
     // Start new point
     console.log(`🏐 Point ${pointNumber} ended (direct quick score). Starting Point ${pointNumber + 1}`);
@@ -1857,47 +1900,58 @@ function VisualTrackingPageContent() {
    * Handle set change with proper state reset
    */
   const handleSetChange = (setNum: number) => {
-    // Warn if there's unsaved data (points recorded in current set)
-    if (homeScore > 0 || opponentScore > 0 || pointHistory.length > 0) {
-      const confirmed = window.confirm(
-        `Changing sets will reset the current set's data. Continue?`
-      );
-      if (!confirmed) return;
+    if (setNum === currentSet) return;
+
+    // Persist current set's score state before leaving it
+    if (matchId && matchId !== 'new') {
+      const setScoresKey = `match_${matchId}_set_scores`;
+      const existing = JSON.parse(localStorage.getItem(setScoresKey) || '{}');
+      existing[currentSet] = {
+        homeScore,
+        opponentScore,
+        servingTeam,
+        pointNumber,
+      };
+      localStorage.setItem(setScoresKey, JSON.stringify(existing));
     }
 
-    // Update current set
+    // Switch to target set
     setCurrentSet(setNum);
 
-    // Reset all game state for new set
-    setHomeScore(0);
-    setOpponentScore(0);
-    setPointNumber(1);
+    // Restore saved score state for target set, or start fresh
+    let restoredScore = { homeScore: 0, opponentScore: 0, servingTeam: servingTeam as 'home' | 'opponent', pointNumber: 1 };
+    if (matchId && matchId !== 'new') {
+      const setScoresKey = `match_${matchId}_set_scores`;
+      const saved = JSON.parse(localStorage.getItem(setScoresKey) || '{}');
+      if (saved[setNum]) {
+        restoredScore = saved[setNum];
+      }
+    }
+
+    setHomeScore(restoredScore.homeScore);
+    setOpponentScore(restoredScore.opponentScore);
+    setServingTeam(restoredScore.servingTeam);
+    setPointNumber(restoredScore.pointNumber);
     setAttemptNumber(1);
     setIsServePhase(true);
-    setFirstPlayerSelected(false);
 
-    // Clear point tracking
+    // Skip "Who serves first?" if set already has points recorded
+    setFirstPlayerSelected(restoredScore.homeScore + restoredScore.opponentScore > 0);
+
+    // Clear in-memory tracking (per-set undo history not persisted across set switches)
     setCurrentPointAttempts([]);
     setPointHistory([]);
     setScoringHistory([]);
 
-    // Reset player selection
+    // Reset player selection and formation
     setSelectedPlayer(null);
     setSelectedTeam(null);
     setCurrentTrajectory(null);
-
-    // Reset action type to serve for new set
     setActionType('serve');
-
-    // Reset formation to serving at start of new set
     setHomeFormationType('serving');
     setOpponentFormationType('serving');
-    console.log(`🔄 Set ${setNum}: Both teams → Serving formation`);
 
-    // Note: servingTeam is NOT reset - it should be set explicitly by user
-    // or loaded from previous set data when that's implemented
-
-    console.log(`Set changed to Set ${setNum} - All state reset`);
+    console.log(`🔄 Switched to Set ${setNum}: ${restoredScore.homeScore}-${restoredScore.opponentScore}`);
   };
 
   /**
