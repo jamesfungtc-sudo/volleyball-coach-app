@@ -65,7 +65,9 @@ function normalizePointData(point: any): PointData {
     opponent_player: point.opponent_player || '',
     // Handle both formats
     home_score: point.home_score !== undefined ? point.home_score : point.score?.home || 0,
-    opponent_score: point.opponent_score !== undefined ? point.opponent_score : point.score?.opponent || 0
+    opponent_score: point.opponent_score !== undefined ? point.opponent_score : point.score?.opponent || 0,
+    player_id: point.player_id,
+    player_team: point.player_team,
   };
 }
 
