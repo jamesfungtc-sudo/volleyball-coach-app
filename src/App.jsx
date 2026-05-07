@@ -9,6 +9,7 @@ import MatchSetupPage from './pages/MatchSetupPage'
 import StatsPage from './pages/StatsPage'
 import AnalyticsPage from './pages/AnalyticsPage'
 import VisualTrackingPage from './pages/VisualTrackingPage'
+import { OpponentTrackingProvider } from './features/inGameStats/context/OpponentTrackingContext'
 
 function AppLayout() {
   const location = useLocation()
@@ -18,9 +19,11 @@ function AppLayout() {
     // Full-screen game view — no nav, no padding
     return (
       <div className="w-full h-screen overflow-hidden bg-background">
-        <Routes>
-          <Route path="/in-game-stats/:matchId/visual" element={<VisualTrackingPage />} />
-        </Routes>
+        <OpponentTrackingProvider>
+          <Routes>
+            <Route path="/in-game-stats/:matchId/visual" element={<VisualTrackingPage />} />
+          </Routes>
+        </OpponentTrackingProvider>
       </div>
     )
   }
