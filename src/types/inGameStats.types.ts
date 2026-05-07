@@ -12,8 +12,12 @@ export interface PointData {
   home_score: number;
   opponent_score: number;
 
-  // NEW: Opponent tracking data (optional, defaults to [])
+  // Opponent tracking data (optional, defaults to [])
   opponent_attempts?: OpponentAttempt[];
+
+  // Player identity for point history reconstruction on resume
+  player_id?: string;
+  player_team?: 'home' | 'opponent';
 }
 
 // Set data (matches OldTool Retool format)

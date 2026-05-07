@@ -28,6 +28,7 @@ import {
   loadSetConfiguration,
   saveSetConfiguration
 } from '../../../utils/rotationHelpers';
+import type { SetData } from '../../../types/inGameStats.types';
 
 // ============================================================================
 // Types
@@ -41,6 +42,7 @@ export interface MatchSession {
   gameState: GameState;
   rotationConfigs: Record<number, any>;
   trajectories: StoredTrajectory[];
+  sets: SetData[];
   isLoaded: boolean;
 }
 
@@ -75,6 +77,7 @@ export async function loadSession(matchId: string): Promise<MatchSession | null>
         gameState: fullMatch.gameState || getDefaultGameState(),
         rotationConfigs: fullMatch.rotationConfigs || {},
         trajectories: mergedTrajectories,
+        sets: fullMatch.sets || [],
         isLoaded: true
       };
     }
@@ -94,6 +97,7 @@ export async function loadSession(matchId: string): Promise<MatchSession | null>
       gameState: localBackup.gameState?.data || getDefaultGameState(),
       rotationConfigs: localBackup.rotationConfigs || {},
       trajectories: getTrajectories(matchId),
+      sets: [],
       isLoaded: true
     };
   }
@@ -144,6 +148,13 @@ export async function createSession(
     gameState: initialGameState,
     rotationConfigs: {},
     trajectories: [],
+    sets: [
+      { set_number: 1, points: [] },
+      { set_number: 2, points: [] },
+      { set_number: 3, points: [] },
+      { set_number: 4, points: [] },
+      { set_number: 5, points: [] }
+    ],
     isLoaded: true
   };
 

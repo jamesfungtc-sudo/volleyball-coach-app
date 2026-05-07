@@ -25,8 +25,8 @@ import type {
   TrajectoryData,
   OpponentAttemptResult
 } from '../features/inGameStats/types/opponentTracking.types';
-import { getMatch, getPlayersByTeam, getTeams, type Player } from '../services/googleSheetsAPI';
-import type { MatchData } from '../types/inGameStats.types';
+import { getMatch, getPlayersByTeam, getTeams, addPoint, undoLastPoint, type Player } from '../services/googleSheetsAPI';
+import type { MatchData, SetData, PointData } from '../types/inGameStats.types';
 import { RotationConfigModal } from '../features/inGameStats/components/RotationConfigModal';
 import { MatchInfoModal } from '../features/inGameStats/components/MatchInfoModal';
 import type {
@@ -206,6 +206,15 @@ function VisualTrackingPageContent() {
     team: 'home' | 'opponent'; // Team of the player
   }
   const [pointHistory, setPointHistory] = useState<PointHistoryEntry[]>([]);
+
+  // Mirror of Sheets sets data — updated locally and synced to Sheets on every point
+  const [sessionSets, setSessionSets] = useState<SetData[]>([
+    { set_number: 1, points: [] },
+    { set_number: 2, points: [] },
+    { set_number: 3, points: [] },
+    { set_number: 4, points: [] },
+    { set_number: 5, points: [] },
+  ]);
 
   // Player lineups (loaded from rotation config)
   // Start with empty state - will be populated when rotation config loads
@@ -414,6 +423,15 @@ function VisualTrackingPageContent() {
                 pointNumber: session.gameState.pointNumber,
               };
               localStorage.setItem(setScoresKey, JSON.stringify(existing));
+            }
+          }
+
+          // Restore full sets data and rebuild point history for the active set
+          if (session.sets && session.sets.length > 0) {
+            setSessionSets(session.sets);
+            const activeSetPoints = session.sets.find(s => s.set_number === restoredSet)?.points || [];
+            if (activeSetPoints.length > 0) {
+              setPointHistory(activeSetPoints.map(pointDataToHistoryEntry));
             }
           }
 
@@ -634,6 +652,43 @@ function VisualTrackingPageContent() {
    * Helper function: Format player display string
    * Returns: "#1 Player Name" or "#1 Unknown" if not found
    */
+  // Map UI action type to Sheets action_type code
+  const actionTypeToCode = (actionType: string): string => {
+    switch (actionType) {
+      case 'serve': return 'Ser.';
+      case 'attack': return 'Att.';
+      case 'block': return 'Blo.';
+      case 'dig': return 'Dig';
+      case 'error': return 'Error';
+      case 'team_error': return 'Error';
+      case 'opponent_error': return 'Error';
+      default: return 'Point';
+    }
+  };
+
+  // Map Sheets action_type code back to UI action type
+  const codeToActionType = (code: string): PointHistoryEntry['actionType'] => {
+    switch (code) {
+      case 'Ser.': return 'serve';
+      case 'Att.': return 'attack';
+      case 'Blo.': return 'block';
+      case 'Dig': return 'dig';
+      case 'Error': return 'error';
+      default: return 'attack';
+    }
+  };
+
+  // Convert a stored PointData entry back to a PointHistoryEntry for UI display
+  const pointDataToHistoryEntry = (pd: PointData): PointHistoryEntry => ({
+    pointNumber: pd.point_number,
+    homeScore: pd.home_score,
+    opponentScore: pd.opponent_score,
+    winningTeam: pd.winning_team,
+    actionType: codeToActionType(pd.action_type),
+    playerId: pd.player_id || '',
+    team: pd.player_team || pd.winning_team,
+  });
+
   const formatPlayerDisplay = (playerId: string, team: 'home' | 'opponent') => {
     const player = getPlayerById(playerId, team);
     if (player) {
@@ -1271,6 +1326,24 @@ function VisualTrackingPageContent() {
       const newHomeScore = pointWinner === 'home' ? homeScore + 1 : homeScore;
       const newOpponentScore = pointWinner === 'opponent' ? opponentScore + 1 : opponentScore;
 
+      // Build PointData record for Sheets persistence
+      const playerId = selectedPlayer.reference
+        ? getPlayerId(selectedPlayer.reference)
+        : (selectedPlayer.playerId || `custom_${selectedPlayer.jerseyNumber}`);
+      const pointRecord: PointData = {
+        point_number: pointNumber,
+        winning_team: pointWinner,
+        action_type: actionTypeToCode(result === 'error' ? 'error' : actionType),
+        action: result,
+        locationTempo: null,
+        home_player: selectedTeam === 'home' ? (selectedPlayer.playerName || '') : '',
+        opponent_player: selectedTeam === 'opponent' ? (selectedPlayer.playerName || '') : '',
+        home_score: newHomeScore,
+        opponent_score: newOpponentScore,
+        player_id: playerId,
+        player_team: selectedTeam,
+      };
+
       // Add to point history for trend display
       setPointHistory(prev => [...prev, {
         pointNumber,
@@ -1278,9 +1351,19 @@ function VisualTrackingPageContent() {
         opponentScore: newOpponentScore,
         winningTeam: pointWinner,
         actionType: result === 'error' ? 'error' : actionType,
-        playerId: selectedPlayer.playerId,
+        playerId,
         team: selectedTeam
       }]);
+
+      // Update local sessionSets mirror and sync to Sheets
+      setSessionSets(prev => prev.map(s =>
+        s.set_number === currentSet ? { ...s, points: [...s.points, pointRecord] } : s
+      ));
+      if (matchId && matchId !== 'new') {
+        addPoint(matchId, currentSet, pointRecord).catch(err => {
+          console.error('Failed to save point to Sheets:', err);
+        });
+      }
 
       // Determine new serving team for game state sync
       const newServingTeam = pointWinner === servingTeam ? servingTeam : pointWinner;
@@ -1557,6 +1640,23 @@ function VisualTrackingPageContent() {
     const newHomeScore = pointWinner === 'home' ? homeScore + 1 : homeScore;
     const newOpponentScore = pointWinner === 'opponent' ? opponentScore + 1 : opponentScore;
 
+    // Build PointData record and persist to Sheets
+    const playerName = getPlayerName(playerId, errorTeam);
+    const newServingTeam = pointWinner === servingTeam ? servingTeam : pointWinner;
+    const pointRecord: PointData = {
+      point_number: pointNumber,
+      winning_team: pointWinner,
+      action_type: 'Error',
+      action: scoringOpt,
+      locationTempo: null,
+      home_player: errorTeam === 'home' ? playerName : '',
+      opponent_player: errorTeam === 'opponent' ? playerName : '',
+      home_score: newHomeScore,
+      opponent_score: newOpponentScore,
+      player_id: playerId,
+      player_team: errorTeam,
+    };
+
     // Add to point history for trend display
     setPointHistory(prev => [...prev, {
       pointNumber,
@@ -1568,9 +1668,16 @@ function VisualTrackingPageContent() {
       team: errorTeam
     }]);
 
-    // Persist per-set scores
+    // Update local sessionSets mirror and sync to Sheets
+    setSessionSets(prev => prev.map(s =>
+      s.set_number === currentSet ? { ...s, points: [...s.points, pointRecord] } : s
+    ));
     if (matchId && matchId !== 'new') {
-      const newServingTeam = pointWinner === servingTeam ? servingTeam : pointWinner;
+      addPoint(matchId, currentSet, pointRecord).catch(err => {
+        console.error('Failed to save point to Sheets:', err);
+      });
+
+      // Persist per-set scores to localStorage
       const setScoresKey = `match_${matchId}_set_scores`;
       const existing = JSON.parse(localStorage.getItem(setScoresKey) || '{}');
       existing[currentSet] = { homeScore: newHomeScore, opponentScore: newOpponentScore, servingTeam: newServingTeam, pointNumber: pointNumber + 1 };
@@ -1664,19 +1771,42 @@ function VisualTrackingPageContent() {
     const newHomeScore = pointWinner === 'home' ? homeScore + 1 : homeScore;
     const newOpponentScore = pointWinner === 'opponent' ? opponentScore + 1 : opponentScore;
 
-    // Add to point history for trend display (outcome is null for direct quick score)
+    // Build PointData record and persist to Sheets
+    const pointRecord: PointData = {
+      point_number: pointNumber,
+      winning_team: pointWinner,
+      action_type: 'Point',
+      action: 'direct_score',
+      locationTempo: null,
+      home_player: '',
+      opponent_player: '',
+      home_score: newHomeScore,
+      opponent_score: newOpponentScore,
+      player_id: undefined,
+      player_team: pointWinner,
+    };
+
+    // Add to point history for trend display
     setPointHistory(prev => [...prev, {
       pointNumber,
       homeScore: newHomeScore,
       opponentScore: newOpponentScore,
       winningTeam: pointWinner,
-      actionType: null,  // No specific action type for direct quick score
-      playerId: null,    // No specific player
+      actionType: 'attack',
+      playerId: '',
       team: pointWinner
     }]);
 
-    // Persist per-set scores
+    // Update local sessionSets mirror and sync to Sheets
+    setSessionSets(prev => prev.map(s =>
+      s.set_number === currentSet ? { ...s, points: [...s.points, pointRecord] } : s
+    ));
     if (matchId && matchId !== 'new') {
+      addPoint(matchId, currentSet, pointRecord).catch(err => {
+        console.error('Failed to save point to Sheets:', err);
+      });
+
+      // Persist per-set scores to localStorage
       const setScoresKey = `match_${matchId}_set_scores`;
       const existing = JSON.parse(localStorage.getItem(setScoresKey) || '{}');
       existing[currentSet] = { homeScore: newHomeScore, opponentScore: newOpponentScore, servingTeam: pointWinner, pointNumber: pointNumber + 1 };
@@ -1747,8 +1877,18 @@ function VisualTrackingPageContent() {
     // Remove the last entry from history
     setScoringHistory(prev => prev.slice(0, -1));
 
-    // Also remove the last point from point history (for trend display)
+    // Also remove the last point from point history and sessionSets mirror
     setPointHistory(prev => prev.slice(0, -1));
+    setSessionSets(prev => prev.map(s =>
+      s.set_number === currentSet ? { ...s, points: s.points.slice(0, -1) } : s
+    ));
+
+    // Sync undo to Sheets
+    if (matchId && matchId !== 'new') {
+      undoLastPoint(matchId, currentSet).catch(err => {
+        console.error('Failed to undo point in Sheets:', err);
+      });
+    }
 
     // Reset to serve phase
     setAttemptNumber(1);
@@ -1938,9 +2078,12 @@ function VisualTrackingPageContent() {
     // Skip "Who serves first?" if set already has points recorded
     setFirstPlayerSelected(restoredScore.homeScore + restoredScore.opponentScore > 0);
 
-    // Clear in-memory tracking (per-set undo history not persisted across set switches)
+    // Restore point history for the target set from sessionSets
+    const targetSetPoints = sessionSets.find(s => s.set_number === setNum)?.points || [];
+    setPointHistory(targetSetPoints.map(pointDataToHistoryEntry));
+
+    // Clear in-memory tracking (undo history not persisted across set switches)
     setCurrentPointAttempts([]);
-    setPointHistory([]);
     setScoringHistory([]);
 
     // Reset player selection and formation

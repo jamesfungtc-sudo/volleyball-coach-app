@@ -403,7 +403,7 @@ export async function deleteMatch(matchId: string): Promise<void> {
 }
 
 /**
- * Add a point to a specific set
+ * Add a point to a specific set (GET-based to avoid CORS preflight)
  */
 export async function addPoint(
   matchId: string,
@@ -416,19 +416,13 @@ export async function addPoint(
   }
 
   try {
-    const response = await fetch(API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        action: 'addPoint',
-        matchId,
-        setNumber,
-        point: pointData
-      })
+    const params = new URLSearchParams({
+      action: 'addPoint',
+      matchId,
+      setNumber: setNumber.toString(),
+      data: JSON.stringify(pointData),
     });
-
+    const response = await fetch(`${API_URL}?${params}`);
     const data: APIResponse<{ success: boolean }> = await response.json();
 
     if (data.status !== 200) {
@@ -441,7 +435,7 @@ export async function addPoint(
 }
 
 /**
- * Undo the last point in a set
+ * Undo the last point in a set (GET-based to avoid CORS preflight)
  */
 export async function undoLastPoint(matchId: string, setNumber: number): Promise<void> {
   if (!API_URL) {
@@ -450,18 +444,12 @@ export async function undoLastPoint(matchId: string, setNumber: number): Promise
   }
 
   try {
-    const response = await fetch(API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        action: 'undoLastPoint',
-        matchId,
-        setNumber
-      })
+    const params = new URLSearchParams({
+      action: 'undoLastPoint',
+      matchId,
+      setNumber: setNumber.toString(),
     });
-
+    const response = await fetch(`${API_URL}?${params}`);
     const data: APIResponse<{ success: boolean }> = await response.json();
 
     if (data.status !== 200) {

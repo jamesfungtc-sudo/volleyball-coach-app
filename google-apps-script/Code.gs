@@ -125,6 +125,13 @@ function doGet(e) {
       case 'deletePlayer':
         return deletePlayer(e.parameter.playerId);
 
+      case 'addPoint':
+        const addPointData = JSON.parse(e.parameter.data || '{}');
+        return addPoint(e.parameter.matchId, parseInt(e.parameter.setNumber), addPointData);
+
+      case 'undoLastPoint':
+        return undoLastPoint(e.parameter.matchId, parseInt(e.parameter.setNumber));
+
       case 'health':
         return createResponse({ status: 'ok', timestamp: new Date() });
 
