@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import type {
   TeamRotationConfig,
@@ -95,6 +95,15 @@ export function RotationConfigModal({
     initialOpponentConfig || createEmptyConfig('5-1 (OH>S)')
   );
   const [startingServer, setStartingServer] = useState<'home' | 'opponent'>('home');
+
+  // Reset state whenever the modal opens so stale config never shows on re-open
+  useEffect(() => {
+    if (isOpen) {
+      setHomeConfig(initialHomeConfig || createEmptyConfig('5-1 (OH>S)'));
+      setOpponentConfig(initialOpponentConfig || createEmptyConfig('5-1 (OH>S)'));
+      setStartingServer('home');
+    }
+  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!isOpen) return null;
 
@@ -287,7 +296,7 @@ export function RotationConfigModal({
     return roles;
   };
 
-  // Validate configuration
+  // Validate configuration — libero is optional, all role slots must have jersey > 0 or a name
   const validateConfig = (config: TeamRotationConfig): boolean => {
     const roles = VOLLEYBALL_SYSTEMS[config.system];
 
@@ -303,13 +312,13 @@ export function RotationConfigModal({
       }
     }
 
-    if (!config.libero) {
-      return false;
-    }
-    const liberoHasNumber = config.libero.jerseyNumber > 0;
-    const liberoHasName = config.libero.displayName !== '';
-    if (!liberoHasNumber && !liberoHasName) {
-      return false;
+    // Libero is optional — only validate if one is set
+    if (config.libero) {
+      const liberoHasNumber = config.libero.jerseyNumber > 0;
+      const liberoHasName = config.libero.displayName !== '';
+      if (!liberoHasNumber && !liberoHasName) {
+        return false;
+      }
     }
 
     return true;

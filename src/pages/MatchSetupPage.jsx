@@ -42,8 +42,8 @@ export default function MatchSetupPage() {
       return;
     }
 
-    // Navigate to new match with team params
-    navigate(`/in-game-stats/new?homeTeam=${homeTeamId}&opponentTeam=${opponentTeamId}&date=${matchDate}`);
+    // Navigate to visual tracking for the new match
+    navigate(`/in-game-stats/new/visual?homeTeam=${homeTeamId}&opponentTeam=${opponentTeamId}&date=${matchDate}`);
   }
 
   function handleCancel() {

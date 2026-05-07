@@ -10,6 +10,11 @@ import {
   TrajectoryData,
   TeamLineup
 } from '../types/opponentTracking.types';
+import {
+  getGridCell,
+  calculateHitPosition,
+  calculateServeZone
+} from '../components/VisualTracking/coordinateCalculations';
 
 // ============================================
 // ACTION TYPES
@@ -133,11 +138,8 @@ function opponentTrackingReducer(
         return state;
       }
 
-      // Import coordinate calculations
-      const { calculateGridCell } = require('../components/VisualTracking/coordinateCalculations');
-
       // Calculate grid cell from trajectory end point
-      const gridCell = calculateGridCell(
+      const gridCell = getGridCell(
         state.currentTrajectory.endX,
         state.currentTrajectory.endY
       );
@@ -147,16 +149,12 @@ function opponentTrackingReducer(
       let servePosition: number | undefined;
 
       if (state.selectedActionType === 'attack') {
-        // Import from coordinate calculations
-        const { calculateHitPosition } = require('../components/VisualTracking/coordinateCalculations');
         hitPosition = calculateHitPosition(
           state.currentTrajectory.startX,
           state.currentTrajectory.startY,
           state.selectedTeam
         );
       } else if (state.selectedActionType === 'serve') {
-        // Import from coordinate calculations
-        const { calculateServeZone } = require('../components/VisualTracking/coordinateCalculations');
         const zone = calculateServeZone(
           state.currentTrajectory.endX,
           state.currentTrajectory.endY

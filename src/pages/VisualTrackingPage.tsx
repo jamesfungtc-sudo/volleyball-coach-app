@@ -53,6 +53,7 @@ import { PlayerStatsModal } from '../features/inGameStats/components/LocationMap
 import { saveTrajectory } from '../features/inGameStats/services/trajectoryStorage';
 import {
   loadSession,
+  createSession,
   updateGameState,
   saveTrajectoryWithSync,
   saveRotationConfigForSet,
@@ -91,14 +92,13 @@ function VisualTrackingPageContent() {
   const [homeTeamName, setHomeTeamName] = useState<string>('Home');
   const [opponentTeamName, setOpponentTeamName] = useState<string>('Opponent');
 
-  // TODO: Re-enable OpponentTrackingContext after fixing require() issue
-  // const {
-  //   selectPlayer,
-  //   setActionType: setContextActionType,
-  //   setTrajectory,
-  //   saveVisualAttempt,
-  //   state: contextState
-  // } = useOpponentTracking();
+  const {
+    selectPlayer: contextSelectPlayer,
+    setActionType: setContextActionType,
+    setTrajectory: setContextTrajectory,
+    saveVisualAttempt,
+    state: contextState
+  } = useOpponentTracking();
 
   // Player selection state
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerInPosition | null>(null);
@@ -178,6 +178,10 @@ function VisualTrackingPageContent() {
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('synced');
   const [sessionLoaded, setSessionLoaded] = useState(false);
 
+  // Saved rotation configs from session restore (for Phase 2 lineup init after rosters load)
+  const [savedRotationConfigs, setSavedRotationConfigs] = useState<Record<number, any> | null>(null);
+  const [savedRestoredSet, setSavedRestoredSet] = useState<number | null>(null);
+
   // Rotation configuration modal state
   const [rotationConfigModalOpen, setRotationConfigModalOpen] = useState(false);
   const [rotationConfigDismissed, setRotationConfigDismissed] = useState(false);
@@ -249,14 +253,38 @@ function VisualTrackingPageContent() {
    */
   useEffect(() => {
     async function loadRosters() {
-      if (!matchId || matchId === 'new') {
-        console.log('No match ID or new match, skipping roster load');
+      if (!matchId) {
+        setLoading(false);
+        return;
+      }
 
-        // Clear any existing rotation configs for new matches
-        if (matchId === 'new') {
-          const rotationKey = `match_new_rotations`;
-          localStorage.removeItem(rotationKey);
-          console.log('🗑️ Cleared rotation configs for new match');
+      // For new matches, load rosters from URL params (homeTeam / opponentTeam)
+      if (matchId === 'new') {
+        const homeTeamId = searchParams.get('homeTeam');
+        const opponentTeamId = searchParams.get('opponentTeam');
+
+        const rotationKey = `match_new_rotations`;
+        localStorage.removeItem(rotationKey);
+        console.log('🗑️ Cleared rotation configs for new match');
+
+        if (homeTeamId && opponentTeamId) {
+          try {
+            setLoading(true);
+            const [teams, home, opp] = await Promise.all([
+              getTeams(),
+              getPlayersByTeam(homeTeamId),
+              getPlayersByTeam(opponentTeamId)
+            ]);
+            setHomeRoster(home);
+            setOpponentRoster(opp);
+            const homeTeam = teams.find((t: any) => t.Id === homeTeamId);
+            const oppTeam = teams.find((t: any) => t.Id === opponentTeamId);
+            setHomeTeamName(homeTeam?.Name || 'Home');
+            setOpponentTeamName(oppTeam?.Name || 'Opponent');
+            console.log('✅ New match rosters loaded from URL params');
+          } catch (err) {
+            console.error('Failed to load rosters for new match:', err);
+          }
         }
 
         setLoading(false);
@@ -343,11 +371,11 @@ function VisualTrackingPageContent() {
   }, [matchId]);
 
   /**
-   * Load session state from Google Sheets (scores, game state)
-   * This restores the game state after a page refresh
+   * Phase 1: Load game state from Google Sheets (scores, set, serving team, rotation configs).
+   * Does NOT depend on rosters — saves rotation configs to state for Phase 2 to pick up.
    */
   useEffect(() => {
-    async function restoreSession() {
+    async function restoreGameState() {
       if (!matchId || matchId === 'new' || loading || sessionLoaded) {
         return;
       }
@@ -359,7 +387,6 @@ function VisualTrackingPageContent() {
         if (session && session.gameState) {
           console.log('📦 Session restored:', session.gameState);
 
-          // Restore game state
           const restoredSet = session.gameState.currentSet;
           setCurrentSet(restoredSet);
           setHomeScore(session.gameState.homeScore);
@@ -367,76 +394,33 @@ function VisualTrackingPageContent() {
           setPointNumber(session.gameState.pointNumber);
           setServingTeam(session.gameState.servingTeam);
 
-          // Update URL to reflect current set
           if (restoredSet !== currentSet) {
             setSearchParams({ set: restoredSet.toString() });
           }
 
-          // Restore rotation config from Google Sheets if available
           if (session.rotationConfigs && Object.keys(session.rotationConfigs).length > 0) {
             console.log('📋 Rotation configs found in session:', session.rotationConfigs);
-
-            // Get config for current set (key could be number or string)
             const setConfig = session.rotationConfigs[restoredSet] || session.rotationConfigs[restoredSet.toString()];
 
             if (setConfig && setConfig.home && setConfig.opponent) {
-              console.log('🔄 Restoring rotation config for set', restoredSet, ':', setConfig);
-
-              // Set rotation configs
               setHomeRotationConfig(setConfig.home);
               setOpponentRotationConfig(setConfig.opponent);
               setServingTeam(setConfig.startingServer || session.gameState.servingTeam);
               setRotationEnabled(true);
 
-              // Initialize lineups from config (rosters should be loaded at this point)
-              if (homeRoster.length > 0 && opponentRoster.length > 0) {
-                // Get the saved rotation numbers (default to 1 if not saved)
-                const homeRotation = setConfig.home.currentRotation || 1;
-                const opponentRotation = setConfig.opponent.currentRotation || 1;
-                const isHomeServing = (setConfig.startingServer || session.gameState.servingTeam) === 'home';
+              // Restore libero swap state if persisted
+              if (setConfig.homeLiberoSwapState) setHomeLiberoSwapState(setConfig.homeLiberoSwapState);
+              if (setConfig.opponentLiberoSwapState) setOpponentLiberoSwapState(setConfig.opponentLiberoSwapState);
 
-                console.log('🏐 Restoring lineups with saved rotations:', {
-                  homeRotation,
-                  opponentRotation,
-                  isHomeServing
-                });
-
-                // Use getLineupForRotation to restore to the correct rotation, not initializeLineup (which always starts at rotation 1)
-                const homeLineupData = getLineupForRotation(
-                  setConfig.home,
-                  homeRotation,
-                  'home',
-                  homeRoster,
-                  null,
-                  isHomeServing
-                );
-                const opponentLineupData = getLineupForRotation(
-                  setConfig.opponent,
-                  opponentRotation,
-                  'opponent',
-                  opponentRoster,
-                  null,
-                  !isHomeServing
-                );
-
-                setHomeLineup(homeLineupData);
-                setOpponentLineup(opponentLineupData);
-
-                console.log('✅ Lineups restored to rotation:', {
-                  homeRotation,
-                  opponentRotation,
-                  home: homeLineupData,
-                  opponent: opponentLineupData
-                });
-              } else {
-                console.log('⏳ Rosters not loaded yet, lineups will be initialized later');
-              }
+              // Store configs for Phase 2 (lineup init requires rosters)
+              setSavedRotationConfigs(session.rotationConfigs);
+              setSavedRestoredSet(restoredSet);
             } else {
               console.log('⚠️ No rotation config for set', restoredSet);
             }
           }
 
-          console.log('✅ Session restored successfully');
+          console.log('✅ Session game state restored successfully');
         } else {
           console.log('📝 No existing session - starting fresh');
         }
@@ -444,12 +428,52 @@ function VisualTrackingPageContent() {
         setSessionLoaded(true);
       } catch (error) {
         console.error('Failed to restore session:', error);
-        setSessionLoaded(true); // Mark as loaded even on error to prevent retry loops
+        setSessionLoaded(true);
       }
     }
 
-    restoreSession();
-  }, [matchId, loading, sessionLoaded, homeRoster.length, opponentRoster.length]);
+    restoreGameState();
+  }, [matchId, loading, sessionLoaded]);
+
+  /**
+   * Phase 2: Initialize lineups once rosters are available AND session is loaded.
+   * Runs whenever rosters finish loading, even if that happens after Phase 1 completes.
+   */
+  useEffect(() => {
+    if (!sessionLoaded || !savedRotationConfigs || savedRestoredSet === null) return;
+    if (homeRoster.length === 0 || opponentRoster.length === 0) return;
+
+    const setConfig = savedRotationConfigs[savedRestoredSet] || savedRotationConfigs[savedRestoredSet.toString()];
+    if (!setConfig || !setConfig.home || !setConfig.opponent) return;
+
+    const homeRotation = setConfig.home.currentRotation || 1;
+    const opponentRotation = setConfig.opponent.currentRotation || 1;
+    const isHomeServing = (setConfig.startingServer || 'home') === 'home';
+
+    console.log('🏐 Phase 2: Restoring lineups with saved rotations:', { homeRotation, opponentRotation, isHomeServing });
+
+    const homeLineupData = getLineupForRotation(
+      setConfig.home,
+      homeRotation,
+      'home',
+      homeRoster,
+      null,
+      isHomeServing
+    );
+    const opponentLineupData = getLineupForRotation(
+      setConfig.opponent,
+      opponentRotation,
+      'opponent',
+      opponentRoster,
+      null,
+      !isHomeServing
+    );
+
+    setHomeLineup(homeLineupData);
+    setOpponentLineup(opponentLineupData);
+
+    console.log('✅ Phase 2: Lineups restored to rotation:', { homeRotation, opponentRotation });
+  }, [sessionLoaded, savedRotationConfigs, savedRestoredSet, homeRoster.length, opponentRoster.length]);
 
   /**
    * Subscribe to sync status changes
@@ -480,7 +504,9 @@ function VisualTrackingPageContent() {
     const fullConfig = {
       home: homeRotationConfig,
       opponent: opponentRotationConfig,
-      startingServer: servingTeam
+      startingServer: servingTeam,
+      homeLiberoSwapState,
+      opponentLiberoSwapState
     };
 
     console.log('📤 Syncing rotation config to Google Sheets (rotation changed):', {
@@ -621,7 +647,7 @@ function VisualTrackingPageContent() {
   /**
    * Handle rotation configuration save from modal
    */
-  const handleRotationConfigSave = (
+  const handleRotationConfigSave = async (
     homeConfig: TeamRotationConfig,
     opponentConfig: TeamRotationConfig,
     startingServer: 'home' | 'opponent'
@@ -634,17 +660,42 @@ function VisualTrackingPageContent() {
     setServingTeam(startingServer);
     setRotationEnabled(true);
 
+    let activeMatchId = matchId;
+
+    // For new matches, create the match in Google Sheets now (first meaningful action)
+    if (matchId === 'new') {
+      const homeTeamId = searchParams.get('homeTeam');
+      const opponentTeamId = searchParams.get('opponentTeam');
+      const gameDate = searchParams.get('date') || new Date().toISOString().split('T')[0];
+
+      if (homeTeamId && opponentTeamId) {
+        try {
+          console.log('🆕 Creating new match in Google Sheets...');
+          const { matchId: newMatchId } = await createSession(homeTeamId, opponentTeamId, gameDate);
+          activeMatchId = newMatchId;
+          console.log('✅ New match created:', newMatchId);
+          // Redirect to real match URL, replacing history so Back doesn't go to /new
+          navigate(`/in-game-stats/${newMatchId}/visual?set=1`, { replace: true });
+          setSessionLoaded(true); // Skip session restore — we just created it
+        } catch (err) {
+          console.error('❌ Failed to create match in Google Sheets:', err);
+        }
+      }
+    }
+
     // Save to localStorage AND sync to Google Sheets
-    if (matchId && matchId !== 'new') {
-      saveSetConfiguration(matchId, currentSet, homeConfig, opponentConfig, startingServer);
+    if (activeMatchId && activeMatchId !== 'new') {
+      saveSetConfiguration(activeMatchId, currentSet, homeConfig, opponentConfig, startingServer);
 
       // Sync rotation config to Google Sheets
       const fullConfig = {
         home: homeConfig,
         opponent: opponentConfig,
-        startingServer
+        startingServer,
+        homeLiberoSwapState,
+        opponentLiberoSwapState
       };
-      saveRotationConfigForSet(matchId, currentSet, fullConfig, homeRoster, opponentRoster)
+      saveRotationConfigForSet(activeMatchId, currentSet, fullConfig, homeRoster, opponentRoster)
         .then(() => console.log('✅ Rotation config synced to Google Sheets'))
         .catch((err) => console.error('❌ Failed to sync rotation config:', err));
     }
@@ -991,7 +1042,7 @@ function VisualTrackingPageContent() {
         setNumber: currentSet,
         pointNumber,
         attemptNumber,
-        playerId: selectedPlayer.playerId || `custom_${selectedPlayer.jerseyNumber}`,
+        playerId: selectedPlayer.reference ? getPlayerId(selectedPlayer.reference) : (selectedPlayer.playerId || `custom_${selectedPlayer.jerseyNumber}`),
         playerName: selectedPlayer.playerName,
         jerseyNumber: selectedPlayer.jerseyNumber,
         team: selectedTeam,
@@ -1012,7 +1063,7 @@ function VisualTrackingPageContent() {
           setNumber: currentSet,
           pointNumber,
           attemptNumber,
-          playerId: selectedPlayer.playerId || `custom_${selectedPlayer.jerseyNumber}`,
+          playerId: selectedPlayer.reference ? getPlayerId(selectedPlayer.reference) : (selectedPlayer.playerId || `custom_${selectedPlayer.jerseyNumber}`),
           playerName: selectedPlayer.playerName,
           jerseyNumber: selectedPlayer.jerseyNumber,
           team: selectedTeam,
