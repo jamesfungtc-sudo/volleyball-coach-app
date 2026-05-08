@@ -259,8 +259,23 @@ export async function saveRotationConfigForSet(
   homeRoster?: any[],
   opponentRoster?: any[]
 ): Promise<void> {
-  // Save to localStorage (existing functionality)
-  saveSetConfiguration(matchId, setNumber, config, homeRoster, opponentRoster);
+  // config is the fullConfig object: { home, opponent, startingServer, homeLiberoSwapState, opponentLiberoSwapState }
+  // saveSetConfiguration expects (matchId, setNumber, homeConfig, opponentConfig, startingServer)
+  saveSetConfiguration(matchId, setNumber, config.home, config.opponent, config.startingServer);
+
+  // Also persist libero swap state alongside the rotation config
+  if (config.homeLiberoSwapState !== undefined || config.opponentLiberoSwapState !== undefined) {
+    const key = `match_${matchId}_rotations`;
+    const existing = localStorage.getItem(key);
+    if (existing) {
+      const data = JSON.parse(existing);
+      if (data.setConfigurations?.[setNumber]) {
+        data.setConfigurations[setNumber].homeLiberoSwapState = config.homeLiberoSwapState;
+        data.setConfigurations[setNumber].opponentLiberoSwapState = config.opponentLiberoSwapState;
+        localStorage.setItem(key, JSON.stringify(data));
+      }
+    }
+  }
 
   // Sync to Google Sheets
   await syncRotationConfig(matchId, setNumber, config);

@@ -701,7 +701,7 @@ export function loadSetConfiguration(
   setNumber: number,
   homeRoster: Player[],
   opponentRoster: Player[]
-): { home: TeamRotationConfig; opponent: TeamRotationConfig; startingServer: 'home' | 'opponent' } | null {
+): { home: TeamRotationConfig; opponent: TeamRotationConfig; startingServer: 'home' | 'opponent'; homeLiberoSwapState?: any; opponentLiberoSwapState?: any } | null {
   const key = `match_${matchId}_rotations`;
   const data = localStorage.getItem(key);
 
@@ -749,7 +749,9 @@ export function loadSetConfiguration(
   return {
     home: migratedHome,
     opponent: migratedOpponent,
-    startingServer: config.startingServer
+    startingServer: config.startingServer,
+    homeLiberoSwapState: config.homeLiberoSwapState,
+    opponentLiberoSwapState: config.opponentLiberoSwapState
   };
 }
 

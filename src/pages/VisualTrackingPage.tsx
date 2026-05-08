@@ -614,22 +614,32 @@ function VisualTrackingPageContent() {
       setServingTeam(existingConfig.startingServer);
       setRotationEnabled(true);
 
-      // Initialize lineups from config WITH ROSTER DATA
-      // initializeLineup now includes libero substitution via getRotations()
-      // Pass serving status to respect P1 serving position rules
-      const homeLineupData = initializeLineup(
+      // Restore libero swap state if saved
+      if (existingConfig.homeLiberoSwapState) setHomeLiberoSwapState(existingConfig.homeLiberoSwapState);
+      if (existingConfig.opponentLiberoSwapState) setOpponentLiberoSwapState(existingConfig.opponentLiberoSwapState);
+
+      // Restore to the saved rotation number, not always rotation 1
+      const homeRot = existingConfig.home.currentRotation || 1;
+      const oppRot = existingConfig.opponent.currentRotation || 1;
+      const isHomeServing = existingConfig.startingServer === 'home';
+
+      console.log(`🔄 Restoring set ${currentSet} lineup at homeRot=${homeRot} oppRot=${oppRot}`);
+
+      const homeLineupData = getLineupForRotation(
         existingConfig.home,
+        homeRot,
         'home',
         homeRoster,
-        null,  // No manual swap role initially
-        existingConfig.startingServer === 'home'  // Home is serving
+        null,
+        isHomeServing
       );
-      const opponentLineupData = initializeLineup(
+      const opponentLineupData = getLineupForRotation(
         existingConfig.opponent,
+        oppRot,
         'opponent',
         opponentRoster,
-        null,  // No manual swap role initially
-        existingConfig.startingServer === 'opponent'  // Opponent is serving
+        null,
+        !isHomeServing
       );
 
       setHomeLineup(homeLineupData);
