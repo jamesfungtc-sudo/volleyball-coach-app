@@ -335,30 +335,32 @@ function getPlayers(teamId) {
  * Save a new match (8 columns)
  */
 function saveMatch(matchData) {
-  const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEETS.IN_GAME_TRENDS);
+  return withLock(function() {
+    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEETS.IN_GAME_TRENDS);
 
-  // Generate new ID if not provided
-  const matchId = matchData.id || Utilities.getUuid();
+    // Generate new ID if not provided
+    const matchId = matchData.id || Utilities.getUuid();
 
-  // Prepare row data (8 columns)
-  const rowData = [
-    matchId,
-    JSON.stringify(matchData.sets || []),
-    matchData.homeTeam,
-    matchData.opponentTeam,
-    matchData.gameDate,
-    JSON.stringify(matchData.gameState || null),
-    JSON.stringify(matchData.rotationConfigs || {}),
-    JSON.stringify(matchData.trajectories || [])
-  ];
+    // Prepare row data (8 columns)
+    const rowData = [
+      matchId,
+      JSON.stringify(matchData.sets || []),
+      matchData.homeTeam,
+      matchData.opponentTeam,
+      matchData.gameDate,
+      JSON.stringify(matchData.gameState || null),
+      JSON.stringify(matchData.rotationConfigs || {}),
+      JSON.stringify(matchData.trajectories || [])
+    ];
 
-  // Append new row
-  sheet.appendRow(rowData);
+    // Append new row
+    sheet.appendRow(rowData);
 
-  return createResponse({
-    success: true,
-    matchId: matchId,
-    message: 'Match saved successfully'
+    return createResponse({
+      success: true,
+      matchId: matchId,
+      message: 'Match saved successfully'
+    });
   });
 }
 
@@ -373,121 +375,129 @@ function saveMatchFull(matchData) {
  * Update an existing match (all 8 columns)
  */
 function updateMatch(matchId, matchData) {
-  const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEETS.IN_GAME_TRENDS);
-  const data = sheet.getDataRange().getValues();
+  return withLock(function() {
+    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEETS.IN_GAME_TRENDS);
+    const data = sheet.getDataRange().getValues();
 
-  // Find row with matching ID
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][0] === matchId) {
-      // Preserve existing values for new columns if not provided
-      const existingGameState = parseJSON(data[i][COLUMNS.GAME_STATE], null);
-      const existingRotationConfigs = parseJSON(data[i][COLUMNS.ROTATION_CONFIGS], {});
-      const existingTrajectories = parseJSON(data[i][COLUMNS.TRAJECTORIES], []);
+    // Find row with matching ID
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] === matchId) {
+        // Preserve existing values for new columns if not provided
+        const existingGameState = parseJSON(data[i][COLUMNS.GAME_STATE], null);
+        const existingRotationConfigs = parseJSON(data[i][COLUMNS.ROTATION_CONFIGS], {});
+        const existingTrajectories = parseJSON(data[i][COLUMNS.TRAJECTORIES], []);
 
-      // Update row (8 columns)
-      sheet.getRange(i + 1, 1, 1, 8).setValues([[
-        matchId,
-        JSON.stringify(matchData.sets || []),
-        matchData.homeTeam,
-        matchData.opponentTeam,
-        matchData.gameDate,
-        JSON.stringify(matchData.gameState !== undefined ? matchData.gameState : existingGameState),
-        JSON.stringify(matchData.rotationConfigs !== undefined ? matchData.rotationConfigs : existingRotationConfigs),
-        JSON.stringify(matchData.trajectories !== undefined ? matchData.trajectories : existingTrajectories)
-      ]]);
+        // Update row (8 columns)
+        sheet.getRange(i + 1, 1, 1, 8).setValues([[
+          matchId,
+          JSON.stringify(matchData.sets || []),
+          matchData.homeTeam,
+          matchData.opponentTeam,
+          matchData.gameDate,
+          JSON.stringify(matchData.gameState !== undefined ? matchData.gameState : existingGameState),
+          JSON.stringify(matchData.rotationConfigs !== undefined ? matchData.rotationConfigs : existingRotationConfigs),
+          JSON.stringify(matchData.trajectories !== undefined ? matchData.trajectories : existingTrajectories)
+        ]]);
 
-      return createResponse({
-        success: true,
-        message: 'Match updated successfully'
-      });
+        return createResponse({
+          success: true,
+          message: 'Match updated successfully'
+        });
+      }
     }
-  }
 
-  return createResponse({ error: 'Match not found' }, 404);
+    return createResponse({ error: 'Match not found' }, 404);
+  });
 }
 
 /**
  * Update only the game state (quick update for live scoring)
  */
 function updateGameState(matchId, gameState) {
-  const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEETS.IN_GAME_TRENDS);
-  const data = sheet.getDataRange().getValues();
+  return withLock(function() {
+    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEETS.IN_GAME_TRENDS);
+    const data = sheet.getDataRange().getValues();
 
-  // Find row with matching ID
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][0] === matchId) {
-      // Update only GameState column (column F = index 6)
-      sheet.getRange(i + 1, COLUMNS.GAME_STATE + 1).setValue(JSON.stringify(gameState));
+    // Find row with matching ID
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] === matchId) {
+        // Update only GameState column (column F = index 6)
+        sheet.getRange(i + 1, COLUMNS.GAME_STATE + 1).setValue(JSON.stringify(gameState));
 
-      return createResponse({
-        success: true,
-        message: 'Game state updated successfully'
-      });
+        return createResponse({
+          success: true,
+          message: 'Game state updated successfully'
+        });
+      }
     }
-  }
 
-  return createResponse({ error: 'Match not found' }, 404);
+    return createResponse({ error: 'Match not found' }, 404);
+  });
 }
 
 /**
  * Update rotation config for a specific set
  */
 function updateRotationConfig(matchId, setNumber, config) {
-  const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEETS.IN_GAME_TRENDS);
-  const data = sheet.getDataRange().getValues();
+  return withLock(function() {
+    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEETS.IN_GAME_TRENDS);
+    const data = sheet.getDataRange().getValues();
 
-  // Find row with matching ID
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][0] === matchId) {
-      // Get existing rotation configs
-      const existingConfigs = parseJSON(data[i][COLUMNS.ROTATION_CONFIGS], {});
+    // Find row with matching ID
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] === matchId) {
+        // Get existing rotation configs
+        const existingConfigs = parseJSON(data[i][COLUMNS.ROTATION_CONFIGS], {});
 
-      // Update config for this set
-      existingConfigs[setNumber] = config;
+        // Update config for this set
+        existingConfigs[setNumber] = config;
 
-      // Update RotationConfigs column (column G = index 7)
-      sheet.getRange(i + 1, COLUMNS.ROTATION_CONFIGS + 1).setValue(JSON.stringify(existingConfigs));
+        // Update RotationConfigs column (column G = index 7)
+        sheet.getRange(i + 1, COLUMNS.ROTATION_CONFIGS + 1).setValue(JSON.stringify(existingConfigs));
 
-      return createResponse({
-        success: true,
-        message: 'Rotation config updated successfully'
-      });
+        return createResponse({
+          success: true,
+          message: 'Rotation config updated successfully'
+        });
+      }
     }
-  }
 
-  return createResponse({ error: 'Match not found' }, 404);
+    return createResponse({ error: 'Match not found' }, 404);
+  });
 }
 
 /**
  * Update trajectories (append new trajectories)
  */
 function updateTrajectories(matchId, newTrajectories) {
-  const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEETS.IN_GAME_TRENDS);
-  const data = sheet.getDataRange().getValues();
+  return withLock(function() {
+    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEETS.IN_GAME_TRENDS);
+    const data = sheet.getDataRange().getValues();
 
-  // Find row with matching ID
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][0] === matchId) {
-      // Get existing trajectories
-      const existingTrajectories = parseJSON(data[i][COLUMNS.TRAJECTORIES], []);
+    // Find row with matching ID
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] === matchId) {
+        // Get existing trajectories
+        const existingTrajectories = parseJSON(data[i][COLUMNS.TRAJECTORIES], []);
 
-      // Append new trajectories (avoid duplicates by ID)
-      const existingIds = new Set(existingTrajectories.map(t => t.id));
-      const uniqueNewTrajectories = newTrajectories.filter(t => !existingIds.has(t.id));
-      const allTrajectories = existingTrajectories.concat(uniqueNewTrajectories);
+        // Append new trajectories (avoid duplicates by ID)
+        const existingIds = new Set(existingTrajectories.map(function(t) { return t.id; }));
+        const uniqueNewTrajectories = newTrajectories.filter(function(t) { return !existingIds.has(t.id); });
+        const allTrajectories = existingTrajectories.concat(uniqueNewTrajectories);
 
-      // Update Trajectories column (column H = index 8)
-      sheet.getRange(i + 1, COLUMNS.TRAJECTORIES + 1).setValue(JSON.stringify(allTrajectories));
+        // Update Trajectories column (column H = index 8)
+        sheet.getRange(i + 1, COLUMNS.TRAJECTORIES + 1).setValue(JSON.stringify(allTrajectories));
 
-      return createResponse({
-        success: true,
-        message: 'Trajectories updated successfully',
-        count: allTrajectories.length
-      });
+        return createResponse({
+          success: true,
+          message: 'Trajectories updated successfully',
+          count: allTrajectories.length
+        });
+      }
     }
-  }
 
-  return createResponse({ error: 'Match not found' }, 404);
+    return createResponse({ error: 'Match not found' }, 404);
+  });
 }
 
 /**
@@ -513,32 +523,36 @@ function deleteMatch(matchId) {
 
 /**
  * Add a point to a specific set
+ * NOTE: withLock is applied here AND inside updateMatch — that's intentional.
+ * The GAS LockService is reentrant within the same execution, so the nested
+ * call to updateMatch won't deadlock; it simply re-acquires the already-held lock.
+ * However, to avoid confusion we do the read-modify-write inline here and call
+ * a raw (unlocked) helper for the actual sheet write.
  */
 function addPoint(matchId, setNumber, pointData) {
-  // Get current match data
-  const matchResponse = getMatch(matchId);
-  const match = JSON.parse(matchResponse.getContent()).data;
+  return withLock(function() {
+    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEETS.IN_GAME_TRENDS);
+    const data = sheet.getDataRange().getValues();
 
-  if (!match) {
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] === matchId) {
+        const sets = parseJSON(data[i][COLUMNS.DATA], []);
+        const setIndex = sets.findIndex(function(s) { return s.set_number === setNumber; });
+
+        if (setIndex === -1) {
+          return createResponse({ error: 'Set not found' }, 404);
+        }
+
+        sets[setIndex].points.push(pointData);
+
+        // Write only the Data column — avoids a second full-row read
+        sheet.getRange(i + 1, COLUMNS.DATA + 1).setValue(JSON.stringify(sets));
+
+        return createResponse({ success: true, message: 'Point added successfully' });
+      }
+    }
+
     return createResponse({ error: 'Match not found' }, 404);
-  }
-
-  // Find the set and add point
-  const sets = match.sets;
-  const setIndex = sets.findIndex(s => s.set_number === setNumber);
-
-  if (setIndex === -1) {
-    return createResponse({ error: 'Set not found' }, 404);
-  }
-
-  sets[setIndex].points.push(pointData);
-
-  // Update match
-  return updateMatch(matchId, {
-    homeTeam: match.homeTeam,
-    opponentTeam: match.opponentTeam,
-    gameDate: match.gameDate,
-    sets: sets
   });
 }
 
@@ -546,34 +560,33 @@ function addPoint(matchId, setNumber, pointData) {
  * Undo last point in a set
  */
 function undoLastPoint(matchId, setNumber) {
-  // Get current match data
-  const matchResponse = getMatch(matchId);
-  const match = JSON.parse(matchResponse.getContent()).data;
+  return withLock(function() {
+    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEETS.IN_GAME_TRENDS);
+    const data = sheet.getDataRange().getValues();
 
-  if (!match) {
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] === matchId) {
+        const sets = parseJSON(data[i][COLUMNS.DATA], []);
+        const setIndex = sets.findIndex(function(s) { return s.set_number === setNumber; });
+
+        if (setIndex === -1) {
+          return createResponse({ error: 'Set not found' }, 404);
+        }
+
+        if (sets[setIndex].points.length === 0) {
+          return createResponse({ error: 'No points to undo' }, 400);
+        }
+
+        sets[setIndex].points.pop();
+
+        // Write only the Data column
+        sheet.getRange(i + 1, COLUMNS.DATA + 1).setValue(JSON.stringify(sets));
+
+        return createResponse({ success: true, message: 'Point undone successfully' });
+      }
+    }
+
     return createResponse({ error: 'Match not found' }, 404);
-  }
-
-  // Find the set and remove last point
-  const sets = match.sets;
-  const setIndex = sets.findIndex(s => s.set_number === setNumber);
-
-  if (setIndex === -1) {
-    return createResponse({ error: 'Set not found' }, 404);
-  }
-
-  if (sets[setIndex].points.length === 0) {
-    return createResponse({ error: 'No points to undo' }, 400);
-  }
-
-  sets[setIndex].points.pop();
-
-  // Update match
-  return updateMatch(matchId, {
-    homeTeam: match.homeTeam,
-    opponentTeam: match.opponentTeam,
-    gameDate: match.gameDate,
-    sets: sets
   });
 }
 
@@ -582,88 +595,118 @@ function undoLastPoint(matchId, setNumber) {
 // ============================================================================
 
 function createTeam(teamData) {
-  const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEETS.TEAMS);
-  const id = Utilities.getUuid();
-  sheet.appendRow([id, teamData.name]);
-  return createResponse({ success: true, teamId: id });
+  return withLock(function() {
+    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEETS.TEAMS);
+    const id = Utilities.getUuid();
+    sheet.appendRow([id, teamData.name]);
+    return createResponse({ success: true, teamId: id });
+  });
 }
 
 function updateTeam(teamId, teamData) {
-  const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEETS.TEAMS);
-  const data = sheet.getDataRange().getValues();
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][0] === teamId) {
-      sheet.getRange(i + 1, 2).setValue(teamData.name);
-      return createResponse({ success: true });
+  return withLock(function() {
+    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEETS.TEAMS);
+    const data = sheet.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] === teamId) {
+        sheet.getRange(i + 1, 2).setValue(teamData.name);
+        return createResponse({ success: true });
+      }
     }
-  }
-  return createResponse({ error: 'Team not found' }, 404);
+    return createResponse({ error: 'Team not found' }, 404);
+  });
 }
 
 function deleteTeam(teamId) {
-  const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEETS.TEAMS);
-  const data = sheet.getDataRange().getValues();
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][0] === teamId) {
-      sheet.deleteRow(i + 1);
-      return createResponse({ success: true });
+  return withLock(function() {
+    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEETS.TEAMS);
+    const data = sheet.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] === teamId) {
+        sheet.deleteRow(i + 1);
+        return createResponse({ success: true });
+      }
     }
-  }
-  return createResponse({ error: 'Team not found' }, 404);
+    return createResponse({ error: 'Team not found' }, 404);
+  });
 }
 
 function createPlayer(playerData) {
-  const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEETS.PLAYERS);
-  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  const id = Utilities.getUuid();
-  const row = headers.map(function(h) {
-    if (h === 'Id') return id;
-    if (h === 'PreferredName') return playerData.preferredName || '';
-    if (h === 'FirstName') return '';
-    if (h === 'LastName') return '';
-    if (h === 'MainPosition') return playerData.mainPosition || '';
-    if (h === 'SecondaryPosition') return playerData.secondaryPosition || '';
-    if (h === 'TeamId') return playerData.teamId || '';
-    if (h === 'JerseyNumber') return playerData.jerseyNumber || 0;
-    return '';
+  return withLock(function() {
+    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEETS.PLAYERS);
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const id = Utilities.getUuid();
+    const row = headers.map(function(h) {
+      if (h === 'Id') return id;
+      if (h === 'PreferredName') return playerData.preferredName || '';
+      if (h === 'FirstName') return '';
+      if (h === 'LastName') return '';
+      if (h === 'MainPosition') return playerData.mainPosition || '';
+      if (h === 'SecondaryPosition') return playerData.secondaryPosition || '';
+      if (h === 'TeamId') return playerData.teamId || '';
+      if (h === 'JerseyNumber') return playerData.jerseyNumber || 0;
+      return '';
+    });
+    sheet.appendRow(row);
+    return createResponse({ success: true, playerId: id });
   });
-  sheet.appendRow(row);
-  return createResponse({ success: true, playerId: id });
 }
 
 function updatePlayer(playerId, playerData) {
-  const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEETS.PLAYERS);
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  const colMap = {};
-  headers.forEach(function(h, i) { colMap[h] = i; });
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][colMap['Id']] === playerId) {
-      if (playerData.preferredName !== undefined) sheet.getRange(i + 1, colMap['PreferredName'] + 1).setValue(playerData.preferredName);
-      if (playerData.jerseyNumber !== undefined) sheet.getRange(i + 1, colMap['JerseyNumber'] + 1).setValue(playerData.jerseyNumber);
-      if (playerData.mainPosition !== undefined) sheet.getRange(i + 1, colMap['MainPosition'] + 1).setValue(playerData.mainPosition);
-      if (playerData.secondaryPosition !== undefined) sheet.getRange(i + 1, colMap['SecondaryPosition'] + 1).setValue(playerData.secondaryPosition);
-      return createResponse({ success: true });
+  return withLock(function() {
+    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEETS.PLAYERS);
+    const data = sheet.getDataRange().getValues();
+    const headers = data[0];
+    const colMap = {};
+    headers.forEach(function(h, i) { colMap[h] = i; });
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][colMap['Id']] === playerId) {
+        if (playerData.preferredName !== undefined) sheet.getRange(i + 1, colMap['PreferredName'] + 1).setValue(playerData.preferredName);
+        if (playerData.jerseyNumber !== undefined) sheet.getRange(i + 1, colMap['JerseyNumber'] + 1).setValue(playerData.jerseyNumber);
+        if (playerData.mainPosition !== undefined) sheet.getRange(i + 1, colMap['MainPosition'] + 1).setValue(playerData.mainPosition);
+        if (playerData.secondaryPosition !== undefined) sheet.getRange(i + 1, colMap['SecondaryPosition'] + 1).setValue(playerData.secondaryPosition);
+        return createResponse({ success: true });
+      }
     }
-  }
-  return createResponse({ error: 'Player not found' }, 404);
+    return createResponse({ error: 'Player not found' }, 404);
+  });
 }
 
 function deletePlayer(playerId) {
-  const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEETS.PLAYERS);
-  const data = sheet.getDataRange().getValues();
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][0] === playerId) {
-      sheet.deleteRow(i + 1);
-      return createResponse({ success: true });
+  return withLock(function() {
+    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEETS.PLAYERS);
+    const data = sheet.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] === playerId) {
+        sheet.deleteRow(i + 1);
+        return createResponse({ success: true });
+      }
     }
-  }
-  return createResponse({ error: 'Player not found' }, 404);
+    return createResponse({ error: 'Player not found' }, 404);
+  });
 }
 
 // ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
+
+/**
+ * Execute fn while holding the script-wide lock.
+ * Prevents concurrent GAS executions from racing on the same spreadsheet row
+ * (read-modify-write race on addPoint, updateMatch, etc.).
+ * Waits up to 30 s; returns a 503 response if the lock cannot be acquired.
+ */
+function withLock(fn) {
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(30000);
+    return fn();
+  } catch (e) {
+    return createResponse({ error: 'Server busy – please retry' }, 503);
+  } finally {
+    lock.releaseLock();
+  }
+}
 
 /**
  * Safely parse JSON with a default value

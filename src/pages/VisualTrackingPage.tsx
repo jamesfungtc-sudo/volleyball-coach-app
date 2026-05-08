@@ -65,6 +65,7 @@ import {
   type SyncStatus
 } from '../features/inGameStats/services/syncService';
 import type { GameState } from '../services/googleSheetsAPI';
+import { enqueueWrite } from '../services/writeQueue';
 import './VisualTrackingPage.css';
 
 /**
@@ -270,6 +271,7 @@ function VisualTrackingPageContent() {
       if (matchId === 'new') {
         const homeTeamId = searchParams.get('homeTeam');
         const opponentTeamId = searchParams.get('opponentTeam');
+        const gameDate = searchParams.get('date') || new Date().toISOString().split('T')[0];
 
         const rotationKey = `match_new_rotations`;
         localStorage.removeItem(rotationKey);
@@ -290,8 +292,17 @@ function VisualTrackingPageContent() {
             setHomeTeamName(homeTeam?.Name || 'Home');
             setOpponentTeamName(oppTeam?.Name || 'Opponent');
             console.log('✅ New match rosters loaded from URL params');
+
+            // Create the match in Google Sheets immediately so it has a real ID
+            // before any scoring or rotation config happens
+            console.log('🆕 Creating new match in Google Sheets...');
+            const { matchId: newMatchId } = await createSession(homeTeamId, opponentTeamId, gameDate);
+            console.log('✅ New match created:', newMatchId);
+            setSessionLoaded(true); // Skip Phase 1 restore — this is a fresh match
+            navigate(`/in-game-stats/${newMatchId}/visual?set=1`, { replace: true });
+            return;
           } catch (err) {
-            console.error('Failed to load rosters for new match:', err);
+            console.error('Failed to load rosters or create match:', err);
           }
         }
 
@@ -555,10 +566,8 @@ function VisualTrackingPageContent() {
       opponentRotation: opponentRotationConfig.currentRotation
     });
 
-    // Sync in background (don't await)
-    saveRotationConfigForSet(matchId, currentSet, fullConfig, homeRoster, opponentRoster)
-      .then(() => console.log('✅ Rotation config synced'))
-      .catch((err) => console.error('❌ Failed to sync rotation config:', err));
+    // Enqueue so this runs after any in-flight point saves
+    enqueueWrite(() => saveRotationConfigForSet(matchId, currentSet, fullConfig, homeRoster, opponentRoster));
   }, [
     homeRotationConfig?.currentRotation,
     opponentRotationConfig?.currentRotation,
@@ -741,28 +750,7 @@ function VisualTrackingPageContent() {
     setServingTeam(startingServer);
     setRotationEnabled(true);
 
-    let activeMatchId = matchId;
-
-    // For new matches, create the match in Google Sheets now (first meaningful action)
-    if (matchId === 'new') {
-      const homeTeamId = searchParams.get('homeTeam');
-      const opponentTeamId = searchParams.get('opponentTeam');
-      const gameDate = searchParams.get('date') || new Date().toISOString().split('T')[0];
-
-      if (homeTeamId && opponentTeamId) {
-        try {
-          console.log('🆕 Creating new match in Google Sheets...');
-          const { matchId: newMatchId } = await createSession(homeTeamId, opponentTeamId, gameDate);
-          activeMatchId = newMatchId;
-          console.log('✅ New match created:', newMatchId);
-          // Redirect to real match URL, replacing history so Back doesn't go to /new
-          navigate(`/in-game-stats/${newMatchId}/visual?set=1`, { replace: true });
-          setSessionLoaded(true); // Skip session restore — we just created it
-        } catch (err) {
-          console.error('❌ Failed to create match in Google Sheets:', err);
-        }
-      }
-    }
+    const activeMatchId = matchId;
 
     // Save to localStorage AND sync to Google Sheets
     if (activeMatchId && activeMatchId !== 'new') {
@@ -776,9 +764,7 @@ function VisualTrackingPageContent() {
         homeLiberoSwapState,
         opponentLiberoSwapState
       };
-      saveRotationConfigForSet(activeMatchId, currentSet, fullConfig, homeRoster, opponentRoster)
-        .then(() => console.log('✅ Rotation config synced to Google Sheets'))
-        .catch((err) => console.error('❌ Failed to sync rotation config:', err));
+      enqueueWrite(() => saveRotationConfigForSet(activeMatchId, currentSet, fullConfig, homeRoster, opponentRoster));
     }
 
     // Initialize lineups from configuration WITH ROSTER DATA
@@ -1370,9 +1356,7 @@ function VisualTrackingPageContent() {
         s.set_number === currentSet ? { ...s, points: [...s.points, pointRecord] } : s
       ));
       if (matchId && matchId !== 'new') {
-        addPoint(matchId, currentSet, pointRecord).catch(err => {
-          console.error('Failed to save point to Sheets:', err);
-        });
+        enqueueWrite(() => addPoint(matchId, currentSet, pointRecord));
       }
 
       // Determine new serving team for game state sync
@@ -1400,9 +1384,7 @@ function VisualTrackingPageContent() {
           servingTeam: newServingTeam,
           status: 'in_progress'
         };
-        updateGameState(matchId, newGameState).catch(err => {
-          console.error('Failed to sync game state:', err);
-        });
+        enqueueWrite(() => updateGameState(matchId, newGameState));
 
         // Persist per-set scores to localStorage so switching sets doesn't lose data
         const setScoresKey = `match_${matchId}_set_scores`;
@@ -1895,9 +1877,7 @@ function VisualTrackingPageContent() {
 
     // Sync undo to Sheets
     if (matchId && matchId !== 'new') {
-      undoLastPoint(matchId, currentSet).catch(err => {
-        console.error('Failed to undo point in Sheets:', err);
-      });
+      enqueueWrite(() => undoLastPoint(matchId, currentSet));
     }
 
     // Reset to serve phase
@@ -2435,34 +2415,32 @@ function VisualTrackingPageContent() {
                       <span>📊 Match Info & Summary</span>
                     </button>
 
-                    {/* Rotation Configuration Option */}
-                    {rotationEnabled && (
-                      <button
-                        onClick={() => {
-                          setRotationConfigModalOpen(true);
-                          setSettingsDropdownOpen(false);
-                        }}
-                        style={{
-                          width: '100%',
-                          padding: '12px 16px',
-                          border: 'none',
-                          borderTop: '1px solid #e5e7eb',
-                          background: 'hsl(var(--card))',
-                          textAlign: 'left',
-                          fontSize: '14px',
-                          fontWeight: '500',
-                          cursor: 'pointer',
-                          transition: 'background 0.2s',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px'
-                        }}
-                        onMouseOver={(e) => e.currentTarget.style.background = '#f3f4f6'}
-                        onMouseOut={(e) => e.currentTarget.style.background = 'white'}
-                      >
-                        <span>🔧 Rotation Config</span>
-                      </button>
-                    )}
+                    {/* Rotation Configuration Option - always visible */}
+                    <button
+                      onClick={() => {
+                        setRotationConfigModalOpen(true);
+                        setSettingsDropdownOpen(false);
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '12px 16px',
+                        border: 'none',
+                        borderTop: '1px solid #e5e7eb',
+                        background: 'hsl(var(--card))',
+                        textAlign: 'left',
+                        fontSize: '14px',
+                        fontWeight: '500',
+                        cursor: 'pointer',
+                        transition: 'background 0.2s',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px'
+                      }}
+                      onMouseOver={(e) => e.currentTarget.style.background = '#f3f4f6'}
+                      onMouseOut={(e) => e.currentTarget.style.background = 'white'}
+                    >
+                      <span>🔧 {rotationEnabled ? 'Rotation Config' : 'Set Up Rotations'}</span>
+                    </button>
                   </div>
                 )}
               </div>
