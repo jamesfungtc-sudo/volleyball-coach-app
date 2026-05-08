@@ -34,6 +34,8 @@ import type {
   RotationHistoryEntry,
   PlayerRole
 } from '../features/inGameStats/types/rotation.types';
+import type { VolleyballPosition } from '../features/inGameStats/types/opponentTracking.types';
+import type { PlayerReference } from '../types/playerReference.types';
 import {
   initializeLineup,
   getLineupForRotation,
@@ -66,6 +68,9 @@ import {
 } from '../features/inGameStats/services/syncService';
 import type { GameState } from '../services/googleSheetsAPI';
 import { enqueueWrite } from '../services/writeQueue';
+import SubstitutionModal from '../features/inGameStats/components/SubstitutionModal';
+import type { TeamSubstitutionState, Substitution } from '../features/inGameStats/types/substitution.types';
+import { emptySubState, MAX_SUBSTITUTIONS } from '../features/inGameStats/types/substitution.types';
 import './VisualTrackingPage.css';
 
 /**
@@ -256,6 +261,12 @@ function VisualTrackingPageContent() {
     replacedRole: null,
     isManualLock: false
   });
+
+  // Regular substitution state
+  const [homeSubState, setHomeSubState] = useState<TeamSubstitutionState>(emptySubState());
+  const [opponentSubState, setOpponentSubState] = useState<TeamSubstitutionState>(emptySubState());
+  const [subModalOpen, setSubModalOpen] = useState(false);
+  const [subModalTeam, setSubModalTeam] = useState<'home' | 'opponent'>('home');
 
   /**
    * Load rosters from match context (Google Sheets API)
@@ -1029,6 +1040,70 @@ function VisualTrackingPageContent() {
 
     const mode = isDefaultTarget ? 'AUTO-SWAP MODE' : 'MANUAL LOCK';
     console.log(`✅ Libero swapped IN at ${selectedPlayer.position} for ${selectedPlayer.roleInSystem} [${mode}]`);
+  };
+
+  /**
+   * Execute a regular player substitution
+   */
+  const handleSubstitution = (
+    team: 'home' | 'opponent',
+    subOut: PlayerInPosition,
+    subIn: Player,
+    courtPosition: VolleyballPosition
+  ) => {
+    const subState = team === 'home' ? homeSubState : opponentSubState;
+    if (subState.count >= MAX_SUBSTITUTIONS) return;
+
+    // Build replacement PlayerInPosition — keep the same position and role
+    const jerseyNum = Number(subIn.jerseyNumber);
+    const newPlayer: PlayerInPosition = {
+      reference: {
+        type: 'roster',
+        playerId: subIn.id,
+        jerseyNumber: jerseyNum,
+        displayName: subIn.name,
+        teamId: subIn.teamId
+      } as PlayerReference,
+      position: courtPosition,
+      roleInSystem: subOut.roleInSystem,
+      isLibero: false,
+      // Populate deprecated fields so PlayerMarker renders correctly
+      playerId: subIn.id,
+      jerseyNumber: jerseyNum,
+      playerName: subIn.name
+    };
+
+    // Update the lineup
+    if (team === 'home') {
+      setHomeLineup(prev => ({ ...prev, [courtPosition]: newPlayer }));
+    } else {
+      setOpponentLineup(prev => ({ ...prev, [courtPosition]: newPlayer }));
+    }
+
+    // Record the substitution
+    const record: Substitution = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      team,
+      setNumber: currentSet,
+      pointNumber,
+      subOutJersey: Number(getJerseyNumber(subOut.reference)),
+      subOutName: getPlayerDisplayName(subOut.reference),
+      subOutRole: subOut.roleInSystem,
+      subInJersey: Number(subIn.jerseyNumber),
+      subInName: subIn.name,
+      subInRole: subOut.roleInSystem, // inherits the position's role
+      courtPosition,
+      timestamp: Date.now()
+    };
+
+    const setter = team === 'home' ? setHomeSubState : setOpponentSubState;
+    setter(prev => ({
+      count: prev.count + 1,
+      history: [...prev.history, record]
+    }));
+
+    console.log(`🔄 Substitution: ${record.subOutName} → ${record.subInName} at ${courtPosition}`);
+    setSubModalOpen(false);
   };
 
   /**
@@ -1984,7 +2059,11 @@ function VisualTrackingPageContent() {
       isManualLock: false
     });
 
-    console.log(`🔄 Set ${currentSet}: Libero swap state reset`);
+    // Reset substitution counts for new set
+    setHomeSubState(emptySubState());
+    setOpponentSubState(emptySubState());
+
+    console.log(`🔄 Set ${currentSet}: Libero swap + substitution state reset`);
   }, [currentSet, searchParams, setSearchParams]);
 
   /**
@@ -2765,6 +2844,50 @@ function VisualTrackingPageContent() {
                   >
                     <div style={{ fontSize: '9px', opacity: 0.9 }}>OPP</div>
                     <div>{opponentFormationType === 'serving' ? 'SERVE' : 'RALLY'}</div>
+                  </button>
+
+                  {/* Home Substitution Button */}
+                  <button
+                    onClick={() => { setSubModalTeam('home'); setSubModalOpen(true); }}
+                    style={{
+                      padding: '8px 14px',
+                      fontSize: '11px',
+                      fontWeight: '700',
+                      background: homeSubState.count >= MAX_SUBSTITUTIONS ? '#6b7280' : '#7c3aed',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: homeSubState.count >= MAX_SUBSTITUTIONS ? 'not-allowed' : 'pointer',
+                      textAlign: 'center',
+                      minWidth: '70px',
+                      opacity: homeSubState.count >= MAX_SUBSTITUTIONS ? 0.6 : 1
+                    }}
+                    title={`Home substitutions: ${homeSubState.count}/${MAX_SUBSTITUTIONS}`}
+                  >
+                    <div style={{ fontSize: '9px', opacity: 0.9 }}>HOME SUB</div>
+                    <div>{homeSubState.count}/{MAX_SUBSTITUTIONS}</div>
+                  </button>
+
+                  {/* Opponent Substitution Button */}
+                  <button
+                    onClick={() => { setSubModalTeam('opponent'); setSubModalOpen(true); }}
+                    style={{
+                      padding: '8px 14px',
+                      fontSize: '11px',
+                      fontWeight: '700',
+                      background: opponentSubState.count >= MAX_SUBSTITUTIONS ? '#6b7280' : '#ef4444',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: opponentSubState.count >= MAX_SUBSTITUTIONS ? 'not-allowed' : 'pointer',
+                      textAlign: 'center',
+                      minWidth: '70px',
+                      opacity: opponentSubState.count >= MAX_SUBSTITUTIONS ? 0.6 : 1
+                    }}
+                    title={`Opponent substitutions: ${opponentSubState.count}/${MAX_SUBSTITUTIONS}`}
+                  >
+                    <div style={{ fontSize: '9px', opacity: 0.9 }}>OPP SUB</div>
+                    <div>{opponentSubState.count}/{MAX_SUBSTITUTIONS}</div>
                   </button>
                 </>
               )}
@@ -4125,11 +4248,24 @@ function VisualTrackingPageContent() {
           playerName: p.Name,
           jerseyNumber: parseInt(p.JerseyNumber) || 0
         }))}
-        opponentRoster={opponentRoster.map(p => ({
+        opponentRoster={opponentRoster.map((p: any) => ({
           playerId: p.Id,
           playerName: p.Name,
           jerseyNumber: parseInt(p.JerseyNumber) || 0
         }))}
+      />
+
+      {/* Substitution Modal */}
+      <SubstitutionModal
+        isOpen={subModalOpen}
+        team={subModalTeam}
+        teamName={subModalTeam === 'home' ? homeTeamName : opponentTeamName}
+        lineup={subModalTeam === 'home' ? homeLineup : opponentLineup}
+        roster={subModalTeam === 'home' ? homeRoster : opponentRoster}
+        subsUsed={subModalTeam === 'home' ? homeSubState.count : opponentSubState.count}
+        subHistory={subModalTeam === 'home' ? homeSubState.history : opponentSubState.history}
+        onConfirm={(subOut, subIn, pos) => handleSubstitution(subModalTeam, subOut, subIn, pos)}
+        onClose={() => setSubModalOpen(false)}
       />
     </div>
   );
