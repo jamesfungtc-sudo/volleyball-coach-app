@@ -2254,7 +2254,6 @@ function VisualTrackingPageContent() {
             onPointerMove={handleMove}
             onPointerUp={handleEnd}
             onPointerCancel={handleEnd}
-            style={{ touchAction: 'none' }}
           >
             {/* Render home team players - Always show, with selection/fade states */}
             {Object.values(getCurrentLineup('home')).map((player) => {

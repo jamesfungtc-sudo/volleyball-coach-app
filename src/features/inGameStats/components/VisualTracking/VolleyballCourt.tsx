@@ -57,12 +57,14 @@ interface VolleyballCourtProps {
   onMouseUp?: (event: React.MouseEvent<SVGSVGElement>) => void;
   /** Mouse leave event handler */
   onMouseLeave?: (event: React.MouseEvent<SVGSVGElement>) => void;
-  /** Touch start event handler */
-  onTouchStart?: (event: React.TouchEvent<SVGSVGElement>) => void;
-  /** Touch move event handler */
-  onTouchMove?: (event: React.TouchEvent<SVGSVGElement>) => void;
-  /** Touch end event handler */
-  onTouchEnd?: (event: React.TouchEvent<SVGSVGElement>) => void;
+  /** Pointer down event handler (covers mouse + touch + stylus) */
+  onPointerDown?: (event: React.PointerEvent<SVGSVGElement>) => void;
+  /** Pointer move event handler */
+  onPointerMove?: (event: React.PointerEvent<SVGSVGElement>) => void;
+  /** Pointer up event handler */
+  onPointerUp?: (event: React.PointerEvent<SVGSVGElement>) => void;
+  /** Pointer cancel event handler (system interruption) */
+  onPointerCancel?: (event: React.PointerEvent<SVGSVGElement>) => void;
   /** Ref to access the SVG element */
   svgRef?: React.RefObject<SVGSVGElement>;
 }
@@ -84,13 +86,10 @@ export const VolleyballCourt: React.FC<VolleyballCourtProps> = ({
   children,
   disabledSide = null,
   servingTeam = null,
-  onMouseDown,
-  onMouseMove,
-  onMouseUp,
-  onMouseLeave,
-  onTouchStart,
-  onTouchMove,
-  onTouchEnd,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+  onPointerCancel,
   svgRef
 }) => {
   const {
@@ -113,18 +112,16 @@ export const VolleyballCourt: React.FC<VolleyballCourtProps> = ({
       className={`volleyball-court ${className} ${isDrawing ? 'drawing-mode' : ''}`}
       viewBox={`0 0 ${viewBoxWidth} ${viewBoxHeight}`}
       preserveAspectRatio="xMidYMid meet"
-      onMouseDown={onMouseDown}
-      onMouseMove={onMouseMove}
-      onMouseUp={onMouseUp}
-      onMouseLeave={onMouseLeave}
-      onTouchStart={onTouchStart}
-      onTouchMove={onTouchMove}
-      onTouchEnd={onTouchEnd}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerCancel}
       style={{
         width: '100%',
         height: '100%',
         maxHeight: '100%',
-        cursor: isDrawing ? 'crosshair' : 'default'
+        cursor: isDrawing ? 'crosshair' : 'default',
+        touchAction: 'none'
       }}
     >
       {/* ========== OUT OF BOUNDS AREAS ========== */}
