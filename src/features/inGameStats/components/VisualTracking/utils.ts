@@ -31,50 +31,28 @@ export const isInBounds = (x: number, y: number): boolean => {
 };
 
 /**
- * Get SVG coordinates from mouse/touch event
+ * Get SVG coordinates from a pointer event (mouse, touch, or stylus).
  *
- * Converts screen coordinates to SVG viewBox coordinates using SVG's built-in transformation matrix.
- * This is the CORRECT method from the prototype documentation.
- *
- * Why this approach:
+ * Uses pointer events instead of separate mouse/touch events because:
+ * - ✅ No 300 ms ghost-click after touchend in iOS PWA standalone mode
+ * - ✅ setPointerCapture keeps tracking even when finger drifts outside SVG
  * - ✅ Handles all transformations automatically
  * - ✅ Works with any viewport size
  * - ✅ Accounts for preserveAspectRatio settings
  * - ✅ Most accurate method (avoids offset issues)
  *
- * Ported from prototype: CourtDrawing Protopype/src/CourtDrawing.jsx (lines 832-846)
- *
- * @param event - Mouse or touch event
+ * @param event - Pointer event (covers mouse, touch, and stylus)
  * @param svgElement - SVG element reference
  * @returns Object with x, y coordinates in SVG viewBox space
  */
 export const getCoordinates = (
-  event: React.MouseEvent | React.TouchEvent,
+  event: React.PointerEvent,
   svgElement: SVGSVGElement
 ): { x: number; y: number } => {
-  // Handle both touch and mouse events
-  let clientX: number;
-  let clientY: number;
-
-  if ('touches' in event) {
-    // Touch event
-    if (event.touches.length > 0) {
-      clientX = event.touches[0].clientX;
-      clientY = event.touches[0].clientY;
-    } else {
-      // Fallback for touch end events
-      return { x: 0, y: 0 };
-    }
-  } else {
-    // Mouse event
-    clientX = event.clientX;
-    clientY = event.clientY;
-  }
-
   // Use SVG's built-in transformation matrix (CRITICAL for accuracy)
   const pt = svgElement.createSVGPoint();
-  pt.x = clientX;
-  pt.y = clientY;
+  pt.x = event.clientX;
+  pt.y = event.clientY;
 
   // Transform screen coordinates to SVG viewBox coordinates
   const screenCTM = svgElement.getScreenCTM();

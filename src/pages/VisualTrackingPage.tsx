@@ -1487,18 +1487,31 @@ function VisualTrackingPageContent() {
   };
 
   /**
-   * Handle drawing start (mouse down or touch start)
-   * Ported from prototype handleStart
+   * Handle drawing start (pointer down — covers mouse, touch, stylus).
    *
-   * IMPORTANT: Only allow drawing if a player is selected
+   * Uses pointer events instead of separate mouse/touch handlers to avoid the
+   * iOS PWA "ghost click" bug: in standalone mode Safari fires a synthetic click
+   * ~300 ms after touchend, which re-triggered handleStart and cleared the
+   * trajectory (distance < 10). Pointer events do not generate ghost clicks.
+   *
+   * setPointerCapture ensures the SVG keeps receiving events even if the finger
+   * drifts outside its bounds.
+   *
+   * IMPORTANT: Only allow drawing if a player is selected.
    */
-  const handleStart = (event: React.MouseEvent<SVGSVGElement> | React.TouchEvent<SVGSVGElement>) => {
+  const handleStart = (event: React.PointerEvent<SVGSVGElement>) => {
+    // Only respond to primary pointer (first finger / left mouse button)
+    if (!event.isPrimary) return;
+
     event.preventDefault();
 
     // Block drawing if no player selected
     if (!selectedPlayer) return;
 
     if (!svgRef.current) return;
+
+    // Capture the pointer so move/up fire on this element even outside its bounds
+    svgRef.current.setPointerCapture(event.pointerId);
 
     const coords = getCoordinates(event, svgRef.current);
     const clamped = clampToViewBox(coords.x, coords.y);
@@ -1515,11 +1528,10 @@ function VisualTrackingPageContent() {
   };
 
   /**
-   * Handle drawing move (mouse move or touch move)
-   * Ported from prototype handleMove
+   * Handle drawing move (pointer move).
    */
-  const handleMove = (event: React.MouseEvent<SVGSVGElement> | React.TouchEvent<SVGSVGElement>) => {
-    if (!isDragging || !svgRef.current) return;
+  const handleMove = (event: React.PointerEvent<SVGSVGElement>) => {
+    if (!event.isPrimary || !isDragging || !svgRef.current) return;
 
     event.preventDefault();
 
@@ -1535,11 +1547,12 @@ function VisualTrackingPageContent() {
   };
 
   /**
-   * Handle drawing end (mouse up or touch end)
-   * Ported from prototype handleEnd
+   * Handle drawing end (pointer up or pointer cancel).
+   * onPointerCancel fires when the system interrupts the touch (e.g. incoming
+   * call), so we handle it the same way as a normal end.
    */
-  const handleEnd = (event: React.MouseEvent<SVGSVGElement> | React.TouchEvent<SVGSVGElement>) => {
-    if (!isDragging) return;
+  const handleEnd = (event: React.PointerEvent<SVGSVGElement>) => {
+    if (!event.isPrimary || !isDragging) return;
 
     event.preventDefault();
 
@@ -2237,13 +2250,11 @@ function VisualTrackingPageContent() {
             isDrawing={isDragging}
             disabledSide={disabledSide}
             servingTeam={servingTeam}
-            onMouseDown={handleStart}
-            onMouseMove={handleMove}
-            onMouseUp={handleEnd}
-            onMouseLeave={handleEnd}
-            onTouchStart={handleStart}
-            onTouchMove={handleMove}
-            onTouchEnd={handleEnd}
+            onPointerDown={handleStart}
+            onPointerMove={handleMove}
+            onPointerUp={handleEnd}
+            onPointerCancel={handleEnd}
+            style={{ touchAction: 'none' }}
           >
             {/* Render home team players - Always show, with selection/fade states */}
             {Object.values(getCurrentLineup('home')).map((player) => {
