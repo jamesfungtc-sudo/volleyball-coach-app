@@ -26,6 +26,7 @@ import type {
   OpponentAttemptResult
 } from '../features/inGameStats/types/opponentTracking.types';
 import { getMatch, getPlayersByTeam, getTeams, addPoint, undoLastPoint, type Player } from '../services/googleSheetsAPI';
+import { PlayerFlipCard } from '../components/ui/PlayerFlipCard';
 import type { MatchData, SetData, PointData } from '../types/inGameStats.types';
 import { RotationConfigModal } from '../features/inGameStats/components/RotationConfigModal';
 import { MatchInfoModal } from '../features/inGameStats/components/MatchInfoModal';
@@ -3702,32 +3703,13 @@ function VisualTrackingPageContent() {
                     const roster = errorTeam === 'home' ? homeRoster : opponentRoster;
 
                     return roster.map((player) => (
-                      <button
-                        key={player.Id}
-                        onClick={() => handleQuickScore(scoringOption, player.Id)}
-                        style={{
-                          padding: '12px 8px',
-                          fontSize: '14px',
-                          fontWeight: '600',
-                          background: 'hsl(var(--card))',
-                          border: '2px solid hsl(var(--border))',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s',
-                          textAlign: 'center'
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.background = 'hsl(var(--accent))';
-                          e.currentTarget.style.borderColor = '#7c3aed';
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.background = 'hsl(var(--card))';
-                          e.currentTarget.style.borderColor = '#e5e7eb';
-                        }}
-                      >
-                        <div style={{ fontSize: '18px', marginBottom: '4px' }}>#{player.jerseyNumber}</div>
-                        <div style={{ fontSize: '12px', color: 'hsl(var(--muted-foreground))' }}>{player.name}</div>
-                      </button>
+                      <PlayerFlipCard
+                        key={player.id}
+                        jerseyNumber={player.jerseyNumber}
+                        name={player.name}
+                        position={player.position}
+                        onClick={() => handleQuickScore(scoringOption, player.id)}
+                      />
                     ));
                   })()}
                 </div>
