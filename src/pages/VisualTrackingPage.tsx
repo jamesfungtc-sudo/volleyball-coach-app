@@ -71,6 +71,8 @@ import { enqueueWrite } from '../services/writeQueue';
 import SubstitutionModal from '../features/inGameStats/components/SubstitutionModal';
 import type { TeamSubstitutionState, Substitution } from '../features/inGameStats/types/substitution.types';
 import { emptySubState, MAX_SUBSTITUTIONS } from '../features/inGameStats/types/substitution.types';
+import RotationDrawer from '../features/inGameStats/components/RotationDrawer';
+import { buildDraftPositionsFromConfig, EMPTY_POSITIONS } from '../utils/rotationDerivation';
 import './VisualTrackingPage.css';
 
 /**
@@ -188,8 +190,14 @@ function VisualTrackingPageContent() {
   const [savedRotationConfigs, setSavedRotationConfigs] = useState<Record<number, any> | null>(null);
   const [savedRestoredSet, setSavedRestoredSet] = useState<number | null>(null);
 
-  // Rotation configuration modal state
+  // Rotation configuration modal state (legacy — kept for handleContinueToNextSet ref)
   const [rotationConfigModalOpen, setRotationConfigModalOpen] = useState(false);
+
+  // Inline rotation config drawer (replaces modal)
+  const [isConfigMode, setIsConfigMode] = useState(false);
+  const [activeConfigPosition, setActiveConfigPosition] = useState<{ team: 'home' | 'opponent'; position: VolleyballPosition } | null>(null);
+  const [draftHomePositions, setDraftHomePositions] = useState<Record<VolleyballPosition, PlayerReference | null>>({ ...EMPTY_POSITIONS });
+  const [draftOpponentPositions, setDraftOpponentPositions] = useState<Record<VolleyballPosition, PlayerReference | null>>({ ...EMPTY_POSITIONS });
 
   // Rotation state
   const [rotationEnabled, setRotationEnabled] = useState(false);
@@ -822,30 +830,47 @@ function VisualTrackingPageContent() {
       opponent: opponentLineupData
     });
 
-    // Close modal
+    // Close config drawer
+    setIsConfigMode(false);
+    setActiveConfigPosition(null);
     setRotationConfigModalOpen(false);
   };
 
   /**
-   * Reset rotation configuration - Clears localStorage and resets state
+   * Enter inline config mode — pre-populates draft positions from existing config if available.
+   */
+  const enterConfigMode = () => {
+    const homeDraft = homeRotationConfig
+      ? buildDraftPositionsFromConfig(homeRotationConfig)
+      : { ...EMPTY_POSITIONS };
+    const oppDraft = opponentRotationConfig
+      ? buildDraftPositionsFromConfig(opponentRotationConfig)
+      : { ...EMPTY_POSITIONS };
+    setDraftHomePositions(homeDraft as Record<VolleyballPosition, PlayerReference | null>);
+    setDraftOpponentPositions(oppDraft as Record<VolleyballPosition, PlayerReference | null>);
+    setActiveConfigPosition({ team: 'home', position: 'P1' });
+    setIsConfigMode(true);
+    setSettingsDropdownOpen(false);
+  };
+
+  /**
+   * Reset rotation configuration - Clears localStorage and resets state, opens config drawer.
    */
   const handleResetConfiguration = () => {
     const rotationKey = `match_${matchId}_rotations`;
     localStorage.removeItem(rotationKey);
 
-    // Reset all rotation-related state
-    setHomeLineup({
-      P1: null, P2: null, P3: null, P4: null, P5: null, P6: null
-    });
-    setOpponentLineup({
-      P1: null, P2: null, P3: null, P4: null, P5: null, P6: null
-    });
+    setHomeLineup({ P1: null, P2: null, P3: null, P4: null, P5: null, P6: null });
+    setOpponentLineup({ P1: null, P2: null, P3: null, P4: null, P5: null, P6: null });
     setHomeRotationConfig(null);
     setOpponentRotationConfig(null);
     setRotationEnabled(false);
 
-    // Open rotation config modal
-    setRotationConfigModalOpen(true);
+    // Open drawer instead of modal
+    setDraftHomePositions({ ...EMPTY_POSITIONS });
+    setDraftOpponentPositions({ ...EMPTY_POSITIONS });
+    setActiveConfigPosition({ team: 'home', position: 'P1' });
+    setIsConfigMode(true);
 
     console.log('🔄 Rotation configuration reset - please reconfigure');
   };
@@ -2183,9 +2208,10 @@ function VisualTrackingPageContent() {
    * Handle continuing to next set after set ends
    */
   const handleContinueToNextSet = () => {
-    // Close modals
+    // Close modals/drawer
     setSetEndModalOpen(false);
     setRotationConfigModalOpen(false);
+    setIsConfigMode(false);
 
     // Move to next set if not already at set 5
     if (currentSet < 5) {
@@ -2247,26 +2273,59 @@ function VisualTrackingPageContent() {
         <div className="court-section">
           <VolleyballCourt
             svgRef={svgRef}
-            isDrawing={isDragging}
-            disabledSide={disabledSide}
-            servingTeam={servingTeam}
-            onPointerDown={handleStart}
-            onPointerMove={handleMove}
-            onPointerUp={handleEnd}
-            onPointerCancel={handleEnd}
+            isDrawing={!isConfigMode && isDragging}
+            disabledSide={isConfigMode ? null : disabledSide}
+            servingTeam={isConfigMode ? null : servingTeam}
+            onPointerDown={isConfigMode ? undefined : handleStart}
+            onPointerMove={isConfigMode ? undefined : handleMove}
+            onPointerUp={isConfigMode ? undefined : handleEnd}
+            onPointerCancel={isConfigMode ? undefined : handleEnd}
           >
-            {/* Render home team players - Always show, with selection/fade states */}
-            {Object.values(getCurrentLineup('home')).map((player) => {
+            {/* ── CONFIG MODE: interactive position circles ── */}
+            {isConfigMode && (['home', 'opponent'] as const).flatMap(team =>
+              (['P1', 'P2', 'P3', 'P4', 'P5', 'P6'] as VolleyballPosition[]).map(pos => {
+                const { x, y } = getPositionCoordinates(team, pos);
+                const draftPositions = team === 'home' ? draftHomePositions : draftOpponentPositions;
+                const ref = draftPositions[pos];
+                const isActive = activeConfigPosition?.team === team && activeConfigPosition?.position === pos;
+                const jersey = ref ? String(getJerseyNumber(ref)) : null;
+                const color = team === 'home' ? '#7c3aed' : '#ef4444';
+                return (
+                  <g
+                    key={`cfg-${team}-${pos}`}
+                    transform={`translate(${x},${y})`}
+                    onClick={() => setActiveConfigPosition({ team, position: pos })}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <circle
+                      cx="0" cy="0" r="22"
+                      fill={isActive ? color : team === 'home' ? '#1e3a5f' : '#5f1e1e'}
+                      stroke={isActive ? (team === 'home' ? '#c4b5fd' : '#fecaca') : ref ? '#22c55e' : '#6b7280'}
+                      strokeWidth={isActive ? 3 : 2}
+                    />
+                    <text x="0" y="-3" textAnchor="middle" dominantBaseline="central"
+                      fill={ref ? 'white' : '#9ca3af'}
+                      fontSize="13" fontWeight="700"
+                    >
+                      {jersey ?? '__'}
+                    </text>
+                    <text x="0" y="13" textAnchor="middle"
+                      fill={isActive ? 'white' : '#9ca3af'} fontSize="8"
+                    >
+                      {pos}
+                    </text>
+                  </g>
+                );
+              })
+            )}
+
+            {/* ── GAME MODE: player markers ── */}
+            {!isConfigMode && Object.values(getCurrentLineup('home')).map((player) => {
               if (!player) return null;
               const position = getPositionCoordinates('home', player.position);
-
-              // Determine visual state
               const isThisPlayerSelected = selectedPlayer?.playerId === player.playerId && selectedTeam === 'home';
               const shouldFade = selectedPlayer !== null && !isThisPlayerSelected;
-
-              // Use unique key combining playerId and position to prevent duplicates
               const uniqueKey = `home-${player.playerId}-${player.position}`;
-
               return (
                 <PlayerMarker
                   key={uniqueKey}
@@ -2284,18 +2343,12 @@ function VisualTrackingPageContent() {
               );
             })}
 
-            {/* Render opponent team players - Always show, with selection/fade states */}
-            {Object.values(getCurrentLineup('opponent')).map((player) => {
+            {!isConfigMode && Object.values(getCurrentLineup('opponent')).map((player) => {
               if (!player) return null;
               const position = getPositionCoordinates('opponent', player.position);
-
-              // Determine visual state
               const isThisPlayerSelected = selectedPlayer?.playerId === player.playerId && selectedTeam === 'opponent';
               const shouldFade = selectedPlayer !== null && !isThisPlayerSelected;
-
-              // Use unique key combining playerId and position to prevent duplicates
               const uniqueKey = `opponent-${player.playerId}-${player.position}`;
-
               return (
                 <PlayerMarker
                   key={uniqueKey}
@@ -2328,8 +2381,31 @@ function VisualTrackingPageContent() {
           </VolleyballCourt>
         </div>
 
-        {/* Right Column: 3 Sectors */}
+        {/* Right Column: Config Drawer OR 3 Sectors */}
         <div className="panel-section">
+          {/* ── CONFIG MODE: drawer replaces right panel ── */}
+          {isConfigMode && (
+            <RotationDrawer
+              homeTeamName={homeTeamName}
+              opponentTeamName={opponentTeamName}
+              currentSet={currentSet}
+              homeRoster={homeRoster}
+              opponentRoster={opponentRoster}
+              initialHomeConfig={homeRotationConfig ?? undefined}
+              initialOpponentConfig={opponentRotationConfig ?? undefined}
+              initialStartingServer={servingTeam ?? 'home'}
+              activePosition={activeConfigPosition}
+              onDraftChange={(team, positions) => {
+                if (team === 'home') setDraftHomePositions(positions);
+                else setDraftOpponentPositions(positions);
+              }}
+              onSave={handleRotationConfigSave}
+              onCancel={() => { setIsConfigMode(false); setActiveConfigPosition(null); }}
+            />
+          )}
+
+          {/* ── GAME MODE: normal 3-sector right panel ── */}
+          {!isConfigMode && <>
           {/* TOP SECTOR (40%): Scoreboard + Stats */}
           <div className="stats-panel" style={{ position: 'relative' }}>
             {/* Set Tabs with Settings Button */}
@@ -2434,6 +2510,25 @@ function VisualTrackingPageContent() {
                   ⚙️
                 </button>
 
+                {/* Lineup config button — always visible */}
+                <button
+                  onClick={enterConfigMode}
+                  style={{
+                    padding: '6px 10px',
+                    border: isConfigMode ? '2px solid #7c3aed' : '2px solid hsl(var(--border))',
+                    borderRadius: '6px',
+                    background: isConfigMode ? 'rgba(124,58,237,0.1)' : 'hsl(var(--card))',
+                    color: isConfigMode ? '#7c3aed' : 'hsl(var(--foreground))',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    letterSpacing: '0.03em'
+                  }}
+                  title={rotationEnabled ? 'Edit Lineup' : 'Set Up Lineup'}
+                >
+                  📋 {rotationEnabled ? 'Lineup' : 'Set Up'}
+                </button>
+
                 {/* Settings Dropdown Menu */}
                 {settingsDropdownOpen && (
                   <div
@@ -2506,10 +2601,7 @@ function VisualTrackingPageContent() {
 
                     {/* Rotation Configuration Option - always visible */}
                     <button
-                      onClick={() => {
-                        setRotationConfigModalOpen(true);
-                        setSettingsDropdownOpen(false);
-                      }}
+                      onClick={enterConfigMode}
                       style={{
                         width: '100%',
                         padding: '12px 16px',
@@ -3525,6 +3617,7 @@ function VisualTrackingPageContent() {
               </div>
             )}
           </div>
+          </>}
         </div>
       </div>
 
@@ -4230,22 +4323,7 @@ function VisualTrackingPageContent() {
         onResetConfiguration={handleResetConfiguration}
       />
 
-      {/* Rotation Configuration Modal */}
-      <RotationConfigModal
-        isOpen={rotationConfigModalOpen}
-        onClose={() => setRotationConfigModalOpen(false)}
-        onSave={handleRotationConfigSave}
-        initialHomeConfig={homeRotationConfig || undefined}
-        initialOpponentConfig={opponentRotationConfig || undefined}
-        onResetConfiguration={handleResetConfiguration}
-        currentSet={currentSet}
-        homeTeamName={homeTeamName}
-        opponentTeamName={opponentTeamName}
-        homeRoster={homeRoster}
-        opponentRoster={opponentRoster}
-      />
-
-      {/* Player Stats Modal */}
+{/* Player Stats Modal */}
       <PlayerStatsModal
         isOpen={statsModalOpen}
         onClose={() => setStatsModalOpen(false)}
