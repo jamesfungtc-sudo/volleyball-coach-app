@@ -277,14 +277,13 @@ export default function RotationDrawer({
           {activePos} · {activeTeam === 'home' ? homeTeamName : opponentTeamName}
         </div>
 
-        {/* Jersey input */}
+        {/* Jersey / name search input */}
         <div style={{ position: 'relative' }}>
           <input
             ref={jerseyRef}
-            type="number"
+            type="text"
             inputMode="numeric"
-            pattern="[0-9]*"
-            placeholder="Jersey #"
+            placeholder="Jersey # or name"
             value={jerseyInput}
             onChange={e => setJerseyInput(e.target.value)}
             onKeyDown={e => {
@@ -317,12 +316,18 @@ export default function RotationDrawer({
           {resolvedName || (jerseyInput ? `Custom #${jerseyInput}` : '—')}
         </div>
 
-        {/* Quick roster suggestions */}
+        {/* Roster suggestions — match by jersey prefix OR name substring */}
         {jerseyInput && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
             {getRoster(activeTeam)
-              .filter(p => String(p.jerseyNumber).startsWith(jerseyInput))
-              .slice(0, 5)
+              .filter(p => {
+                const q = jerseyInput.toLowerCase();
+                return (
+                  String(p.jerseyNumber).startsWith(jerseyInput) ||
+                  (p.name || '').toLowerCase().includes(q)
+                );
+              })
+              .slice(0, 6)
               .map(p => (
                 <button
                   key={p.id}
@@ -414,19 +419,33 @@ export default function RotationDrawer({
     };
     const allRoles = SYSTEM_ROLES_MAP[system] as PlayerRole[];
 
+    const liberoInputRef = team === 'home'
+      ? { current: null } as React.RefObject<HTMLInputElement>
+      : { current: null } as React.RefObject<HTMLInputElement>;
+
+    const rosterSuggestions = liberoInput
+      ? getRoster(team).filter(p => {
+          const q = liberoInput.toLowerCase();
+          return (
+            String(p.jerseyNumber).startsWith(liberoInput) ||
+            (p.name || '').toLowerCase().includes(q)
+          );
+        }).slice(0, 6)
+      : [];
+
     return (
       <div style={{ padding: '10px 16px', borderTop: '1px solid hsl(var(--border))' }}>
         <div style={{ fontSize: '11px', fontWeight: '700', color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>
           {team === 'home' ? homeTeamName : opponentTeamName} — Libero (optional)
         </div>
         <input
-          type="number"
+          ref={liberoInputRef}
+          type="text"
           inputMode="numeric"
-          pattern="[0-9]*"
-          placeholder="Jersey #"
+          placeholder="Jersey # or name"
           value={liberoInput}
           onChange={e => setLiberoInput(e.target.value)}
-          onBlur={() => resolveLibero(liberoInput, team)}
+          onBlur={() => { if (liberoInput.trim()) resolveLibero(liberoInput, team); }}
           style={{
             width: '100%', padding: '10px 14px',
             fontSize: '18px', fontWeight: '600',
@@ -437,9 +456,40 @@ export default function RotationDrawer({
             marginBottom: '8px'
           }}
         />
+        {/* Libero suggestions */}
+        {rosterSuggestions.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
+            {rosterSuggestions.map(p => (
+              <button
+                key={p.id}
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => {
+                  setLiberoInput(String(p.jerseyNumber));
+                  const ref = createRosterReference(p);
+                  if (team === 'home') {
+                    setHomeLibero(ref);
+                    setHomeLiberoTargets(getDefaultLiberoTargets(homeSystem));
+                  } else {
+                    setOpponentLibero(ref);
+                    setOpponentLiberoTargets(getDefaultLiberoTargets(opponentSystem));
+                  }
+                }}
+                style={{
+                  padding: '4px 10px', borderRadius: '99px',
+                  border: '1px solid #f59e0b',
+                  background: 'rgba(245,158,11,0.1)',
+                  fontSize: '12px', fontWeight: '600',
+                  color: '#92400e', cursor: 'pointer'
+                }}
+              >
+                #{p.jerseyNumber} {p.name}
+              </button>
+            ))}
+          </div>
+        )}
         {libero && (
           <div style={{ fontSize: '12px', color: '#92400e', marginBottom: '8px' }}>
-            #{getJerseyNumber(libero)} {getPlayerDisplayName(libero)}
+            ✓ #{getJerseyNumber(libero)} {getPlayerDisplayName(libero)}
           </div>
         )}
         {libero && (
