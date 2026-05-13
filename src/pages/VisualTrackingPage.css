@@ -282,6 +282,48 @@
   }
 }
 
+/* ── Loading screen ────────────────────────────────────────── */
+.vt-loading-screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  background: hsl(var(--background));
+  z-index: 9999;
+}
+
+.vt-loading-ball {
+  font-size: 72px;
+  animation: vt-spin 0.9s linear infinite;
+  filter: drop-shadow(0 4px 12px rgba(124,58,237,0.35));
+}
+
+.vt-loading-label {
+  font-size: 18px;
+  font-weight: 700;
+  color: hsl(var(--foreground));
+  letter-spacing: 0.02em;
+}
+
+.vt-loading-sub {
+  font-size: 13px;
+  color: hsl(var(--muted-foreground));
+  animation: vt-fade 1.4s ease-in-out infinite;
+}
+
+@keyframes vt-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes vt-fade {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.35; }
+}
+
 /* Sync status pulse animation */
 @keyframes pulse {
   0%, 100% {

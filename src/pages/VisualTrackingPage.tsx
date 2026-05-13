@@ -2265,6 +2265,17 @@ function VisualTrackingPageContent() {
     console.log('🏁 Match finished! Navigating back to stats page.');
   };
 
+  // ── Loading screen ──────────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="vt-loading-screen">
+        <div className="vt-loading-ball">🏐</div>
+        <div className="vt-loading-label">Loading match…</div>
+        <div className="vt-loading-sub">Fetching rosters &amp; session data</div>
+      </div>
+    );
+  }
+
   return (
     <div className="visual-tracking-page">
       {/* Main Content - 2 Column Grid */}
@@ -2394,39 +2405,28 @@ function VisualTrackingPageContent() {
               borderBottom: '2px solid hsl(var(--border))',
               paddingBottom: '8px'
             }}>
-              {/* Set Tab Buttons */}
-              <div style={{ display: 'flex', gap: '4px', flex: 1 }}>
-                {[1, 2, 3, 4, 5].map((setNum) => (
-                  <button
-                    key={setNum}
-                    onClick={() => handleSetChange(setNum)}
-                    style={{
-                      flex: 1,
-                      padding: '8px 4px',
-                      fontSize: '13px',
-                      fontWeight: '700',
-                      background: currentSet === setNum ? '#7c3aed' : 'hsl(var(--secondary))',
-                      color: currentSet === setNum ? 'white' : 'hsl(var(--muted-foreground))',
-                      border: currentSet === setNum ? '2px solid #5b21b6' : '2px solid hsl(var(--border))',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s'
-                    }}
-                    onMouseOver={(e) => {
-                      if (currentSet !== setNum) {
-                        e.currentTarget.style.background = 'hsl(var(--accent))';
-                      }
-                    }}
-                    onMouseOut={(e) => {
-                      if (currentSet !== setNum) {
-                        e.currentTarget.style.background = 'hsl(var(--accent))';
-                      }
-                    }}
-                  >
-                    Set {setNum}
-                  </button>
+              {/* Set selector dropdown */}
+              <select
+                value={currentSet}
+                onChange={e => handleSetChange(Number(e.target.value))}
+                style={{
+                  height: '32px',
+                  padding: '0 8px',
+                  fontSize: '14px',
+                  fontWeight: '700',
+                  border: '2px solid #7c3aed',
+                  borderRadius: '6px',
+                  background: '#7c3aed',
+                  color: 'white',
+                  cursor: 'pointer',
+                  outline: 'none',
+                  flex: 1
+                }}
+              >
+                {[1, 2, 3, 4, 5].map(s => (
+                  <option key={s} value={s}>Set {s}</option>
                 ))}
-              </div>
+              </select>
 
               {/* Player Stats Button */}
               <button
@@ -2453,6 +2453,30 @@ function VisualTrackingPageContent() {
                 }}
               >
                 📊
+              </button>
+
+              {/* Lineup config button */}
+              <button
+                onClick={enterConfigMode}
+                style={{
+                  height: '32px',
+                  padding: '0 10px',
+                  border: isConfigMode ? '2px solid #7c3aed' : '2px solid hsl(var(--border))',
+                  borderRadius: '6px',
+                  background: isConfigMode ? 'rgba(124,58,237,0.1)' : 'hsl(var(--card))',
+                  color: isConfigMode ? '#7c3aed' : 'hsl(var(--foreground))',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0
+                }}
+                title={rotationEnabled ? 'Edit Lineup' : 'Set Up Lineup'}
+              >
+                📋 {rotationEnabled ? 'Lineup' : 'Set Up'}
               </button>
 
               {/* Settings Dropdown Button */}
@@ -2485,25 +2509,6 @@ function VisualTrackingPageContent() {
                   }}
                 >
                   ⚙️
-                </button>
-
-                {/* Lineup config button — always visible */}
-                <button
-                  onClick={enterConfigMode}
-                  style={{
-                    padding: '6px 10px',
-                    border: isConfigMode ? '2px solid #7c3aed' : '2px solid hsl(var(--border))',
-                    borderRadius: '6px',
-                    background: isConfigMode ? 'rgba(124,58,237,0.1)' : 'hsl(var(--card))',
-                    color: isConfigMode ? '#7c3aed' : 'hsl(var(--foreground))',
-                    fontSize: '12px',
-                    fontWeight: '700',
-                    cursor: 'pointer',
-                    letterSpacing: '0.03em'
-                  }}
-                  title={rotationEnabled ? 'Edit Lineup' : 'Set Up Lineup'}
-                >
-                  📋 {rotationEnabled ? 'Lineup' : 'Set Up'}
                 </button>
 
                 {/* Settings Dropdown Menu */}
