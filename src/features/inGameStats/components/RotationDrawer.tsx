@@ -468,12 +468,29 @@ export default function RotationDrawer({
 
   // ── Render ────────────────────────────────────────────────────────────
   return (
-    <div style={{
-      display: 'flex', flexDirection: 'column',
-      height: '100%', background: 'hsl(var(--card))',
-      borderLeft: '2px solid hsl(var(--border))',
-      overflow: 'hidden'
-    }}>
+    <>
+      {/* Backdrop — tap to cancel */}
+      <div
+        onClick={onCancel}
+        style={{
+          position: 'fixed', inset: 0,
+          background: 'rgba(0,0,0,0.4)',
+          zIndex: 1499,
+          touchAction: 'none'
+        }}
+      />
+
+      {/* Drawer panel */}
+      <div style={{
+        position: 'fixed', right: 0, top: 0, bottom: 0,
+        width: '380px', maxWidth: '90vw',
+        display: 'flex', flexDirection: 'column',
+        background: 'hsl(var(--card))',
+        borderLeft: '2px solid hsl(var(--border))',
+        boxShadow: '-8px 0 40px rgba(0,0,0,0.25)',
+        zIndex: 1500,
+        overflow: 'hidden'
+      }}>
       {/* Header */}
       <div style={{
         padding: '10px 14px',
@@ -590,6 +607,7 @@ export default function RotationDrawer({
           {canSave ? 'Save & Play →' : `Fill all positions + select setters`}
         </button>
       </div>
-    </div>
+      </div>
+    </>
   );
 }

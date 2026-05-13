@@ -2381,31 +2381,8 @@ function VisualTrackingPageContent() {
           </VolleyballCourt>
         </div>
 
-        {/* Right Column: Config Drawer OR 3 Sectors */}
+        {/* Right Column: 3-sector stats/controls panel */}
         <div className="panel-section">
-          {/* ── CONFIG MODE: drawer replaces right panel ── */}
-          {isConfigMode && (
-            <RotationDrawer
-              homeTeamName={homeTeamName}
-              opponentTeamName={opponentTeamName}
-              currentSet={currentSet}
-              homeRoster={homeRoster}
-              opponentRoster={opponentRoster}
-              initialHomeConfig={homeRotationConfig ?? undefined}
-              initialOpponentConfig={opponentRotationConfig ?? undefined}
-              initialStartingServer={servingTeam ?? 'home'}
-              activePosition={activeConfigPosition}
-              onDraftChange={(team, positions) => {
-                if (team === 'home') setDraftHomePositions(positions);
-                else setDraftOpponentPositions(positions);
-              }}
-              onSave={handleRotationConfigSave}
-              onCancel={() => { setIsConfigMode(false); setActiveConfigPosition(null); }}
-            />
-          )}
-
-          {/* ── GAME MODE: normal 3-sector right panel ── */}
-          {!isConfigMode && <>
           {/* TOP SECTOR (40%): Scoreboard + Stats */}
           <div className="stats-panel" style={{ position: 'relative' }}>
             {/* Set Tabs with Settings Button */}
@@ -3617,9 +3594,29 @@ function VisualTrackingPageContent() {
               </div>
             )}
           </div>
-          </>}
         </div>
       </div>
+
+      {/* ── Rotation Config Drawer (fixed overlay) ── */}
+      {isConfigMode && (
+        <RotationDrawer
+          homeTeamName={homeTeamName}
+          opponentTeamName={opponentTeamName}
+          currentSet={currentSet}
+          homeRoster={homeRoster}
+          opponentRoster={opponentRoster}
+          initialHomeConfig={homeRotationConfig ?? undefined}
+          initialOpponentConfig={opponentRotationConfig ?? undefined}
+          initialStartingServer={servingTeam ?? 'home'}
+          activePosition={activeConfigPosition}
+          onDraftChange={(team, positions) => {
+            if (team === 'home') setDraftHomePositions(positions);
+            else setDraftOpponentPositions(positions);
+          }}
+          onSave={handleRotationConfigSave}
+          onCancel={() => { setIsConfigMode(false); setActiveConfigPosition(null); }}
+        />
+      )}
 
       {/* Portrait Orientation Warning */}
       <div className="orientation-warning">
