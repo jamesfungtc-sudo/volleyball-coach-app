@@ -539,7 +539,7 @@ export default function RotationDrawer({
       {/* Drawer panel */}
       <div style={{
         position: 'fixed', right: 0, top: 0, bottom: 0,
-        width: '380px', maxWidth: '90vw',
+        width: '520px', maxWidth: '90vw',
         display: 'flex', flexDirection: 'column',
         background: 'hsl(var(--card))',
         borderLeft: '2px solid hsl(var(--border))',
