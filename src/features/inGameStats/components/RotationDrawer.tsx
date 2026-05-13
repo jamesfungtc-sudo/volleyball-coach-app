@@ -290,7 +290,15 @@ export default function RotationDrawer({
             onKeyDown={e => {
               if (e.key === 'Enter' && activePos) confirmJersey(activePos, activeTeam);
             }}
-            onBlur={() => { if (activePos) confirmJersey(activePos, activeTeam); }}
+            onBlur={() => {
+              // Only confirm if the user actually typed something.
+              // An empty input means we already confirmed (via Enter or a
+              // suggestion chip) and jerseyInput was cleared by auto-advance —
+              // calling confirmJersey here would wipe the saved player.
+              if (activePos && jerseyInput.trim() !== '') {
+                confirmJersey(activePos, activeTeam);
+              }
+            }}
             style={{
               width: '100%', padding: '14px 16px',
               fontSize: '28px', fontWeight: '700',
@@ -318,15 +326,14 @@ export default function RotationDrawer({
               .map(p => (
                 <button
                   key={p.id}
+                  onMouseDown={e => e.preventDefault()}  /* keep input focused; prevents spurious onBlur */
                   onClick={() => {
-                    setJerseyInput(String(p.jerseyNumber));
-                    if (activePos) {
-                      const ref = createRosterReference(p);
-                      updatePositions(activeTeam, activePos, ref);
-                      const next = nextEmptyPosition({ ...activePositions, [activePos]: ref }, activePos);
-                      setJerseyInput(next && activePositions[next] ? String(getJerseyNumber(activePositions[next]!)) : '');
-                      setTimeout(() => jerseyRef.current?.focus(), 80);
-                    }
+                    if (!activePos) return;
+                    const ref = createRosterReference(p);
+                    updatePositions(activeTeam, activePos, ref);
+                    const next = nextEmptyPosition({ ...activePositions, [activePos]: ref }, activePos);
+                    setJerseyInput(next && activePositions[next] ? String(getJerseyNumber(activePositions[next]!)) : '');
+                    setTimeout(() => jerseyRef.current?.focus(), 80);
                   }}
                   style={{
                     padding: '4px 10px', borderRadius: '99px',
