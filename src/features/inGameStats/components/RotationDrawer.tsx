@@ -469,14 +469,13 @@ export default function RotationDrawer({
   // ── Render ────────────────────────────────────────────────────────────
   return (
     <>
-      {/* Backdrop — tap to cancel */}
+      {/* Backdrop — visual only, no click-close (court must stay interactive) */}
       <div
-        onClick={onCancel}
         style={{
           position: 'fixed', inset: 0,
-          background: 'rgba(0,0,0,0.4)',
+          background: 'rgba(0,0,0,0.2)',
           zIndex: 1499,
-          touchAction: 'none'
+          pointerEvents: 'none'
         }}
       />
 
