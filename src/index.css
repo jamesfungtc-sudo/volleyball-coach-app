@@ -217,12 +217,14 @@ body {
   min-height: 100vh;
 }
 
-a {
-  font-weight: 500;
-  color: hsl(var(--primary));
-  text-decoration: inherit;
-}
+@layer base {
+  a {
+    font-weight: 500;
+    color: hsl(var(--primary));
+    text-decoration: inherit;
+  }
 
-a:hover {
-  opacity: 0.8;
+  a:hover {
+    opacity: 0.8;
+  }
 }
