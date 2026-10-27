@@ -8,6 +8,8 @@ import AnalysisPage from './pages/AnalysisPage'
 import ScoutingPage from './pages/ScoutingPage'
 import TeamsPage from './pages/TeamsPage'
 import SettingsPage from './pages/SettingsPage'
+import MatchSetup from './features/live/MatchSetup'
+import LiveMatchRoute from './features/live/LiveMatchRoute'
 
 import MatchListPage from './pages/MatchListPage'
 import MatchSetupPage from './pages/MatchSetupPage'
@@ -39,7 +41,11 @@ function AppRoutes() {
         <Route path="/scouting" element={<ScoutingPage />} />
         <Route path="/teams" element={<TeamsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/live/new" element={<MatchSetup />} />
       </Route>
+
+      {/* Full-screen live tracking (no tab bar) */}
+      <Route path="/live/:matchId/quick" element={<LiveMatchRoute />} />
 
       {/* Existing match flow pages (kept during rebuild) */}
       <Route path="/in-game-stats" element={<MatchListPage />} />

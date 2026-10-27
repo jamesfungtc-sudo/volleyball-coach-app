@@ -24,6 +24,7 @@ export function SegmentedControl<T extends string>({
       {options.map((option) => (
         <button
           key={option.value}
+          type="button"
           role="radio"
           aria-checked={value === option.value}
           onClick={() => onChange(option.value)}
