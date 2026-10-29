@@ -8,11 +8,15 @@ The Volleyball Coach App is a React 19 + Vite 7 progressive web app that lets co
 
 The app today is functional but has grown organically: the core match-tracking page (`VisualTrackingPage.tsx`) is 4,368 lines of tightly coupled state, the navigation is a hamburger menu that hides all features behind a tap, two of six pages are placeholders, and the visual design is dark-only with no light theme. The rotation planner and match tracker operate as separate workflows with no shared context.
 
-This review proposes a rebuild around three coach-facing modes — **Live Match**, **Post-Match Analysis**, and **Opponent Scouting** — with the rotation viewer folded into Live mode, a quick-entry option for head coaches alongside the existing detailed entry, multi-team support, dark and light themes, and offline-first architecture throughout. The data connection to Google Sheets (`googleSheetsAPI.ts`, `writeQueue.ts`, `Code.gs`) stays unchanged.
+This review proposes a rebuild around three coach-facing modes — **Live Match**, **Post-Match Analysis**, and **Opponent Scouting** — with the rotation viewer folded into Live mode, a quick-entry option for head coaches alongside the existing detailed entry, multi-team support, dark and light themes, and offline-first architecture throughout.
 
-**What stays**: the data layer, the SVG court rendering system, the rotation calculation logic, the offline sync queue, and the Google Sheets backend.
+**Revised Oct 28, 2026:** the backend moves from Google Sheets to a Postgres database (Neon) behind the app's own API, hosted on Vercel (Phase 1.5). Google Sheets keeps working in parallel until the new backend is proven on real matches, then is retired. The schema and API are designed from the start for multiple users, so the app can later be shared with other coaches and gain user-specific features without another migration.
 
-**What changes**: information architecture, navigation, every page layout, the component structure, the state management approach, theming, and the CSS foundation.
+**What stays**: the SVG court rendering system, the rotation calculation logic, the offline-first approach (local storage + ordered sync outbox), and the Google Sheets backend *until* the Neon cutover is verified.
+
+**What changes**: information architecture, navigation, every page layout, the component structure, the state management approach, theming, the CSS foundation, and (from Phase 1.5) the backend and hosting.
+
+**Rollback point:** tag `pre-rebuild-2026-10-26` (commit `04eac72`) is the last version before the rebuild.
 
 ## Current State Review
 
@@ -164,7 +168,9 @@ The offline architecture has three layers: (1) `vite-plugin-pwa` generates a ser
 
 ### Data Layer
 
-`googleSheetsAPI.ts` exports 18 functions covering teams, players, matches, points, game state, rotations, and trajectories. All communication goes through a single Google Apps Script web app URL. The `writeQueue.ts` singleton ensures writes are serialized. This layer is clean and well-separated from the UI. The rebuild should preserve it as-is.
+`googleSheetsAPI.ts` exports 18 functions covering teams, players, matches, points, game state, rotations, and trajectories. All communication goes through a single Google Apps Script web app URL. The `writeQueue.ts` singleton ensures writes are serialized. This layer is clean and well-separated from the UI.
+
+Limits of Sheets as a backend: no user accounts or per-user data, the Apps Script URL is public and unauthenticated, every write is a GET request with JSON in the query string, there are no relational constraints or indexes, and concurrent writes need the client-side `writeQueue` to avoid lost updates. These are acceptable for one coach but block sharing the app. Phase 1.5 replaces it with Postgres; see **Backend Architecture** below.
 
 ### Build and Tooling
 
@@ -400,9 +406,65 @@ All interactive elements meet 44 x 44px minimum on iPad. Critical live-tracking 
 - Player markers on court: 44px diameter (scaled to court viewport)
 - Bottom tab bar items: 56px height, equal-width distribution
 
+## Backend Architecture
+
+*Added Oct 28, 2026.*
+
+### Decision: own API on Vercel + Neon Postgres (Option B)
+
+*Confirmed Oct 29, 2026. Auth provider: Neon Auth.*
+
+Two options were considered for replacing Google Sheets with the Neon Postgres database already used by the personal tracker (`playground` repo):
+
+| | A. Add volleyball routes to the `playground` app | **B. Volleyball app gets its own API (chosen)** |
+| --- | --- | --- |
+| Setup cost | Lowest: reuses an existing Vercel project | A new Vercel project for this repo |
+| Deploys | Coupled: a volleyball change redeploys the personal tracker and vice versa | Independent |
+| Sharing with other coaches | Other users' traffic and data sit inside a personal app with no login | Built for it: own auth, own users |
+| Security | `playground` API has no auth; exposing it more widely exposes personal health and family data | Isolated; volleyball credentials can only reach volleyball data |
+| Scaling and limits | Shares function limits and cold starts with the tracker | Scales on its own |
+| Same-origin | Needs CORS from GitHub Pages | Frontend and API on one origin, no CORS |
+
+B is chosen because the goal includes sharing the app and adding user-specific features. A is cheaper today but would have to be undone at that point.
+
+### Shape
+
+- **Hosting:** the Vite app and its API deploy together as one Vercel project from this repo. The frontend is unchanged in kind (static SPA); the API is Vercel Functions in `api/`. GitHub Pages stays live until cutover, then redirects.
+- **Database:** a **separate Neon project** (or at minimum a separate database) for volleyball, not a schema inside the personal tracker's database. This keeps other people's data away from personal data, allows separate backups, branches and limits, and lets the volleyball app be handed over or open-sourced later. Same stack as `playground`: `@neondatabase/serverless` + Drizzle ORM + drizzle-kit migrations.
+- **Auth:** Neon Auth, with a login from day one even while there is only one user. Adding auth after data exists is a migration; adding users to an auth system that exists is configuration.
+- **Validation:** every API input is validated with `zod` (already a dependency).
+- **Offline:** unchanged. The app keeps writing locally first and syncing through the ordered outbox (`liveSyncEngine.ts`). Only the transport changes from Apps Script to the new API, and writes become idempotent (client-generated IDs) so retries can never duplicate a point.
+
+### Data model (multi-user ready)
+
+Ownership hangs off **teams**, not individual rows, so sharing works the way coaching staff do:
+
+| Table | Key columns | Notes |
+| --- | --- | --- |
+| `users` | id, email, name | From the auth provider |
+| `teams` | id, name, created_by | A coach's own team or a one-off opponent |
+| `team_members` | team_id, user_id, role (`owner`, `coach`, `statistician`, `viewer`) | Sharing = adding a member |
+| `players` | id, team_id, name, jersey, position, archived | Replaces PlayerInfo sheet |
+| `matches` | id (client-generated), team_id, opponent_team_id, date, venue, format, status | Belongs to the home team |
+| `sets` | match_id, number, home, opponent, first_serve, winner | |
+| `points` | id (client-generated), match_id, set_number, number, winner, serving_before, rotation_before, action_type, action, player_id, opponent_player, payload jsonb, created_at | Quick and Detailed mode share this table |
+| `rotation_configs` | match_id, set_number, config jsonb | Mirrors current per-set rotation data |
+| `trajectories` | id, match_id, point_id, data jsonb | |
+
+Every API query is scoped through `team_members` for the signed-in user. User-specific features (per-coach defaults, saved systems, preferences) attach to `users`; anything shared attaches to `teams`.
+
+### Cutover rules
+
+1. Sheets remains the source of truth until Neon has recorded real matches correctly.
+2. During the transition the app can write to both backends (dual-write in the sync engine) and a comparison script checks they agree.
+3. Existing Sheets data (teams, players, matches, points) is imported once with a script and verified by count and score per set.
+4. `googleSheetsAPI.ts`, `writeQueue.ts` and `Code.gs` are only removed in Phase 7, after cutover.
+
 ## Phased Rebuild Plan
 
-### Phase 0 — Foundation (1 week)
+### Phase 0 — Foundation (1 week) ✅ Done
+
+**Status:** merged Oct 27, 2026 (PR #1, `7281a97`).
 
 **Goal:** New project skeleton, design tokens, and theme switching. No feature code yet.
 
@@ -422,7 +484,9 @@ All interactive elements meet 44 x 44px minimum on iPad. Critical live-tracking 
 
 ---
 
-### Phase 1 — Live Match: Quick Mode (2 weeks)
+### Phase 1 — Live Match: Quick Mode (2 weeks) ✅ Done
+
+**Status:** shipped Oct 27, 2026 (`28ecf59`). Built local-first: matches are stored on the device and synced through an ordered, persistent outbox (`src/features/live/services/liveSyncEngine.ts`) that retries until delivered. Quick-mode points are recorded with `action_type: "Quick"`. Not yet verified against the real Google Sheet.
 
 **Goal:** Head coach can track a full match with two-tap scoring.
 
@@ -446,6 +510,30 @@ All interactive elements meet 44 x 44px minimum on iPad. Critical live-tracking 
 
 ---
 
+### Phase 1.5 — Backend Migration: Google Sheets → Neon (1.5 weeks)
+
+**Goal:** Move storage to Postgres behind the app's own authenticated API, without losing data or breaking live tracking. See **Backend Architecture**.
+
+| Task | Files | Effort |
+| --- | --- | --- |
+| Create Neon project for volleyball (with Neon Auth enabled); Vercel project for this repo with `DATABASE_URL` | Neon, Vercel | 1h |
+| Drizzle schema + first migration (users, teams, team_members, players, matches, sets, points, rotation_configs, trajectories) | `db/schema.ts`, `drizzle/` | 4h |
+| Auth: sign-in screen, session check on every API route, queries scoped via `team_members` | `api/_lib/auth.ts`, `src/features/auth/` | 5h |
+| API routes with zod validation and idempotent writes (client-generated IDs) | `api/` | 8h |
+| Typed API client for the new backend | `src/services/api.ts` | 3h |
+| Switch `liveSyncEngine` transport to the new API; dual-write to Sheets during transition | `src/features/live/services/liveSyncEngine.ts` | 3h |
+| One-off import of existing Sheets data + verification report (counts, per-set scores) | `scripts/import-sheets.ts` | 4h |
+| Switch Teams and old match screens from `googleSheetsAPI.ts` to the new client | Various | 4h |
+| Move deployment to Vercel; GitHub Pages redirects to the new URL | `vercel.json`, `vite.config.ts` (`base`), `.github/workflows/` | 2h |
+
+**Depends on:** Phase 1 (sync outbox).
+
+**Exit criteria:** At least two real matches recorded with Neon and Sheets in agreement; all historic Sheets data imported and verified; signing in is required; Sheets writes switched off (code kept until Phase 7).
+
+**Rollback:** while dual-write is on, turning off the Neon transport returns the app to Sheets-only with no data loss.
+
+---
+
 ### Phase 2 — Live Match: Detailed Mode + Court (2 weeks)
 
 **Goal:** Statistician mode with per-action attribution, court visualization, and rotation tracking.
@@ -462,7 +550,7 @@ All interactive elements meet 44 x 44px minimum on iPad. Critical live-tracking 
 | Build substitution modal (swap player in/out of rotation) | `src/features/live/components/SubstitutionModal.tsx` | 3h |
 | Add mode toggle (Quick ↔ Detailed) in score strip | `src/features/live/components/ModeToggle.tsx` | 1h |
 
-**Depends on:** Phase 1 (match context, scoring, point history).
+**Depends on:** Phase 1 (match context, scoring, point history) and Phase 1.5 (built directly on the new API).
 
 **Exit criteria:** Statistician can record actions with player, court location, and trajectory. Rotation tracks automatically on side-out.
 
@@ -531,6 +619,7 @@ All interactive elements meet 44 x 44px minimum on iPad. Critical live-tracking 
 | --- | --- | --- |
 | Rebuild `TeamsPage` with multi-team support (add/switch/edit teams) | `src/features/teams/TeamsPage.tsx` | 4h |
 | Build player management (add/edit/archive players per team) | `src/features/teams/PlayerManagement.tsx` | 3h |
+| Team sharing: invite another coach by email, assign role (coach, statistician, viewer) | `src/features/teams/TeamSharing.tsx`, `api/teams/members` | 4h |
 | Create Settings screen (theme toggle, sync config, data export) | `src/features/settings/SettingsPage.tsx` | 3h |
 
 **Depends on:** Phase 0 (shell, routing).
@@ -550,8 +639,9 @@ All interactive elements meet 44 x 44px minimum on iPad. Critical live-tracking 
 | Convert remaining `.jsx` files to `.tsx` | Various | 3h |
 | Verify PWA manifest, service worker, offline behavior | `vite.config.ts`, manifest | 2h |
 | Test all breakpoints: iPad landscape (primary), iPad portrait, phone | Manual testing | 3h |
-| Verify Google Sheets sync end-to-end (create match, record points, sync) | Integration test | 2h |
-| Update GitHub Actions build if needed | `.github/workflows/` | 1h |
+| Verify Neon sync end-to-end (create match, record points offline and online, sync) | Integration test | 2h |
+| Retire Google Sheets: remove `googleSheetsAPI.ts`, `writeQueue.ts`, `Code.gs`; archive the spreadsheet read-only | Various | 2h |
+| Remove the GitHub Pages workflow once the redirect has been live for a while | `.github/workflows/` | 1h |
 
 **Depends on:** All previous phases.
 
@@ -563,15 +653,16 @@ All interactive elements meet 44 x 44px minimum on iPad. Critical live-tracking 
 
 | Phase | Scope | Duration | Cumulative |
 | --- | --- | --- | --- |
-| 0 — Foundation | Tokens, theme, shell, routing | 1 week | 1 week |
-| 1 — Quick Mode | Two-tap scoring, sync, offline | 2 weeks | 3 weeks |
-| 2 — Detailed Mode | Actions, court, rotations | 2 weeks | 5 weeks |
-| 3 — Opponent Overlay | Live scouting capture | 1 week | 6 weeks |
-| 4 — Analysis | Post-match stats and charts | 1.5 weeks | 7.5 weeks |
-| 5 — Scouting Report | Opponent review views | 1 week | 8.5 weeks |
-| 6 — Teams & Settings | Roster management, config | 0.5 weeks | 9 weeks |
-| 7 — Polish | Cleanup, PWA, deploy | 1 week | 10 weeks |
+| 0 — Foundation ✅ | Tokens, theme, shell, routing | 1 week | 1 week |
+| 1 — Quick Mode ✅ | Two-tap scoring, sync, offline | 2 weeks | 3 weeks |
+| 1.5 — Backend Migration | Neon, own API, auth, Sheets import | 1.5 weeks | 4.5 weeks |
+| 2 — Detailed Mode | Actions, court, rotations | 2 weeks | 6.5 weeks |
+| 3 — Opponent Overlay | Live scouting capture | 1 week | 7.5 weeks |
+| 4 — Analysis | Post-match stats and charts | 1.5 weeks | 9 weeks |
+| 5 — Scouting Report | Opponent review views | 1 week | 10 weeks |
+| 6 — Teams & Settings | Roster management, sharing, config | 0.5 weeks | 10.5 weeks |
+| 7 — Polish | Cleanup, PWA, retire Sheets | 1 week | 11.5 weeks |
 
-**Total estimated effort: 10 weeks** (solo developer, part-time adjust accordingly).
+**Total estimated effort: 11.5 weeks** (solo developer, part-time adjust accordingly).
 
-Phases 0–2 are the critical path. Phase 6 can run in parallel with Phases 2–5. Phase 4 can start as soon as Phase 1 is done (independent of Phases 2–3).
+Phases 0–2 (including 1.5) are the critical path. Phase 6 can run in parallel with Phases 2–5. Phase 4 can start as soon as Phase 1 is done (independent of Phases 2–3).
