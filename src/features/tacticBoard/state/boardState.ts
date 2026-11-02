@@ -1,5 +1,6 @@
 import { clampToRect, FULL_VIEW, type Point } from '../engine/court'
 import { BLOCKER_Y, isInBlockZone } from '../engine/defence'
+import type { HitType } from '../engine/hitZones'
 
 export type IconKind = 'home' | 'opponent' | 'ball'
 
@@ -11,12 +12,16 @@ export interface BoardIcon extends Point {
 
 export type ZoomMode = 'full' | 'defence'
 
+/** Which attack's landing zones to show; 'all' layers them. */
+export type HitView = HitType | 'all'
+
 export interface BoardState {
   icons: BoardIcon[]
   /** Opponent icon treated as the attacker; drives the defence view and the block shadow. */
   hitterId: string
   zoom: ZoomMode
   showShadow: boolean
+  hitView: HitView
 }
 
 export type BoardAction =
@@ -26,6 +31,7 @@ export type BoardAction =
   | { type: 'setHitter'; id: string }
   | { type: 'setZoom'; zoom: ZoomMode }
   | { type: 'toggleShadow' }
+  | { type: 'setHitView'; hitView: HitView }
   | { type: 'reset' }
 
 // Opponents face down the screen, so their left side (positions 4, 5) is on screen right.
@@ -54,6 +60,7 @@ export const initialBoardState: BoardState = {
   hitterId: 'o4',
   zoom: 'full',
   showShadow: true,
+  hitView: 'hard',
 }
 
 export function isBlocker(icon: BoardIcon): boolean {
@@ -76,8 +83,11 @@ export function boardReducer(state: BoardState, action: BoardAction): BoardState
       return { ...state, zoom: action.zoom }
     case 'toggleShadow':
       return { ...state, showShadow: !state.showShadow }
+    case 'setHitView':
+      return { ...state, hitView: action.hitView }
     case 'reset':
-      return { ...initialBoardState, zoom: state.zoom, showShadow: state.showShadow }
+      // Board positions reset; view settings stay as the coach left them.
+      return { ...initialBoardState, zoom: state.zoom, showShadow: state.showShadow, hitView: state.hitView }
   }
 }
 

@@ -120,7 +120,7 @@ export function TacticBoard({ state, dispatch }: TacticBoardProps) {
       aria-label="Volleyball tactic board"
     >
       <Court />
-      {analysis && <DefenceOverlay analysis={analysis} />}
+      {analysis && <DefenceOverlay analysis={analysis} hitView={state.hitView} />}
       <BlockerHands blockerXs={blockerXs} />
       {ordered.map(icon => (
         <BoardIconView

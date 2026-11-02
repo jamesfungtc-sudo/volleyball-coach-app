@@ -1,6 +1,8 @@
 import { COURT_WIDTH, NET_Y, type Point } from '../engine/court'
 import { BLOCK_WIDTH, type DefenceAnalysis, type LaneKind } from '../engine/defence'
 import { polygonArea, polygonCentroid } from '../engine/geometry'
+import { rollZones, tipZone } from '../engine/hitZones'
+import type { HitView } from '../state/boardState'
 
 const LANE_FILL: Record<LaneKind, string> = {
   line: 'hsl(var(--tb-lane))',
@@ -12,24 +14,37 @@ const LANE_FILL: Record<LaneKind, string> = {
 /** Lanes smaller than this (m²) are too thin to label legibly. */
 const MIN_LABELLED_AREA = 0.6
 const LABEL_INSET = 0.8
+/** Hard-hit lanes stay faintly visible behind the roll/tip zones for context. */
+const BACKGROUND_LANE_OPACITY = 0.35
 
 interface DefenceOverlayProps {
   analysis: DefenceAnalysis
+  hitView: HitView
 }
 
-/** Block shadow and open lanes on our court, plus the sight lines from the hitter to the block edges. */
-export function DefenceOverlay({ analysis }: DefenceOverlayProps) {
+/** Block shadow and attack landing zones on our court, plus the sight lines from the hitter to the block edges. */
+export function DefenceOverlay({ analysis, hitView }: DefenceOverlayProps) {
   const { contact } = analysis
   const edges = analysis.shadows.flatMap(s => [s.from, s.to])
+  const showHard = hitView === 'hard' || hitView === 'all'
+  const rolls = hitView === 'roll' || hitView === 'all' ? rollZones(analysis) : []
+  const tip = hitView === 'tip' || hitView === 'all' ? tipZone(analysis) : null
 
   return (
     <g pointerEvents="none" aria-hidden="true">
-      {analysis.lanes.map(lane => (
-        <polygon key={`lane-${lane.from}`} points={toPoints(lane.polygon)} fill={LANE_FILL[lane.kind]} />
-      ))}
+      <g opacity={showHard ? 1 : BACKGROUND_LANE_OPACITY}>
+        {analysis.lanes.map(lane => (
+          <polygon key={`lane-${lane.from}`} points={toPoints(lane.polygon)} fill={LANE_FILL[lane.kind]} />
+        ))}
+      </g>
       {analysis.shadows.map(shadow => (
         <polygon key={`shadow-${shadow.from}`} points={toPoints(shadow.polygon)} fill="hsl(var(--tb-shadow))" />
       ))}
+
+      {rolls.map((zone, i) => (
+        <Zone key={`roll-${i}`} polygon={zone} color="--tb-roll" />
+      ))}
+      {tip && <Zone polygon={tip} color="--tb-tip" />}
 
       <g stroke="hsl(var(--tb-sight-line))" strokeWidth={0.035} strokeDasharray="0.15 0.12">
         {edges.map(x => (
@@ -37,31 +52,54 @@ export function DefenceOverlay({ analysis }: DefenceOverlayProps) {
         ))}
       </g>
 
-      {analysis.lanes.map(lane => {
-        if (polygonArea(lane.polygon) < MIN_LABELLED_AREA) return null
-        const c = polygonCentroid(lane.polygon)
-        return (
-          <text
-            key={`label-${lane.from}`}
-            // Narrow edge lanes put the centroid near a sideline; keep the word inside the court.
-            x={Math.min(COURT_WIDTH - LABEL_INSET, Math.max(LABEL_INSET, c.x))}
-            y={c.y}
-            textAnchor="middle"
-            dominantBaseline="central"
-            fontSize={0.42}
-            fontWeight={700}
-            letterSpacing={0.04}
-            fill="hsl(0 0% 100%)"
-            stroke="hsl(222 47% 7% / 0.55)"
-            strokeWidth={0.08}
-            paintOrder="stroke"
-            style={{ userSelect: 'none' }}
-          >
-            {lane.kind.toUpperCase()}
-          </text>
-        )
-      })}
+      {showHard &&
+        analysis.lanes.map(lane =>
+          polygonArea(lane.polygon) < MIN_LABELLED_AREA ? null : (
+            <Label key={`label-${lane.from}`} at={polygonCentroid(lane.polygon)} text={lane.kind.toUpperCase()} />
+          ),
+        )}
+      {rolls.map((zone, i) =>
+        polygonArea(zone) < MIN_LABELLED_AREA ? null : (
+          <Label key={`roll-label-${i}`} at={polygonCentroid(zone)} text="ROLL" />
+        ),
+      )}
+      {tip && <Label at={polygonCentroid(tip)} text="TIP" />}
     </g>
+  )
+}
+
+function Zone({ polygon, color }: { polygon: Point[]; color: string }) {
+  return (
+    <polygon
+      points={toPoints(polygon)}
+      fill={`hsl(var(${color}-fill))`}
+      stroke={`hsl(var(${color}-stroke))`}
+      strokeWidth={0.05}
+      strokeDasharray="0.18 0.1"
+      strokeLinejoin="round"
+    />
+  )
+}
+
+function Label({ at, text }: { at: Point; text: string }) {
+  return (
+    <text
+      // Narrow edge lanes put the centroid near a sideline; keep the word inside the court.
+      x={Math.min(COURT_WIDTH - LABEL_INSET, Math.max(LABEL_INSET, at.x))}
+      y={at.y}
+      textAnchor="middle"
+      dominantBaseline="central"
+      fontSize={0.42}
+      fontWeight={700}
+      letterSpacing={0.04}
+      fill="hsl(0 0% 100%)"
+      stroke="hsl(222 47% 7% / 0.55)"
+      strokeWidth={0.08}
+      paintOrder="stroke"
+      style={{ userSelect: 'none' }}
+    >
+      {text}
+    </text>
   )
 }
 

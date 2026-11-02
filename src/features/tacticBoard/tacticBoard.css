@@ -10,6 +10,10 @@
   --tb-lane: 0 80% 52% / 0.42;
   --tb-seam: 45 100% 52% / 0.6;
   --tb-sight-line: 0 0% 100% / 0.75;
+  --tb-roll-fill: 275 75% 55% / 0.5;
+  --tb-roll-stroke: 275 80% 45%;
+  --tb-tip-fill: 165 75% 40% / 0.5;
+  --tb-tip-stroke: 165 80% 30%;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -24,6 +28,10 @@
     --tb-lane: 0 85% 60% / 0.35;
     --tb-seam: 45 100% 55% / 0.55;
     --tb-sight-line: 0 0% 100% / 0.6;
+    --tb-roll-fill: 275 80% 65% / 0.45;
+    --tb-roll-stroke: 275 90% 78%;
+    --tb-tip-fill: 165 70% 45% / 0.45;
+    --tb-tip-stroke: 165 80% 65%;
   }
 }
 
@@ -38,4 +46,8 @@
   --tb-lane: 0 85% 60% / 0.35;
   --tb-seam: 45 100% 55% / 0.55;
   --tb-sight-line: 0 0% 100% / 0.6;
+  --tb-roll-fill: 275 80% 65% / 0.45;
+  --tb-roll-stroke: 275 90% 78%;
+  --tb-tip-fill: 165 70% 45% / 0.45;
+  --tb-tip-stroke: 165 80% 65%;
 }

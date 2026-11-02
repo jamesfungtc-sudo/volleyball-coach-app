@@ -134,6 +134,18 @@ src/features/tacticBoard/
    - **Lane naming.** "Line" is the lane along the hitter's own sideline, decided by
      which half of the court the hitter is in. For a middle attacker this split is
      arbitrary.
-3. Hit-type overlays (Hard / Roll / Tip).
+3. ✅ Hit-type overlays (Hard / Roll / Tip / All), in `engine/hitZones.ts`.
+   - **Hard:** the open lanes (line, cross, seams), at any depth.
+   - **Roll:** the block shadow cut to the band 2–6 m off the net (`ROLL_DEPTH`).
+     A shadow that crosses the sideline before 2 m has no roll zone.
+   - **Tip:** a box 0–3 m off the net (`TIP_DEPTH`), reaching 1.5 m beyond the
+     block on each side (`TIP_SPREAD`). With no block, it covers the whole short
+     area.
+   - **Faded lanes:** in Roll and Tip, the hard lanes are drawn at 35% so the
+     picture keeps its context.
+   - On phones, the "Tap opponent…" hint is hidden to save room for the court.
+   - To tune: `ROLL_DEPTH`, `TIP_DEPTH` and `TIP_SPREAD` are first guesses. A hard
+     hit probably can't land very short, so the Hard view may need a minimum depth.
+     Roll and tip zones should also depend on where the hitter is.
 4. Defender suggestions and reset.
 5. Drawing: lines, arrows, undo, clear.

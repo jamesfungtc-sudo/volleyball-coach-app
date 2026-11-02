@@ -2,7 +2,7 @@ import { useReducer } from 'react'
 import { Button } from '@/components/ui/button'
 import { SegmentedControl } from '@/components/ui/segmented-control'
 import { TacticBoard } from './components/TacticBoard'
-import { boardReducer, initialBoardState, type ZoomMode } from './state/boardState'
+import { boardReducer, initialBoardState, type HitView, type ZoomMode } from './state/boardState'
 import './tacticBoard.css'
 
 const ZOOM_OPTIONS: { value: ZoomMode; label: string }[] = [
@@ -10,11 +10,27 @@ const ZOOM_OPTIONS: { value: ZoomMode; label: string }[] = [
   { value: 'defence', label: 'Defence' },
 ]
 
-const LEGEND = [
-  { label: 'Blocked', color: 'hsl(var(--tb-shadow))' },
-  { label: 'Open', color: 'hsl(var(--tb-lane))' },
-  { label: 'Seam', color: 'hsl(var(--tb-seam))' },
+const HIT_OPTIONS: { value: HitView; label: string }[] = [
+  { value: 'hard', label: 'Hard' },
+  { value: 'roll', label: 'Roll' },
+  { value: 'tip', label: 'Tip' },
+  { value: 'all', label: 'All' },
 ]
+
+const LEGEND = {
+  blocked: { label: 'Blocked', color: 'hsl(var(--tb-shadow))' },
+  open: { label: 'Open', color: 'hsl(var(--tb-lane))' },
+  seam: { label: 'Seam', color: 'hsl(var(--tb-seam))' },
+  roll: { label: 'Roll', color: 'hsl(var(--tb-roll-fill))' },
+  tip: { label: 'Tip', color: 'hsl(var(--tb-tip-fill))' },
+}
+
+const LEGEND_FOR: Record<HitView, (keyof typeof LEGEND)[]> = {
+  hard: ['blocked', 'open', 'seam'],
+  roll: ['blocked', 'roll'],
+  tip: ['blocked', 'tip'],
+  all: ['blocked', 'open', 'seam', 'roll', 'tip'],
+}
 
 export default function TacticBoardPage() {
   const [state, dispatch] = useReducer(boardReducer, initialBoardState)
@@ -51,8 +67,16 @@ export default function TacticBoardPage() {
         </div>
       </header>
       <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 px-3 pt-2 text-xs text-muted-foreground">
+        {state.showShadow && (
+          <SegmentedControl
+            value={state.hitView}
+            onChange={hitView => dispatch({ type: 'setHitView', hitView })}
+            options={HIT_OPTIONS}
+            className="mr-1"
+          />
+        )}
         {state.showShadow &&
-          LEGEND.map(({ label, color }) => (
+          LEGEND_FOR[state.hitView].map(key => LEGEND[key]).map(({ label, color }) => (
             <span key={label} className="inline-flex items-center gap-1.5">
               <span
                 className="h-3 w-3 rounded-sm border border-border"
@@ -62,7 +86,8 @@ export default function TacticBoardPage() {
               {label}
             </span>
           ))}
-        <span className="ml-auto">Tap opponent = hitter · Drag to net = block</span>
+        {/* Hidden on phones to keep the court as large as possible. */}
+        <span className="ml-auto hidden sm:inline">Tap opponent = hitter · Drag to net = block</span>
       </div>
       <div className="min-h-0 flex-1 p-2">
         <TacticBoard state={state} dispatch={dispatch} />
