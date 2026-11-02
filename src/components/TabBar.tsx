@@ -5,6 +5,7 @@ const tabs = [
   { path: '/', label: 'Live', icon: LiveIcon },
   { path: '/analysis', label: 'Analysis', icon: AnalysisIcon },
   { path: '/scouting', label: 'Scouting', icon: ScoutingIcon },
+  { path: '/tactics', label: 'Tactics', icon: TacticsIcon },
   { path: '/teams', label: 'Teams', icon: TeamsIcon },
   { path: '/settings', label: 'Settings', icon: SettingsIcon },
 ] as const
@@ -59,6 +60,17 @@ function ScoutingIcon({ className }: { className?: string }) {
       <circle cx="12" cy="12" r="10" />
       <circle cx="12" cy="12" r="6" />
       <circle cx="12" cy="12" r="2" />
+    </svg>
+  )
+}
+
+function TacticsIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4" y="2" width="16" height="20" rx="1" />
+      <line x1="4" y1="12" x2="20" y2="12" />
+      <circle cx="9" cy="17" r="1.5" />
+      <circle cx="15" cy="7" r="1.5" />
     </svg>
   )
 }

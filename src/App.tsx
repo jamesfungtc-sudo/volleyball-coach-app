@@ -15,6 +15,7 @@ import MatchListPage from './pages/MatchListPage'
 import MatchSetupPage from './pages/MatchSetupPage'
 import StatsPage from './pages/StatsPage'
 import VisualTrackingPage from './pages/VisualTrackingPage'
+import TacticBoardPage from './features/tacticBoard/TacticBoardPage'
 import { OpponentTrackingProvider } from './features/inGameStats/context/OpponentTrackingContext'
 
 function AppRoutes() {
@@ -39,6 +40,7 @@ function AppRoutes() {
         <Route path="/" element={<LivePage />} />
         <Route path="/analysis" element={<AnalysisPage />} />
         <Route path="/scouting" element={<ScoutingPage />} />
+        <Route path="/tactics" element={<TacticBoardPage />} />
         <Route path="/teams" element={<TeamsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/live/new" element={<MatchSetup />} />

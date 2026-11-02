@@ -1,0 +1,141 @@
+import { useMemo, useRef, useState, type Dispatch, type PointerEvent } from 'react'
+import { defenceView, fitViewToAspect, FULL_VIEW, type Point, type Rect } from '../engine/court'
+import { analyseDefence } from '../engine/defence'
+import { useAnimatedViewBox } from '../hooks/useAnimatedViewBox'
+import { useElementAspect } from '../hooks/useElementAspect'
+import { isBlocker, type BoardAction, type BoardIcon, type BoardState } from '../state/boardState'
+import { BoardIconView } from './BoardIconView'
+import { Court } from './Court'
+import { BlockerHands, DefenceOverlay } from './DefenceOverlay'
+
+/** Pointer travel (CSS px) below which a press counts as a tap rather than a drag. */
+const TAP_SLOP_PX = 6
+
+interface Drag {
+  id: string
+  /** Offset from the pointer to the icon centre, so icons don't jump under the finger. */
+  offset: Point
+  startClient: Point
+  moved: boolean
+}
+
+interface TacticBoardProps {
+  state: BoardState
+  dispatch: Dispatch<BoardAction>
+}
+
+export function TacticBoard({ state, dispatch }: TacticBoardProps) {
+  const svgRef = useRef<SVGSVGElement>(null)
+  // Keyed by pointerId so several fingers can drag different icons at once.
+  const drags = useRef(new Map<number, Drag>())
+  const [draggingIds, setDraggingIds] = useState<string[]>([])
+
+  const aspect = useElementAspect(svgRef)
+  const hitter = state.icons.find(icon => icon.id === state.hitterId)
+  const target =
+    state.zoom === 'defence' && hitter
+      ? fitViewToAspect(defenceView(hitter), aspect, 'bottom')
+      : fitViewToAspect(FULL_VIEW, aspect, 'center')
+  // Hold the view still while dragging; a moving view under the pointer would feed back into the drag.
+  const settledTarget = useRef<Rect>(target)
+  if (draggingIds.length === 0) settledTarget.current = target
+  const view = useAnimatedViewBox(settledTarget.current)
+
+  const blockerXs = useMemo(() => state.icons.filter(isBlocker).map(icon => icon.x), [state.icons])
+  const analysis = useMemo(
+    () => (hitter && state.showShadow ? analyseDefence({ hitter, blockerXs }) : null),
+    [hitter, blockerXs, state.showShadow],
+  )
+
+  function toBoardPoint(e: PointerEvent): Point | null {
+    const ctm = svgRef.current?.getScreenCTM()
+    if (!ctm) return null
+    const p = new DOMPoint(e.clientX, e.clientY).matrixTransform(ctm.inverse())
+    return { x: p.x, y: p.y }
+  }
+
+  function syncDragging() {
+    setDraggingIds([...drags.current.values()].map(d => d.id))
+  }
+
+  function handleIconPointerDown(e: PointerEvent<SVGGElement>, icon: BoardIcon) {
+    const p = toBoardPoint(e)
+    if (!p || [...drags.current.values()].some(d => d.id === icon.id)) return
+    e.preventDefault()
+    svgRef.current?.setPointerCapture(e.pointerId)
+    drags.current.set(e.pointerId, {
+      id: icon.id,
+      offset: { x: icon.x - p.x, y: icon.y - p.y },
+      startClient: { x: e.clientX, y: e.clientY },
+      moved: false,
+    })
+    syncDragging()
+  }
+
+  function handlePointerMove(e: PointerEvent<SVGSVGElement>) {
+    const drag = drags.current.get(e.pointerId)
+    if (!drag) return
+    if (!drag.moved) {
+      const travel = Math.hypot(e.clientX - drag.startClient.x, e.clientY - drag.startClient.y)
+      if (travel < TAP_SLOP_PX) return
+      drag.moved = true
+    }
+    const p = toBoardPoint(e)
+    if (!p) return
+    dispatch({ type: 'move', id: drag.id, to: { x: p.x + drag.offset.x, y: p.y + drag.offset.y } })
+  }
+
+  function handlePointerUp(e: PointerEvent<SVGSVGElement>) {
+    const drag = drags.current.get(e.pointerId)
+    if (!drag) return
+    // Tapping an opponent makes them the hitter; the reducer ignores taps on anyone else.
+    dispatch(drag.moved ? { type: 'drop', id: drag.id } : { type: 'setHitter', id: drag.id })
+    drags.current.delete(e.pointerId)
+    syncDragging()
+  }
+
+  function handlePointerCancel(e: PointerEvent<SVGSVGElement>) {
+    const drag = drags.current.get(e.pointerId)
+    if (!drag) return
+    if (drag.moved) dispatch({ type: 'drop', id: drag.id })
+    drags.current.delete(e.pointerId)
+    syncDragging()
+  }
+
+  // Paint order: players, then the ball, with anything being dragged on top.
+  const ordered = [...state.icons].sort(
+    (a, b) => paintRank(a, draggingIds) - paintRank(b, draggingIds),
+  )
+
+  return (
+    <svg
+      ref={svgRef}
+      viewBox={`${view.x} ${view.y} ${view.width} ${view.height}`}
+      preserveAspectRatio="xMidYMid meet"
+      className="h-full w-full touch-none select-none"
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
+      role="img"
+      aria-label="Volleyball tactic board"
+    >
+      <Court />
+      {analysis && <DefenceOverlay analysis={analysis} />}
+      <BlockerHands blockerXs={blockerXs} />
+      {ordered.map(icon => (
+        <BoardIconView
+          key={icon.id}
+          icon={icon}
+          isHitter={icon.id === state.hitterId}
+          isDragging={draggingIds.includes(icon.id)}
+          onPointerDown={handleIconPointerDown}
+        />
+      ))}
+    </svg>
+  )
+}
+
+function paintRank(icon: BoardIcon, draggingIds: string[]) {
+  if (draggingIds.includes(icon.id)) return 2
+  return icon.kind === 'ball' ? 1 : 0
+}
