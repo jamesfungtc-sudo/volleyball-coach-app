@@ -2,7 +2,14 @@ import { useReducer } from 'react'
 import { Button } from '@/components/ui/button'
 import { SegmentedControl } from '@/components/ui/segmented-control'
 import { TacticBoard } from './components/TacticBoard'
-import { boardReducer, initialBoardState, isBlocker, type HitView, type ZoomMode } from './state/boardState'
+import {
+  boardReducer,
+  initialBoardState,
+  isBlocker,
+  type HitView,
+  type Tool,
+  type ZoomMode,
+} from './state/boardState'
 import './tacticBoard.css'
 
 const ZOOM_OPTIONS: { value: ZoomMode; label: string }[] = [
@@ -15,6 +22,12 @@ const HIT_OPTIONS: { value: HitView; label: string }[] = [
   { value: 'roll', label: 'Roll' },
   { value: 'tip', label: 'Tip' },
   { value: 'all', label: 'All' },
+]
+
+const TOOL_OPTIONS: { value: Tool; label: string }[] = [
+  { value: 'move', label: 'Move' },
+  { value: 'pen', label: 'Pen' },
+  { value: 'arrow', label: 'Arrow' },
 ]
 
 const LEGEND = {
@@ -112,10 +125,58 @@ export default function TacticBoardPage() {
         {/* Hidden on phones to keep the court as large as possible. */}
         <span className="ml-auto hidden sm:inline">Tap opponent = hitter · Drag to net = block</span>
       </div>
-      <div className="min-h-0 flex-1 p-2">
+      <div className="relative min-h-0 flex-1 p-2">
         <TacticBoard state={state} dispatch={dispatch} />
+        <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-xl border border-border bg-surface-elevated/90 p-1 shadow-lg backdrop-blur">
+          <SegmentedControl
+            value={state.tool}
+            onChange={tool => dispatch({ type: 'setTool', tool })}
+            options={TOOL_OPTIONS}
+          />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-11 w-11"
+            onClick={() => dispatch({ type: 'undoDrawing' })}
+            disabled={state.drawings.length === 0}
+            aria-label="Undo last drawing"
+            title="Undo last drawing"
+          >
+            <UndoIcon />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-11 w-11"
+            onClick={() => dispatch({ type: 'clearDrawings' })}
+            disabled={state.drawings.length === 0}
+            aria-label="Clear drawings"
+            title="Clear drawings"
+          >
+            <ClearIcon />
+          </Button>
+        </div>
       </div>
     </div>
+  )
+}
+
+function UndoIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 14 4 9l5-5" />
+      <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
+    </svg>
+  )
+}
+
+function ClearIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 6h18" />
+      <path d="M8 6V4h8v2" />
+      <path d="M19 6l-1 14H6L5 6" />
+    </svg>
   )
 }
 

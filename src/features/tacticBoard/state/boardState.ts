@@ -13,6 +13,16 @@ export interface BoardIcon extends Point {
 
 export type ZoomMode = 'full' | 'defence'
 
+/** 'move' drags icons; the drawing tools draw on the board instead. */
+export type Tool = 'move' | 'pen' | 'arrow'
+
+export interface Drawing {
+  id: string
+  kind: 'pen' | 'arrow'
+  /** Pen: the stroke path. Arrow: [tail, head]. */
+  points: Point[]
+}
+
 /** Which attack's landing zones to show; 'all' layers them. */
 export type HitView = HitType | 'all'
 
@@ -27,6 +37,8 @@ export interface BoardState {
   autoDefence: boolean
   /** Home players the coach has placed by hand; auto defence leaves them where they are. */
   manual: string[]
+  tool: Tool
+  drawings: Drawing[]
 }
 
 export type BoardAction =
@@ -40,6 +52,10 @@ export type BoardAction =
   | { type: 'toggleAutoDefence' }
   /** Send hand-placed defenders back to their suggested spots. */
   | { type: 'resetDefenders' }
+  | { type: 'setTool'; tool: Tool }
+  | { type: 'addDrawing'; drawing: Drawing }
+  | { type: 'undoDrawing' }
+  | { type: 'clearDrawings' }
   | { type: 'reset' }
 
 // Opponents face down the screen, so their left side (positions 4, 5) is on screen right.
@@ -71,6 +87,8 @@ export const initialBoardState: BoardState = withAutoDefence({
   hitView: 'hard',
   autoDefence: true,
   manual: [],
+  tool: 'move',
+  drawings: [],
 })
 
 export function isBlocker(icon: BoardIcon): boolean {
@@ -105,6 +123,14 @@ function applyAction(state: BoardState, action: BoardAction): BoardState {
       return { ...state, autoDefence: !state.autoDefence, manual: [] }
     case 'resetDefenders':
       return { ...state, manual: [] }
+    case 'setTool':
+      return { ...state, tool: action.tool }
+    case 'addDrawing':
+      return { ...state, drawings: [...state.drawings, action.drawing] }
+    case 'undoDrawing':
+      return { ...state, drawings: state.drawings.slice(0, -1) }
+    case 'clearDrawings':
+      return { ...state, drawings: [] }
     case 'reset':
       // Board positions reset; view settings stay as the coach left them.
       return {
@@ -113,6 +139,7 @@ function applyAction(state: BoardState, action: BoardAction): BoardState {
         showShadow: state.showShadow,
         hitView: state.hitView,
         autoDefence: state.autoDefence,
+        tool: state.tool,
       }
   }
 }

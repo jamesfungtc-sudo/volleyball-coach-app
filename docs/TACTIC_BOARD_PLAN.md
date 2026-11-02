@@ -170,4 +170,20 @@ src/features/tacticBoard/
      to tip cover behind the block, rather than to the sharp cross at the attack
      line as in a perimeter defence. Next step: offer a choice of system
      (perimeter / rotational / middle-up) with role-based spots.
-5. Drawing: lines, arrows, undo, clear.
+5. ✅ Drawing: lines, arrows, undo, clear (`engine/drawing.ts`, `components/DrawLayer.tsx`).
+   - **Toolbar:** a floating bar at the bottom of the board with **Move / Pen /
+     Arrow**, Undo and Clear.
+   - **Drawing tools:**
+     - Pen draws freehand, smoothed with curves through midpoints. Samples closer
+       than 6 cm are dropped.
+     - Arrow draws a straight line from where you press to where you let go.
+     - A stroke shorter than 25 cm counts as a stray tap and is thrown away.
+   - **Players while drawing:** with Pen or Arrow selected, players can't be
+     grabbed, so a stroke can start right on top of one (for example, an arrow
+     showing where a player runs). Switch back to Move to drag players again.
+   - **Ink:** yellow with a dark outline, so it shows on every zone colour in both
+     themes.
+   - **Undo:** removes only drawings, not player moves.
+   - **↺ (reset board):** clears drawings but keeps the selected tool.
+   - Ideas for later: undo for player moves, several ink colours, saving and
+     loading boards.

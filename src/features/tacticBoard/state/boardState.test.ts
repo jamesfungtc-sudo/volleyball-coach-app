@@ -38,3 +38,26 @@ describe('auto defence', () => {
     expect(pos(state, 'h1')).toEqual(before)
   })
 })
+
+describe('drawings', () => {
+  const arrow = { id: 'a', kind: 'arrow' as const, points: [{ x: 1, y: 10 }, { x: 4, y: 14 }] }
+  const pen = { id: 'p', kind: 'pen' as const, points: [{ x: 2, y: 12 }, { x: 3, y: 12 }] }
+
+  it('adds, undoes and clears', () => {
+    let state = boardReducer(initialBoardState, { type: 'addDrawing', drawing: arrow })
+    state = boardReducer(state, { type: 'addDrawing', drawing: pen })
+    expect(state.drawings.map(d => d.id)).toEqual(['a', 'p'])
+    state = boardReducer(state, { type: 'undoDrawing' })
+    expect(state.drawings.map(d => d.id)).toEqual(['a'])
+    state = boardReducer(state, { type: 'clearDrawings' })
+    expect(state.drawings).toEqual([])
+  })
+
+  it('board reset wipes drawings but keeps the chosen tool', () => {
+    let state = boardReducer(initialBoardState, { type: 'setTool', tool: 'pen' })
+    state = boardReducer(state, { type: 'addDrawing', drawing: pen })
+    state = boardReducer(state, { type: 'reset' })
+    expect(state.drawings).toEqual([])
+    expect(state.tool).toBe('pen')
+  })
+})

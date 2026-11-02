@@ -1,13 +1,23 @@
 import { useMemo, useRef, useState, type Dispatch, type PointerEvent } from 'react'
+import { cn } from '@/lib/utils'
 import { defenceView, fitViewToAspect, FULL_VIEW, type Point, type Rect } from '../engine/court'
 import { analyseDefence } from '../engine/defence'
+import { appendPenPoint, isMeaningfulStroke } from '../engine/drawing'
 import { useAnimatedViewBox } from '../hooks/useAnimatedViewBox'
 import { useElementAspect } from '../hooks/useElementAspect'
-import { isBlocker, suggestedDefence, type BoardAction, type BoardIcon, type BoardState } from '../state/boardState'
+import {
+  isBlocker,
+  suggestedDefence,
+  type BoardAction,
+  type BoardIcon,
+  type BoardState,
+  type Drawing,
+} from '../state/boardState'
 import { BoardIconView } from './BoardIconView'
 import { Court } from './Court'
 import { BlockerHands, DefenceOverlay } from './DefenceOverlay'
 import { DefenderGhosts } from './DefenderGhosts'
+import { DrawLayer } from './DrawLayer'
 
 /** Pointer travel (CSS px) below which a press counts as a tap rather than a drag. */
 const TAP_SLOP_PX = 6
@@ -30,6 +40,10 @@ export function TacticBoard({ state, dispatch }: TacticBoardProps) {
   // Keyed by pointerId so several fingers can drag different icons at once.
   const drags = useRef(new Map<number, Drag>())
   const [draggingIds, setDraggingIds] = useState<string[]>([])
+  // One stroke at a time; extra fingers are ignored while drawing.
+  const [draft, setDraft] = useState<Drawing | null>(null)
+  const draftPointer = useRef<number | null>(null)
+  const isDrawing = state.tool !== 'move'
 
   const aspect = useElementAspect(svgRef)
   const hitter = state.icons.find(icon => icon.id === state.hitterId)
@@ -79,7 +93,33 @@ export function TacticBoard({ state, dispatch }: TacticBoardProps) {
     syncDragging()
   }
 
+  function handleBoardPointerDown(e: PointerEvent<SVGSVGElement>) {
+    if (state.tool === 'move' || draftPointer.current !== null) return
+    const p = toBoardPoint(e)
+    if (!p) return
+    e.preventDefault()
+    svgRef.current?.setPointerCapture(e.pointerId)
+    draftPointer.current = e.pointerId
+    setDraft({ id: `d${Date.now()}-${e.pointerId}`, kind: state.tool, points: [p] })
+  }
+
+  function updateDraft(e: PointerEvent<SVGSVGElement>) {
+    const p = toBoardPoint(e)
+    if (!p) return
+    // Arrow: keep the tail, move the head. Pen: add a sample.
+    setDraft(d => d && { ...d, points: d.kind === 'arrow' ? [d.points[0], p] : appendPenPoint(d.points, p) })
+  }
+
+  function finishDraft(e: PointerEvent<SVGSVGElement>, keep: boolean) {
+    if (draftPointer.current !== e.pointerId) return false
+    draftPointer.current = null
+    if (keep && draft && isMeaningfulStroke(draft.points)) dispatch({ type: 'addDrawing', drawing: draft })
+    setDraft(null)
+    return true
+  }
+
   function handlePointerMove(e: PointerEvent<SVGSVGElement>) {
+    if (draftPointer.current === e.pointerId) return updateDraft(e)
     const drag = drags.current.get(e.pointerId)
     if (!drag) return
     if (!drag.moved) {
@@ -93,6 +133,7 @@ export function TacticBoard({ state, dispatch }: TacticBoardProps) {
   }
 
   function handlePointerUp(e: PointerEvent<SVGSVGElement>) {
+    if (finishDraft(e, true)) return
     const drag = drags.current.get(e.pointerId)
     if (!drag) return
     // Tapping an opponent makes them the hitter; the reducer ignores taps on anyone else.
@@ -102,6 +143,7 @@ export function TacticBoard({ state, dispatch }: TacticBoardProps) {
   }
 
   function handlePointerCancel(e: PointerEvent<SVGSVGElement>) {
+    if (finishDraft(e, false)) return
     const drag = drags.current.get(e.pointerId)
     if (!drag) return
     if (drag.moved) dispatch({ type: 'drop', id: drag.id })
@@ -119,7 +161,8 @@ export function TacticBoard({ state, dispatch }: TacticBoardProps) {
       ref={svgRef}
       viewBox={`${view.x} ${view.y} ${view.width} ${view.height}`}
       preserveAspectRatio="xMidYMid meet"
-      className="h-full w-full touch-none select-none"
+      className={cn('h-full w-full touch-none select-none', isDrawing && 'cursor-crosshair')}
+      onPointerDown={handleBoardPointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerCancel}
@@ -130,15 +173,19 @@ export function TacticBoard({ state, dispatch }: TacticBoardProps) {
       {analysis && <DefenceOverlay analysis={analysis} hitView={state.hitView} />}
       <BlockerHands blockerXs={blockerXs} />
       <DefenderGhosts defenders={manualDefenders} suggestions={suggestions} />
-      {ordered.map(icon => (
-        <BoardIconView
-          key={icon.id}
-          icon={icon}
-          isHitter={icon.id === state.hitterId}
-          isDragging={draggingIds.includes(icon.id)}
-          onPointerDown={handleIconPointerDown}
-        />
-      ))}
+      <DrawLayer drawings={state.drawings} draft={draft} />
+      {/* While drawing, strokes can start on top of players without grabbing them. */}
+      <g pointerEvents={isDrawing ? 'none' : undefined}>
+        {ordered.map(icon => (
+          <BoardIconView
+            key={icon.id}
+            icon={icon}
+            isHitter={icon.id === state.hitterId}
+            isDragging={draggingIds.includes(icon.id)}
+            onPointerDown={handleIconPointerDown}
+          />
+        ))}
+      </g>
     </svg>
   )
 }
