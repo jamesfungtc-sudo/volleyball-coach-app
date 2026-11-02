@@ -147,5 +147,27 @@ src/features/tacticBoard/
    - To tune: `ROLL_DEPTH`, `TIP_DEPTH` and `TIP_SPREAD` are first guesses. A hard
      hit probably can't land very short, so the Hard view may need a minimum depth.
      Roll and tip zones should also depend on where the hitter is.
-4. Defender suggestions and reset.
+4. ✅ Defender suggestions and reset (`engine/defenders.ts`).
+   - **Who defends:** every home player who isn't blocking.
+   - **Spots, in priority order:**
+     1. one digger per open lane of at least 1 m², biggest first, at the lane's
+        centre 3.5–8.3 m off the net
+     2. tip cover (the middle of the tip box)
+     3. roll cover (the middle of the biggest roll zone)
+     4. deep middle as a fallback
+   - **Who goes where:** spots are matched to defenders by the smallest total
+     distance, trying every pairing.
+   - **Distance from the net:** spots are never placed within 1.5 m of the net.
+     Otherwise a defender would land in the block zone and become a blocker
+     (found by a test).
+   - **Auto D (on by default):** defenders follow their spots, and glide there.
+     - Drag a defender and it stays where you put it, with a dashed ghost on its
+       suggested spot.
+     - **Reset D** clears those overrides.
+     - The board's ↺ resets everything but keeps the view settings.
+   - **To tune with the coach:** the suggestions follow geometry, not a named
+     system. For example, against a closed double block the off-blocker can be sent
+     to tip cover behind the block, rather than to the sharp cross at the attack
+     line as in a perimeter defence. Next step: offer a choice of system
+     (perimeter / rotational / middle-up) with role-based spots.
 5. Drawing: lines, arrows, undo, clear.

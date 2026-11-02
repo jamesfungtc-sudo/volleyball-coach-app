@@ -21,9 +21,10 @@ interface BoardIconViewProps {
 export function BoardIconView({ icon, isHitter, isDragging, onPointerDown }: BoardIconViewProps) {
   return (
     <g
-      transform={`translate(${icon.x} ${icon.y})`}
+      // CSS transform (px = user units inside SVG) so auto-placed defenders glide rather than jump.
+      className={isDragging ? undefined : 'motion-safe:transition-transform motion-safe:duration-200 motion-safe:ease-out'}
       onPointerDown={e => onPointerDown(e, icon)}
-      style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+      style={{ transform: `translate(${icon.x}px, ${icon.y}px)`, cursor: isDragging ? 'grabbing' : 'grab' }}
       role="button"
       aria-label={iconLabel(icon, isHitter)}
     >

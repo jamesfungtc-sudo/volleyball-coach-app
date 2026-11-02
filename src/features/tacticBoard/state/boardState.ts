@@ -1,5 +1,6 @@
 import { clampToRect, FULL_VIEW, type Point } from '../engine/court'
-import { BLOCKER_Y, isInBlockZone } from '../engine/defence'
+import { analyseDefence, BLOCKER_Y, isInBlockZone } from '../engine/defence'
+import { suggestDefence, type DefenderTarget } from '../engine/defenders'
 import type { HitType } from '../engine/hitZones'
 
 export type IconKind = 'home' | 'opponent' | 'ball'
@@ -22,6 +23,10 @@ export interface BoardState {
   zoom: ZoomMode
   showShadow: boolean
   hitView: HitView
+  /** Non-blocking home players follow the suggested defence spots. */
+  autoDefence: boolean
+  /** Home players the coach has placed by hand; auto defence leaves them where they are. */
+  manual: string[]
 }
 
 export type BoardAction =
@@ -32,6 +37,9 @@ export type BoardAction =
   | { type: 'setZoom'; zoom: ZoomMode }
   | { type: 'toggleShadow' }
   | { type: 'setHitView'; hitView: HitView }
+  | { type: 'toggleAutoDefence' }
+  /** Send hand-placed defenders back to their suggested spots. */
+  | { type: 'resetDefenders' }
   | { type: 'reset' }
 
 // Opponents face down the screen, so their left side (positions 4, 5) is on screen right.
@@ -55,23 +63,31 @@ const DEFAULT_ICONS: BoardIcon[] = [
   { id: 'ball', kind: 'ball', label: '', x: 7.5, y: 8.5 },
 ]
 
-export const initialBoardState: BoardState = {
+export const initialBoardState: BoardState = withAutoDefence({
   icons: DEFAULT_ICONS,
   hitterId: 'o4',
   zoom: 'full',
   showShadow: true,
   hitView: 'hard',
-}
+  autoDefence: true,
+  manual: [],
+})
 
 export function isBlocker(icon: BoardIcon): boolean {
   return icon.kind === 'home' && isInBlockZone(icon)
 }
 
 export function boardReducer(state: BoardState, action: BoardAction): BoardState {
+  return withAutoDefence(applyAction(state, action))
+}
+
+function applyAction(state: BoardState, action: BoardAction): BoardState {
   switch (action.type) {
     case 'move': {
       const to = clampToRect(action.to, FULL_VIEW)
-      return updateIcon(state, action.id, icon => ({ ...icon, ...to }))
+      const moved = updateIcon(state, action.id, icon => ({ ...icon, ...to }))
+      const isHome = state.icons.some(i => i.id === action.id && i.kind === 'home')
+      return isHome && !state.manual.includes(action.id) ? { ...moved, manual: [...state.manual, action.id] } : moved
     }
     case 'drop':
       return updateIcon(state, action.id, icon => (isBlocker(icon) ? { ...icon, y: BLOCKER_Y } : icon))
@@ -85,12 +101,46 @@ export function boardReducer(state: BoardState, action: BoardAction): BoardState
       return { ...state, showShadow: !state.showShadow }
     case 'setHitView':
       return { ...state, hitView: action.hitView }
+    case 'toggleAutoDefence':
+      return { ...state, autoDefence: !state.autoDefence, manual: [] }
+    case 'resetDefenders':
+      return { ...state, manual: [] }
     case 'reset':
       // Board positions reset; view settings stay as the coach left them.
-      return { ...initialBoardState, zoom: state.zoom, showShadow: state.showShadow, hitView: state.hitView }
+      return {
+        ...initialBoardState,
+        zoom: state.zoom,
+        showShadow: state.showShadow,
+        hitView: state.hitView,
+        autoDefence: state.autoDefence,
+      }
   }
 }
 
 function updateIcon(state: BoardState, id: string, update: (icon: BoardIcon) => BoardIcon): BoardState {
   return { ...state, icons: state.icons.map(icon => (icon.id === id ? update(icon) : icon)) }
+}
+
+/** Suggested spot for each non-blocking home player (empty if there's no hitter). */
+export function suggestedDefence(state: BoardState): Map<string, DefenderTarget> {
+  const hitter = state.icons.find(icon => icon.id === state.hitterId)
+  if (!hitter) return new Map()
+  const blockerXs = state.icons.filter(isBlocker).map(icon => icon.x)
+  const defenders = state.icons.filter(icon => icon.kind === 'home' && !isBlocker(icon))
+  return suggestDefence(analyseDefence({ hitter, blockerXs }), defenders)
+}
+
+/** Move every auto-managed defender onto its suggested spot. */
+function withAutoDefence(state: BoardState): BoardState {
+  if (!state.autoDefence) return state
+  const suggestions = suggestedDefence(state)
+  let changed = false
+  const icons = state.icons.map(icon => {
+    const target = suggestions.get(icon.id)
+    if (!target || state.manual.includes(icon.id)) return icon
+    if (target.point.x === icon.x && target.point.y === icon.y) return icon
+    changed = true
+    return { ...icon, ...target.point }
+  })
+  return changed ? { ...state, icons } : state
 }

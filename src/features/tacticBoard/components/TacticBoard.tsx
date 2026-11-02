@@ -3,10 +3,11 @@ import { defenceView, fitViewToAspect, FULL_VIEW, type Point, type Rect } from '
 import { analyseDefence } from '../engine/defence'
 import { useAnimatedViewBox } from '../hooks/useAnimatedViewBox'
 import { useElementAspect } from '../hooks/useElementAspect'
-import { isBlocker, type BoardAction, type BoardIcon, type BoardState } from '../state/boardState'
+import { isBlocker, suggestedDefence, type BoardAction, type BoardIcon, type BoardState } from '../state/boardState'
 import { BoardIconView } from './BoardIconView'
 import { Court } from './Court'
 import { BlockerHands, DefenceOverlay } from './DefenceOverlay'
+import { DefenderGhosts } from './DefenderGhosts'
 
 /** Pointer travel (CSS px) below which a press counts as a tap rather than a drag. */
 const TAP_SLOP_PX = 6
@@ -46,6 +47,12 @@ export function TacticBoard({ state, dispatch }: TacticBoardProps) {
     () => (hitter && state.showShadow ? analyseDefence({ hitter, blockerXs }) : null),
     [hitter, blockerXs, state.showShadow],
   )
+
+  const manualDefenders = state.autoDefence
+    ? state.icons.filter(icon => state.manual.includes(icon.id) && icon.kind === 'home' && !isBlocker(icon))
+    : []
+  const hasGhosts = manualDefenders.length > 0
+  const suggestions = useMemo(() => (hasGhosts ? suggestedDefence(state) : new Map()), [state, hasGhosts])
 
   function toBoardPoint(e: PointerEvent): Point | null {
     const ctm = svgRef.current?.getScreenCTM()
@@ -122,6 +129,7 @@ export function TacticBoard({ state, dispatch }: TacticBoardProps) {
       <Court />
       {analysis && <DefenceOverlay analysis={analysis} hitView={state.hitView} />}
       <BlockerHands blockerXs={blockerXs} />
+      <DefenderGhosts defenders={manualDefenders} suggestions={suggestions} />
       {ordered.map(icon => (
         <BoardIconView
           key={icon.id}

@@ -2,7 +2,7 @@ import { useReducer } from 'react'
 import { Button } from '@/components/ui/button'
 import { SegmentedControl } from '@/components/ui/segmented-control'
 import { TacticBoard } from './components/TacticBoard'
-import { boardReducer, initialBoardState, type HitView, type ZoomMode } from './state/boardState'
+import { boardReducer, initialBoardState, isBlocker, type HitView, type ZoomMode } from './state/boardState'
 import './tacticBoard.css'
 
 const ZOOM_OPTIONS: { value: ZoomMode; label: string }[] = [
@@ -34,6 +34,9 @@ const LEGEND_FOR: Record<HitView, (keyof typeof LEGEND)[]> = {
 
 export default function TacticBoardPage() {
   const [state, dispatch] = useReducer(boardReducer, initialBoardState)
+  const hasMovedDefenders =
+    state.autoDefence &&
+    state.icons.some(icon => state.manual.includes(icon.id) && icon.kind === 'home' && !isBlocker(icon))
 
   return (
     // Fill the space above the tab bar (h-14 + safe area, see AppShell/TabBar).
@@ -66,15 +69,35 @@ export default function TacticBoardPage() {
           </Button>
         </div>
       </header>
-      <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 px-3 pt-2 text-xs text-muted-foreground">
+      <div className="flex shrink-0 flex-wrap items-center gap-2 px-3 pt-2">
         {state.showShadow && (
           <SegmentedControl
             value={state.hitView}
             onChange={hitView => dispatch({ type: 'setHitView', hitView })}
             options={HIT_OPTIONS}
-            className="mr-1"
           />
         )}
+        <Button
+          variant={state.autoDefence ? 'default' : 'outline'}
+          className="h-11 shrink-0 px-3"
+          onClick={() => dispatch({ type: 'toggleAutoDefence' })}
+          aria-pressed={state.autoDefence}
+          title="Move non-blocking players to suggested defence spots"
+        >
+          Auto D
+        </Button>
+        {hasMovedDefenders && (
+          <Button
+            variant="outline"
+            className="h-11 shrink-0 px-3"
+            onClick={() => dispatch({ type: 'resetDefenders' })}
+            title="Send hand-placed defenders back to their suggested spots"
+          >
+            Reset D
+          </Button>
+        )}
+      </div>
+      <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 px-3 pt-2 text-xs text-muted-foreground">
         {state.showShadow &&
           LEGEND_FOR[state.hitView].map(key => LEGEND[key]).map(({ label, color }) => (
             <span key={label} className="inline-flex items-center gap-1.5">
