@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useReducer, useState, type Dispatch } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useId, useReducer, useState, type Dispatch } from 'react'
 import { Button } from '@/components/ui/button'
 import { SegmentedControl } from '@/components/ui/segmented-control'
 import { cn } from '@/lib/utils'
@@ -14,7 +14,11 @@ import {
   type Tool,
   type ZoomMode,
 } from './state/boardState'
+import type { NetKind } from './engine/view3d'
 import './tacticBoard.css'
+
+// three.js is big; only download it when someone opens the 3D view.
+const Viewer3D = lazy(() => import('./components/three/Viewer3D'))
 
 const ZOOM_OPTIONS: { value: ZoomMode; label: string }[] = [
   { value: 'full', label: 'Full' },
@@ -32,6 +36,11 @@ const AUTO_DEFENCE_OPTIONS: { value: AutoDefence; label: string }[] = [
   { value: 'off', label: 'Off' },
   { value: 'perimeter', label: 'Perimeter' },
   { value: 'rotational', label: 'Rotational' },
+]
+
+const NET_OPTIONS: { value: NetKind; label: string }[] = [
+  { value: 'men', label: 'Men' },
+  { value: 'women', label: 'Women' },
 ]
 
 const TOOL_OPTIONS: { value: Tool; label: string }[] = [
@@ -60,51 +69,76 @@ export default function TacticBoardPage() {
   const [presenting, setPresenting] = useState(false)
   // Stable, so PresentView's full-screen effect runs once per visit rather than on every render.
   const exitPresent = useCallback(() => setPresenting(false), [])
+  // Defender whose 3D view is open, on top of whichever 2D screen opened it.
+  const [viewFrom, setViewFrom] = useState<string | null>(null)
+  const closeView = useCallback(() => setViewFrom(null), [])
+
+  const viewer = viewFrom && (
+    <Suspense fallback={<Loading3D />}>
+      <Viewer3D state={state} viewerId={viewFrom} onChangeViewer={setViewFrom} onClose={closeView} />
+    </Suspense>
+  )
 
   if (presenting) {
-    return <PresentView state={state} dispatch={dispatch} onExit={exitPresent} />
+    return (
+      <>
+        <PresentView state={state} dispatch={dispatch} onExit={exitPresent} onViewFrom={setViewFrom} />
+        {viewer}
+      </>
+    )
   }
 
   return (
-    // Fill the space above the tab bar (h-14 + safe area, see AppShell/TabBar).
-    <div className="flex h-[calc(100dvh-3.5rem-env(safe-area-inset-bottom))] flex-col">
-      <header className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2 pt-[calc(0.5rem+env(safe-area-inset-top))]">
-        <h1 className="mr-auto hidden text-lg font-semibold sm:block">Tactics</h1>
-        <Button className="h-11 shrink-0 gap-1.5 px-3" onClick={() => setPresenting(true)} title="Show the court full screen">
-          <PresentIcon />
-          Present
-        </Button>
-        <SegmentedControl
-          value={state.zoom}
-          onChange={zoom => dispatch({ type: 'setZoom', zoom })}
-          options={ZOOM_OPTIONS}
-          className="ml-auto sm:ml-0"
-        />
-        <Button
-          variant="outline"
-          size="icon"
-          className="h-11 w-11 shrink-0"
-          onClick={() => dispatch({ type: 'reset' })}
-          aria-label="Reset board"
-          title="Reset board"
-        >
-          <ResetIcon />
-        </Button>
-      </header>
+    <>
+      {/* Fill the space above the tab bar (h-14 + safe area, see AppShell/TabBar). */}
+      <div className="flex h-[calc(100dvh-3.5rem-env(safe-area-inset-bottom))] flex-col">
+        <header className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2 pt-[calc(0.5rem+env(safe-area-inset-top))]">
+          <h1 className="mr-auto hidden text-lg font-semibold sm:block">Tactics</h1>
+          <Button className="h-11 shrink-0 gap-1.5 px-3" onClick={() => setPresenting(true)} title="Show the court full screen">
+            <PresentIcon />
+            Present
+          </Button>
+          <SegmentedControl
+            value={state.zoom}
+            onChange={zoom => dispatch({ type: 'setZoom', zoom })}
+            options={ZOOM_OPTIONS}
+            className="ml-auto sm:ml-0"
+          />
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-11 w-11 shrink-0"
+            onClick={() => dispatch({ type: 'reset' })}
+            aria-label="Reset board"
+            title="Reset board"
+          >
+            <ResetIcon />
+          </Button>
+        </header>
 
-      <div className="flex shrink-0 flex-wrap items-center gap-2 px-3 pt-2">
-        <DefenceSettings state={state} dispatch={dispatch} />
-      </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-2 px-3 pt-2">
+          <DefenceSettings state={state} dispatch={dispatch} />
+        </div>
 
-      <div className="relative min-h-0 flex-1 p-2">
-        <TacticBoard state={state} dispatch={dispatch} />
-        {state.showShadow && <Legend hitView={state.hitView} />}
-      </div>
+        <div className="relative min-h-0 flex-1 p-2">
+          <TacticBoard state={state} dispatch={dispatch} onViewFrom={setViewFrom} />
+          {state.showShadow && <Legend hitView={state.hitView} />}
+        </div>
 
-      {/* Below the court rather than floating over it, so it never hides a player. */}
-      <div className="flex shrink-0 justify-center pb-2">
-        <DrawingToolbar state={state} dispatch={dispatch} />
+        {/* Below the court rather than floating over it, so it never hides a player. */}
+        <div className="flex shrink-0 justify-center pb-2">
+          <DrawingToolbar state={state} dispatch={dispatch} />
+        </div>
       </div>
+      {viewer}
+    </>
+  )
+}
+
+function Loading3D() {
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-background text-sm text-muted-foreground">
+      Loading 3D view…
     </div>
   )
 }
@@ -120,7 +154,12 @@ interface BoardProps {
  * Browsers that allow it (Android, desktop) also go truly full screen; iPhone Safari doesn't, but
  * the app opened from the Home Screen has no browser bars anyway.
  */
-function PresentView({ state, dispatch, onExit }: BoardProps & { onExit: () => void }) {
+function PresentView({
+  state,
+  dispatch,
+  onExit,
+  onViewFrom,
+}: BoardProps & { onExit: () => void; onViewFrom: (id: string) => void }) {
   useEffect(() => {
     // Older browsers return nothing instead of a promise.
     document.documentElement.requestFullscreen?.()?.catch(() => {})
@@ -154,7 +193,7 @@ function PresentView({ state, dispatch, onExit }: BoardProps & { onExit: () => v
         </Button>
       </div>
       <div className="relative min-h-0 flex-1 p-1">
-        <TacticBoard state={state} dispatch={dispatch} presenting />
+        <TacticBoard state={state} dispatch={dispatch} presenting onViewFrom={onViewFrom} />
         {state.showShadow && <Legend hitView={state.hitView} />}
       </div>
       <div className="flex shrink-0 justify-center pb-1">
@@ -193,6 +232,7 @@ function DefenceSettings({ state, dispatch }: BoardProps) {
         options={AUTO_DEFENCE_OPTIONS}
         onChange={autoDefence => dispatch({ type: 'setAutoDefence', autoDefence })}
       />
+      <NativeSelect label="Net" value={state.net} options={NET_OPTIONS} onChange={net => dispatch({ type: 'setNet', net })} />
       {hasMovedDefenders && (
         <Button
           variant="outline"

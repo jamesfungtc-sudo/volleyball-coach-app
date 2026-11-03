@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type Dispatch, type PointerEvent } from 'react'
+import { useMemo, useRef, useState, type Dispatch, type PointerEvent, type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 import { defenceView, fitViewToAspect, FULL_VIEW, type Point, type Rect } from '../engine/court'
 import { analyseDefence, BLOCK_SIZES, DEFAULT_BLOCK_SIZE, type BlockSize } from '../engine/defence'
@@ -45,9 +45,11 @@ interface TacticBoardProps {
   dispatch: Dispatch<BoardAction>
   /** Shown to a player at arm's length: zone labels are drawn larger. */
   presenting?: boolean
+  /** Open the 3D view from one of our defenders. */
+  onViewFrom?: (id: string) => void
 }
 
-export function TacticBoard({ state, dispatch, presenting = false }: TacticBoardProps) {
+export function TacticBoard({ state, dispatch, presenting = false, onViewFrom }: TacticBoardProps) {
   const svgRef = useRef<SVGSVGElement>(null)
   // Keyed by pointerId so several fingers can drag different icons at once.
   const drags = useRef(new Map<number, Drag>())
@@ -55,7 +57,7 @@ export function TacticBoard({ state, dispatch, presenting = false }: TacticBoard
   // One stroke at a time; extra fingers are ignored while drawing.
   const [draft, setDraft] = useState<Drawing | null>(null)
   const draftPointer = useRef<number | null>(null)
-  // Blocker whose size picker is open (opened by tapping them).
+  // Our player whose tap menu is open: block size for blockers, 3D view for defenders.
   const [pickerId, setPickerId] = useState<string | null>(null)
   const isDrawing = state.tool !== 'move'
 
@@ -76,6 +78,7 @@ export function TacticBoard({ state, dispatch, presenting = false }: TacticBoard
     [hitter, blockers, state.showShadow],
   )
   const pickerIcon = state.icons.find(icon => icon.id === pickerId && isBlocker(icon))
+  const viewIcon = onViewFrom ? state.icons.find(icon => icon.id === pickerId && icon.kind === 'home' && !isBlocker(icon)) : undefined
 
   const manualDefenders = state.autoDefence !== 'off'
     ? state.icons.filter(icon => state.manual.includes(icon.id) && icon.kind === 'home' && !isBlocker(icon))
@@ -154,8 +157,8 @@ export function TacticBoard({ state, dispatch, presenting = false }: TacticBoard
     if (!drag) return
     const icon = state.icons.find(i => i.id === drag.id)
     if (drag.moved) dispatch({ type: 'drop', id: drag.id })
-    // Tapping one of our blockers opens their size picker; tapping an opponent makes them the hitter.
-    else if (icon && isBlocker(icon)) setPickerId(id => (id === icon.id ? null : icon.id))
+    // Tapping one of our players opens their menu; tapping an opponent makes them the hitter.
+    else if (icon?.kind === 'home') setPickerId(id => (id === icon.id ? null : icon.id))
     else dispatch({ type: 'setHitter', id: drag.id })
     drags.current.delete(e.pointerId)
     syncDragging()
@@ -208,6 +211,21 @@ export function TacticBoard({ state, dispatch, presenting = false }: TacticBoard
           ))}
         </g>
       </svg>
+      {viewIcon && onViewFrom && (
+        <Popover at={toClient(svgRef.current, viewIcon)} onClose={() => setPickerId(null)}>
+          <button
+            type="button"
+            onClick={() => {
+              setPickerId(null)
+              onViewFrom(viewIcon.id)
+            }}
+            className="flex h-11 items-center gap-2 whitespace-nowrap rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground"
+          >
+            <EyeIcon />
+            View from {viewIcon.label}
+          </button>
+        </Popover>
+      )}
       {pickerIcon && (
         <BlockSizePicker
           at={toClient(svgRef.current, pickerIcon)}
@@ -221,6 +239,31 @@ export function TacticBoard({ state, dispatch, presenting = false }: TacticBoard
         />
       )}
     </div>
+  )
+}
+
+/** Floating menu just above one of our players; tap anywhere else to close. */
+function Popover({ at, onClose, children }: { at: { x: number; y: number }; onClose: () => void; children: ReactNode }) {
+  return (
+    <>
+      <div className="fixed inset-0 z-10" onClick={onClose} aria-hidden="true" />
+      <div
+        className="absolute z-20 flex -translate-x-1/2 -translate-y-full items-center gap-1 rounded-xl border border-border bg-surface-elevated p-1 shadow-lg"
+        // Kept on screen when the player is near a sideline.
+        style={{ left: `clamp(5.5rem, ${at.x}px, calc(100% - 5.5rem))`, top: at.y - 28 }}
+      >
+        {children}
+      </div>
+    </>
+  )
+}
+
+function EyeIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
   )
 }
 
@@ -248,15 +291,8 @@ function BlockSizePicker({
   onClose: () => void
 }) {
   return (
-    <>
-      <div className="fixed inset-0 z-10" onClick={onClose} aria-hidden="true" />
-      <div
-        role="radiogroup"
-        aria-label={`Block size for player ${label}`}
-        className="absolute z-20 flex -translate-x-1/2 -translate-y-full items-center gap-1 rounded-xl border border-border bg-surface-elevated p-1 shadow-lg"
-        // Kept on screen when the blocker is near a sideline.
-        style={{ left: `clamp(5.5rem, ${at.x}px, calc(100% - 5.5rem))`, top: at.y - 28 }}
-      >
+    <Popover at={at} onClose={onClose}>
+      <div role="radiogroup" aria-label={`Block size for player ${label}`} className="flex items-center gap-1">
         {SIZE_OPTIONS.map(({ size, letter }) => (
           <button
             key={size}
@@ -280,7 +316,7 @@ function BlockSizePicker({
           </button>
         ))}
       </div>
-    </>
+    </Popover>
   )
 }
 

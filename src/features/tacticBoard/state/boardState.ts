@@ -11,6 +11,7 @@ import {
 } from '../engine/defence'
 import { suggestDefence, type DefenceSystem, type DefenderTarget } from '../engine/defenders'
 import type { HitType } from '../engine/hitZones'
+import type { NetKind } from '../engine/view3d'
 
 export type IconKind = 'home' | 'opponent' | 'ball'
 
@@ -53,6 +54,8 @@ export interface BoardState {
   manual: string[]
   tool: Tool
   drawings: Drawing[]
+  /** Net height for the 3D view. */
+  net: NetKind
 }
 
 export type BoardAction =
@@ -69,6 +72,7 @@ export type BoardAction =
   /** Send hand-placed defenders back to their suggested spots. */
   | { type: 'resetDefenders' }
   | { type: 'setTool'; tool: Tool }
+  | { type: 'setNet'; net: NetKind }
   | { type: 'addDrawing'; drawing: Drawing }
   | { type: 'undoDrawing' }
   | { type: 'clearDrawings' }
@@ -105,6 +109,7 @@ export const initialBoardState: BoardState = withAutoDefence({
   manual: [],
   tool: 'move',
   drawings: [],
+  net: 'men',
 })
 
 export function isBlocker(icon: BoardIcon): boolean {
@@ -146,6 +151,8 @@ function applyAction(state: BoardState, action: BoardAction): BoardState {
       return { ...state, manual: [] }
     case 'setTool':
       return { ...state, tool: action.tool }
+    case 'setNet':
+      return { ...state, net: action.net }
     case 'addDrawing':
       return { ...state, drawings: [...state.drawings, action.drawing] }
     case 'undoDrawing':
@@ -161,6 +168,7 @@ function applyAction(state: BoardState, action: BoardAction): BoardState {
         hitView: state.hitView,
         autoDefence: state.autoDefence,
         tool: state.tool,
+        net: state.net,
       }
   }
 }
