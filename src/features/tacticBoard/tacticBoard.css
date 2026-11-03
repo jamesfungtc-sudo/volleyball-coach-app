@@ -8,8 +8,8 @@
   --tb-ball-stroke: 222 35% 18%;
   --tb-shadow: 222 45% 12% / 0.5;
   --tb-lane: 0 80% 52% / 0.42;
-  --tb-seam: 30 85% 55% / 0.45;
-  --tb-seam-stroke: 28 90% 38%;
+  --tb-seam: 0 78% 40% / 0.6;
+  --tb-seam-stroke: 0 80% 24%;
   --tb-sight-line: 0 0% 100% / 0.75;
   --tb-roll-fill: 275 75% 55% / 0.5;
   --tb-roll-stroke: 275 80% 45%;
@@ -29,8 +29,8 @@
     --tb-ball-stroke: 222 47% 7%;
     --tb-shadow: 222 50% 4% / 0.6;
     --tb-lane: 0 85% 60% / 0.35;
-    --tb-seam: 32 90% 60% / 0.38;
-    --tb-seam-stroke: 36 100% 72%;
+    --tb-seam: 0 62% 32% / 0.65;
+    --tb-seam-stroke: 0 90% 80%;
     --tb-sight-line: 0 0% 100% / 0.6;
     --tb-roll-fill: 275 80% 65% / 0.45;
     --tb-roll-stroke: 275 90% 78%;
@@ -48,8 +48,8 @@
   --tb-ball-stroke: 222 47% 7%;
   --tb-shadow: 222 50% 4% / 0.6;
   --tb-lane: 0 85% 60% / 0.35;
-  --tb-seam: 32 90% 60% / 0.38;
-  --tb-seam-stroke: 36 100% 72%;
+  --tb-seam: 0 62% 32% / 0.65;
+  --tb-seam-stroke: 0 90% 80%;
   --tb-sight-line: 0 0% 100% / 0.6;
   --tb-roll-fill: 275 80% 65% / 0.45;
   --tb-roll-stroke: 275 90% 78%;
