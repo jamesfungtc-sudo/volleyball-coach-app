@@ -19,6 +19,9 @@ import { BlockerHands, DefenceOverlay } from './DefenceOverlay'
 import { DefenderGhosts } from './DefenderGhosts'
 import { DrawLayer } from './DrawLayer'
 
+/** Zone labels in present mode, relative to normal. */
+const PRESENT_LABEL_SCALE = 1.4
+
 /** Pointer travel (CSS px) below which a press counts as a tap rather than a drag. */
 const TAP_SLOP_PX = 6
 
@@ -33,9 +36,11 @@ interface Drag {
 interface TacticBoardProps {
   state: BoardState
   dispatch: Dispatch<BoardAction>
+  /** Shown to a player at arm's length: zone labels are drawn larger. */
+  presenting?: boolean
 }
 
-export function TacticBoard({ state, dispatch }: TacticBoardProps) {
+export function TacticBoard({ state, dispatch, presenting = false }: TacticBoardProps) {
   const svgRef = useRef<SVGSVGElement>(null)
   // Keyed by pointerId so several fingers can drag different icons at once.
   const drags = useRef(new Map<number, Drag>())
@@ -170,7 +175,7 @@ export function TacticBoard({ state, dispatch }: TacticBoardProps) {
       aria-label="Volleyball tactic board"
     >
       <Court />
-      {analysis && <DefenceOverlay analysis={analysis} hitView={state.hitView} />}
+      {analysis && <DefenceOverlay analysis={analysis} hitView={state.hitView} labelScale={presenting ? PRESENT_LABEL_SCALE : 1} />}
       <BlockerHands blockerXs={blockerXs} />
       <DefenderGhosts defenders={manualDefenders} suggestions={suggestions} />
       <DrawLayer drawings={state.drawings} draft={draft} />

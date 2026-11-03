@@ -1,10 +1,10 @@
 import {
   ANTENNA_X,
+  BOARD_BOUNDS,
   ATTACK_LINE_DISTANCE,
   ATTACK_LINE_EXTENSION,
   COURT_LENGTH,
   COURT_WIDTH,
-  FULL_VIEW,
   LINE_WIDTH,
   NET_Y,
 } from '../engine/court'
@@ -24,10 +24,10 @@ export function Court() {
     <g aria-hidden="true">
       {/* Oversized so the floor still fills the screen when the view is widened to fit it. */}
       <rect
-        x={FULL_VIEW.x - FLOOR_BLEED}
-        y={FULL_VIEW.y - FLOOR_BLEED}
-        width={FULL_VIEW.width + FLOOR_BLEED * 2}
-        height={FULL_VIEW.height + FLOOR_BLEED * 2}
+        x={BOARD_BOUNDS.x - FLOOR_BLEED}
+        y={BOARD_BOUNDS.y - FLOOR_BLEED}
+        width={BOARD_BOUNDS.width + FLOOR_BLEED * 2}
+        height={BOARD_BOUNDS.height + FLOOR_BLEED * 2}
         fill="hsl(var(--tb-free-zone))"
       />
       <rect x={0} y={0} width={COURT_WIDTH} height={COURT_LENGTH} fill="hsl(var(--tb-court))" />

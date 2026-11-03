@@ -25,18 +25,28 @@ export const ATTACK_LINE_EXTENSION = { dash: 0.15, gap: 0.2, count: 5 }
 /** Antennae stand on the outer edge of each sideline. */
 export const ANTENNA_X = [0, COURT_WIDTH] as const
 
-/** Free zone shown around the court (rules require >= 3 m; trimmed to save screen space). */
-export const FREE_ZONE = { side: 2, end: 2.5 }
+/** Area icons can be dragged around in: the court plus a free zone (rules require >= 3 m; trimmed). */
+const FREE_ZONE = { side: 2, end: 2.5 }
 
-export const FULL_VIEW: Rect = {
+export const BOARD_BOUNDS: Rect = {
   x: -FREE_ZONE.side,
   y: -FREE_ZONE.end,
   width: COURT_WIDTH + FREE_ZONE.side * 2,
   height: COURT_LENGTH + FREE_ZONE.end * 2,
 }
 
-// Portrait phones are width-limited in this view, so keep the side margin tight.
-const DEFENCE_VIEW_PADDING = { side: 0.6, end: 1.2 }
+// Phones in portrait are width-limited, so the framing keeps only a thin margin round the court:
+// enough for icons standing on a line, so the court itself is as large as possible.
+const FULL_VIEW_MARGIN = { side: 0.5, end: 1 }
+
+export const FULL_VIEW: Rect = {
+  x: -FULL_VIEW_MARGIN.side,
+  y: -FULL_VIEW_MARGIN.end,
+  width: COURT_WIDTH + FULL_VIEW_MARGIN.side * 2,
+  height: COURT_LENGTH + FULL_VIEW_MARGIN.end * 2,
+}
+
+const DEFENCE_VIEW_PADDING = { side: 0.5, end: 0.8 }
 
 /** Tight view that keeps the hitter and our entire half (plus a margin) on screen. */
 export function defenceView(hitter: Point): Rect {

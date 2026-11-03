@@ -1,4 +1,4 @@
-import { clampToRect, FULL_VIEW, type Point } from '../engine/court'
+import { BOARD_BOUNDS, clampToRect, type Point } from '../engine/court'
 import { analyseDefence, BLOCKER_Y, isInBlockZone } from '../engine/defence'
 import { suggestDefence, type DefenceSystem, type DefenderTarget } from '../engine/defenders'
 import type { HitType } from '../engine/hitZones'
@@ -105,7 +105,7 @@ export function boardReducer(state: BoardState, action: BoardAction): BoardState
 function applyAction(state: BoardState, action: BoardAction): BoardState {
   switch (action.type) {
     case 'move': {
-      const to = clampToRect(action.to, FULL_VIEW)
+      const to = clampToRect(action.to, BOARD_BOUNDS)
       const moved = updateIcon(state, action.id, icon => ({ ...icon, ...to }))
       const isHome = state.icons.some(i => i.id === action.id && i.kind === 'home')
       return isHome && !state.manual.includes(action.id) ? { ...moved, manual: [...state.manual, action.id] } : moved

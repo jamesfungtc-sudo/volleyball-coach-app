@@ -20,10 +20,11 @@ const BACKGROUND_LANE_OPACITY = 0.35
 interface DefenceOverlayProps {
   analysis: DefenceAnalysis
   hitView: HitView
+  labelScale?: number
 }
 
 /** Block shadow and attack landing zones on our court, plus the sight lines from the hitter to the block edges. */
-export function DefenceOverlay({ analysis, hitView }: DefenceOverlayProps) {
+export function DefenceOverlay({ analysis, hitView, labelScale = 1 }: DefenceOverlayProps) {
   const { contact } = analysis
   const edges = analysis.shadows.flatMap(s => [s.from, s.to])
   const showHard = hitView === 'hard' || hitView === 'all'
@@ -55,15 +56,15 @@ export function DefenceOverlay({ analysis, hitView }: DefenceOverlayProps) {
       {showHard &&
         analysis.lanes.map(lane =>
           polygonArea(lane.polygon) < MIN_LABELLED_AREA ? null : (
-            <Label key={`label-${lane.from}`} at={polygonCentroid(lane.polygon)} text={lane.kind.toUpperCase()} />
+            <Label key={`label-${lane.from}`} at={polygonCentroid(lane.polygon)} text={lane.kind.toUpperCase()} scale={labelScale} />
           ),
         )}
       {rolls.map((zone, i) =>
         polygonArea(zone) < MIN_LABELLED_AREA ? null : (
-          <Label key={`roll-label-${i}`} at={polygonCentroid(zone)} text="ROLL" />
+          <Label key={`roll-label-${i}`} at={polygonCentroid(zone)} text="ROLL" scale={labelScale} />
         ),
       )}
-      {tip && <Label at={polygonCentroid(tip)} text="TIP" />}
+      {tip && <Label at={polygonCentroid(tip)} text="TIP" scale={labelScale} />}
     </g>
   )
 }
@@ -81,7 +82,7 @@ function Zone({ polygon, color }: { polygon: Point[]; color: string }) {
   )
 }
 
-function Label({ at, text }: { at: Point; text: string }) {
+function Label({ at, text, scale }: { at: Point; text: string; scale: number }) {
   return (
     <text
       // Narrow edge lanes put the centroid near a sideline; keep the word inside the court.
@@ -89,12 +90,12 @@ function Label({ at, text }: { at: Point; text: string }) {
       y={at.y}
       textAnchor="middle"
       dominantBaseline="central"
-      fontSize={0.42}
+      fontSize={0.42 * scale}
       fontWeight={700}
       letterSpacing={0.04}
       fill="hsl(0 0% 100%)"
       stroke="hsl(222 47% 7% / 0.55)"
-      strokeWidth={0.08}
+      strokeWidth={0.08 * scale}
       paintOrder="stroke"
       style={{ userSelect: 'none' }}
     >
