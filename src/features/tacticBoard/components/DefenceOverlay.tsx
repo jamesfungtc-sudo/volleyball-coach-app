@@ -1,5 +1,5 @@
 import { COURT_WIDTH, NET_Y, type Point } from '../engine/court'
-import { BLOCK_WIDTH, type DefenceAnalysis, type LaneKind } from '../engine/defence'
+import { BLOCK_SIZES, DEFAULT_BLOCK_SIZE, type Blocker, type DefenceAnalysis, type LaneKind } from '../engine/defence'
 import { polygonArea, polygonCentroid } from '../engine/geometry'
 import { rollZones, tipZone } from '../engine/hitZones'
 import type { HitView } from '../state/boardState'
@@ -37,11 +37,21 @@ export function DefenceOverlay({ analysis, hitView, labelScale = 1 }: DefenceOve
         {analysis.lanes.map(lane => (
           <polygon key={`lane-${lane.from}`} points={toPoints(lane.polygon)} fill={LANE_FILL[lane.kind]} />
         ))}
+        {/* Deep court a hard hit can reach over a block whose shadow stops short. */}
+        {analysis.over.map(zone => (
+          <polygon key={`over-${zone.from}`} points={toPoints(zone.polygon)} fill="hsl(var(--tb-lane))" />
+        ))}
       </g>
       {analysis.shadows.map(shadow => (
         <polygon key={`shadow-${shadow.from}`} points={toPoints(shadow.polygon)} fill="hsl(var(--tb-shadow))" />
       ))}
 
+      {showHard &&
+        analysis.over.map(zone =>
+          polygonArea(zone.polygon) < MIN_LABELLED_AREA ? null : (
+            <Label key={`over-label-${zone.from}`} at={polygonCentroid(zone.polygon)} text="OVER" scale={labelScale} />
+          ),
+        )}
       {rolls.map((zone, i) => (
         <Zone key={`roll-${i}`} polygon={zone} color="--tb-roll" />
       ))}
@@ -104,16 +114,16 @@ function Label({ at, text, scale }: { at: Point; text: string; scale: number }) 
   )
 }
 
-/** Each blocker's hands drawn on the net, so the covered width is visible. */
-export function BlockerHands({ blockerXs }: { blockerXs: number[] }) {
+/** Each blocker's hands drawn on the net at their size, so the covered width is visible. */
+export function BlockerHands({ blockers }: { blockers: Blocker[] }) {
   return (
     <g pointerEvents="none" aria-hidden="true">
-      {blockerXs.map((x, i) => (
+      {blockers.map(({ x, size = DEFAULT_BLOCK_SIZE }, i) => (
         <rect
           key={i}
-          x={x - BLOCK_WIDTH / 2}
+          x={x - BLOCK_SIZES[size].width / 2}
           y={NET_Y - 0.08}
-          width={BLOCK_WIDTH}
+          width={BLOCK_SIZES[size].width}
           height={0.16}
           rx={0.05}
           fill="hsl(var(--team-home))"

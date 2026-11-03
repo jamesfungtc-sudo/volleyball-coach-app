@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { boardReducer, initialBoardState, isBlocker, suggestedDefence, type BoardState } from './boardState'
+import { boardReducer, initialBoardState, blockersOf, isBlocker, suggestedDefence, type BoardState } from './boardState'
 
 const pos = (state: BoardState, id: string) => {
   const icon = state.icons.find(i => i.id === id)!
@@ -58,6 +58,24 @@ describe('tapping a hitter', () => {
   it('puts 6 in the deep middle and 1 on the line against their 4 (perimeter)', () => {
     const jobs = Object.fromEntries([...suggestedDefence(initialBoardState)].map(([id, t]) => [id, t.kind]))
     expect(jobs).toEqual({ h1: 'line', h6: 'deepMiddle', h5: 'deepCross', h4: 'sharpCross' })
+  })
+})
+
+describe('block size', () => {
+  it('is kept per player and squeezes a small double block closed', () => {
+    let state = boardReducer(initialBoardState, { type: 'setBlockSize', id: 'h3', size: 'small' })
+    state = boardReducer(state, { type: 'setBlockSize', id: 'h2', size: 'small' })
+    state = boardReducer(state, { type: 'setHitter', id: 'o2' })
+    state = boardReducer(state, { type: 'setHitter', id: 'o4' })
+    expect(state.icons.find(i => i.id === 'h3')!.blockSize).toBe('small')
+    const [a, b] = state.icons.filter(isBlocker).map(i => i.x).sort()
+    expect(b - a).toBeLessThan(0.68)
+    expect(blockersOf(state.icons).every(bl => bl.size === 'small')).toBe(true)
+  })
+
+  it('only applies to our players', () => {
+    const state = boardReducer(initialBoardState, { type: 'setBlockSize', id: 'o4', size: 'large' })
+    expect(state.icons.find(i => i.id === 'o4')!.blockSize).toBeUndefined()
   })
 })
 

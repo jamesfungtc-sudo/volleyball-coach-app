@@ -1,5 +1,14 @@
 import { BOARD_BOUNDS, clampToRect, COURT_WIDTH, NET_Y, type Point } from '../engine/court'
-import { analyseDefence, BLOCKER_Y, isInBlockZone } from '../engine/defence'
+import {
+  analyseDefence,
+  BALL_DIAMETER,
+  BLOCK_SIZES,
+  BLOCKER_Y,
+  DEFAULT_BLOCK_SIZE,
+  isInBlockZone,
+  type Blocker,
+  type BlockSize,
+} from '../engine/defence'
 import { suggestDefence, type DefenceSystem, type DefenderTarget } from '../engine/defenders'
 import type { HitType } from '../engine/hitZones'
 
@@ -9,6 +18,8 @@ export interface BoardIcon extends Point {
   id: string
   kind: IconKind
   label: string
+  /** Home players: how big a block they put up (medium when unset). Kept as they move around. */
+  blockSize?: BlockSize
 }
 
 export type ZoomMode = 'full' | 'defence'
@@ -50,6 +61,7 @@ export type BoardAction =
   | { type: 'drop'; id: string }
   /** Tap on an opponent: they become the hitter and our default block lines up against them. */
   | { type: 'setHitter'; id: string }
+  | { type: 'setBlockSize'; id: string; size: BlockSize }
   | { type: 'setZoom'; zoom: ZoomMode }
   | { type: 'toggleShadow' }
   | { type: 'setHitView'; hitView: HitView }
@@ -119,6 +131,8 @@ function applyAction(state: BoardState, action: BoardAction): BoardState {
       // A new attack is a new scene: hand placements give way to the defaults.
       return { ...state, hitterId: action.id, icons: lineUpBlock(state.icons, hitter), manual: [] }
     }
+    case 'setBlockSize':
+      return updateIcon(state, action.id, icon => (icon.kind === 'home' ? { ...icon, blockSize: action.size } : icon))
     case 'setZoom':
       return { ...state, zoom: action.zoom }
     case 'toggleShadow':
@@ -155,6 +169,8 @@ function applyAction(state: BoardState, action: BoardAction): BoardState {
 const OUTSIDE_ATTACK_BAND = 3
 /** Blocker centres in a closed double block: icons touching (2 × PLAYER_RADIUS). */
 const DOUBLE_BLOCK_SPACING = 0.68
+/** Hand gap a default block is set with: just under the ball, so it's closed. */
+const CLOSED_HAND_GAP = BALL_DIAMETER - 0.03
 /** The outside blocker sets the block just inside the hitter's arm. */
 const OUTSIDE_BLOCKER_INSET = 0.1
 /** Keep blockers' hands inside the antennae. */
@@ -170,24 +186,30 @@ const OFF_NET_SPOT: Record<string, Point> = {
  * Who blocks which attacker, by our court positions: an attack from our right (their 4) gets our
  * 2 + 3, from our left (their 2) our 4 + 3, through the middle our 3 alone. Returns blocker x's.
  */
-export function defaultBlock(hitter: Point): { label: string; x: number }[] {
+export function defaultBlock(
+  hitter: Point,
+  sizeOf: (label: string) => BlockSize = () => DEFAULT_BLOCK_SIZE,
+): { label: string; x: number }[] {
+  // Touching icons close a medium or large block; smaller hands have to squeeze in tighter.
+  const spacing = (a: string, b: string) =>
+    Math.min(DOUBLE_BLOCK_SPACING, (BLOCK_SIZES[sizeOf(a)].width + BLOCK_SIZES[sizeOf(b)].width) / 2 + CLOSED_HAND_GAP)
   // Rounded to the centimetre so the same tap always gives exactly the same picture.
   const clampX = (x: number) =>
     Math.round(Math.min(COURT_WIDTH / 2 + BLOCKER_MAX_FROM_CENTRE, Math.max(COURT_WIDTH / 2 - BLOCKER_MAX_FROM_CENTRE, x)) * 100) / 100
   if (hitter.x > COURT_WIDTH - OUTSIDE_ATTACK_BAND) {
     const outside = clampX(hitter.x - OUTSIDE_BLOCKER_INSET)
-    return [{ label: '2', x: outside }, { label: '3', x: clampX(outside - DOUBLE_BLOCK_SPACING) }]
+    return [{ label: '2', x: outside }, { label: '3', x: clampX(outside - spacing('2', '3')) }]
   }
   if (hitter.x < OUTSIDE_ATTACK_BAND) {
     const outside = clampX(hitter.x + OUTSIDE_BLOCKER_INSET)
-    return [{ label: '4', x: outside }, { label: '3', x: clampX(outside + DOUBLE_BLOCK_SPACING) }]
+    return [{ label: '4', x: outside }, { label: '3', x: clampX(outside + spacing('4', '3')) }]
   }
   return [{ label: '3', x: clampX(hitter.x) }]
 }
 
 /** Put the default blockers on the net and send anyone else off it; the ball goes to the hitter. */
 function lineUpBlock(icons: BoardIcon[], hitter: BoardIcon): BoardIcon[] {
-  const block = defaultBlock(hitter)
+  const block = defaultBlock(hitter, label => blockSizeOf(icons.find(i => i.kind === 'home' && i.label === label)))
   const towardMiddle = hitter.x > COURT_WIDTH / 2 ? -1 : 1
   return icons.map(icon => {
     if (icon.kind === 'ball') return { ...icon, x: hitter.x + 0.5 * towardMiddle, y: hitter.y + 0.5 }
@@ -199,6 +221,15 @@ function lineUpBlock(icons: BoardIcon[], hitter: BoardIcon): BoardIcon[] {
   })
 }
 
+function blockSizeOf(icon: BoardIcon | undefined): BlockSize {
+  return icon?.blockSize ?? DEFAULT_BLOCK_SIZE
+}
+
+/** Our players at the net, as the defence model sees them. */
+export function blockersOf(icons: BoardIcon[]): Blocker[] {
+  return icons.filter(isBlocker).map(icon => ({ x: icon.x, size: blockSizeOf(icon) }))
+}
+
 function updateIcon(state: BoardState, id: string, update: (icon: BoardIcon) => BoardIcon): BoardState {
   return { ...state, icons: state.icons.map(icon => (icon.id === id ? update(icon) : icon)) }
 }
@@ -208,11 +239,11 @@ export function suggestedDefence(state: BoardState): Map<string, DefenderTarget>
   if (state.autoDefence === 'off') return new Map()
   const hitter = state.icons.find(icon => icon.id === state.hitterId)
   if (!hitter) return new Map()
-  const blockerXs = state.icons.filter(isBlocker).map(icon => icon.x)
+
   const defenders = state.icons
     .filter(icon => icon.kind === 'home' && !isBlocker(icon))
     .map(icon => ({ ...icon, zone: Number(icon.label) || undefined }))
-  return suggestDefence(analyseDefence({ hitter, blockerXs }), defenders, state.autoDefence)
+  return suggestDefence(analyseDefence({ hitter, blockers: blockersOf(state.icons) }), defenders, state.autoDefence)
 }
 
 /** Move every auto-managed defender onto its suggested spot. */

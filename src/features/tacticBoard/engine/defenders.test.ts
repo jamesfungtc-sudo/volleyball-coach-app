@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { COURT_LENGTH, COURT_WIDTH, NET_Y } from './court'
 import { analyseDefence, BLOCK_ZONE_DEPTH, rayPointAt } from './defence'
+import { pointInPolygon } from './geometry'
 import { assignDefenders, MAX_SHADOW_NUDGE, suggestDefence, SYSTEM_ROLES, systemTargets, type DefenceSystem } from './defenders'
 
 // Opponent outside hitter attacking from our right into our closed 2 + 3 double block.
@@ -23,9 +24,21 @@ describe('systemTargets', () => {
     expect(kinds('rotational')).toEqual(['tip', 'deepLine', 'deepCross', 'sharpCross', 'deepMiddle'])
   })
 
-  it('perimeter keeps the deep middle deep and leaves tips to the fifth player only', () => {
-    const deepMiddle = targetOf('perimeter', closedBlock, 'deepMiddle')
+  it('perimeter keeps the deep middle deep behind a block that covers the whole court', () => {
+    const analysis = analyseDefence({ hitter, blockers: closedBlock.map(x => ({ x, size: 'large' as const })) })
+    const deepMiddle = systemTargets(analysis, 'perimeter').find(t => t.kind === 'deepMiddle')!
     expect(deepMiddle.point.y).toBeGreaterThan(NET_Y + 8)
+    expect(deepMiddle.inSeam).toBeUndefined()
+  })
+
+  it('sends the seam taker deep over a short block', () => {
+    // Squeezed closed: small hands leave a seam if the icons merely touch.
+    const analysis = analyseDefence({ hitter, blockers: [7.3, 7.9].map(x => ({ x, size: 'small' as const })) })
+    expect(analysis.lanes.map(l => l.kind)).not.toContain('seam')
+    for (const system of SYSTEMS) {
+      const taker = systemTargets(analysis, system).find(t => t.inSeam)!
+      expect(analysis.over.some(zone => pointInPolygon(taker.point, zone.polygon))).toBe(true)
+    }
   })
 
   it('rotational brings the tip player up right behind the block', () => {

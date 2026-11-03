@@ -1,11 +1,12 @@
 import { useMemo, useRef, useState, type Dispatch, type PointerEvent } from 'react'
 import { cn } from '@/lib/utils'
 import { defenceView, fitViewToAspect, FULL_VIEW, type Point, type Rect } from '../engine/court'
-import { analyseDefence } from '../engine/defence'
+import { analyseDefence, BLOCK_SIZES, DEFAULT_BLOCK_SIZE, type BlockSize } from '../engine/defence'
 import { appendPenPoint, isMeaningfulStroke } from '../engine/drawing'
 import { useAnimatedViewBox } from '../hooks/useAnimatedViewBox'
 import { useElementAspect } from '../hooks/useElementAspect'
 import {
+  blockersOf,
   isBlocker,
   suggestedDefence,
   type BoardAction,
@@ -21,6 +22,12 @@ import { DrawLayer } from './DrawLayer'
 
 /** Zone labels in present mode, relative to normal. */
 const PRESENT_LABEL_SCALE = 1.4
+
+const SIZE_OPTIONS: { size: BlockSize; letter: string }[] = [
+  { size: 'large', letter: 'L' },
+  { size: 'medium', letter: 'M' },
+  { size: 'small', letter: 'S' },
+]
 
 /** Pointer travel (CSS px) below which a press counts as a tap rather than a drag. */
 const TAP_SLOP_PX = 6
@@ -48,6 +55,8 @@ export function TacticBoard({ state, dispatch, presenting = false }: TacticBoard
   // One stroke at a time; extra fingers are ignored while drawing.
   const [draft, setDraft] = useState<Drawing | null>(null)
   const draftPointer = useRef<number | null>(null)
+  // Blocker whose size picker is open (opened by tapping them).
+  const [pickerId, setPickerId] = useState<string | null>(null)
   const isDrawing = state.tool !== 'move'
 
   const aspect = useElementAspect(svgRef)
@@ -61,11 +70,12 @@ export function TacticBoard({ state, dispatch, presenting = false }: TacticBoard
   if (draggingIds.length === 0) settledTarget.current = target
   const view = useAnimatedViewBox(settledTarget.current)
 
-  const blockerXs = useMemo(() => state.icons.filter(isBlocker).map(icon => icon.x), [state.icons])
+  const blockers = useMemo(() => blockersOf(state.icons), [state.icons])
   const analysis = useMemo(
-    () => (hitter && state.showShadow ? analyseDefence({ hitter, blockerXs }) : null),
-    [hitter, blockerXs, state.showShadow],
+    () => (hitter && state.showShadow ? analyseDefence({ hitter, blockers }) : null),
+    [hitter, blockers, state.showShadow],
   )
+  const pickerIcon = state.icons.find(icon => icon.id === pickerId && isBlocker(icon))
 
   const manualDefenders = state.autoDefence !== 'off'
     ? state.icons.filter(icon => state.manual.includes(icon.id) && icon.kind === 'home' && !isBlocker(icon))
@@ -131,6 +141,7 @@ export function TacticBoard({ state, dispatch, presenting = false }: TacticBoard
       const travel = Math.hypot(e.clientX - drag.startClient.x, e.clientY - drag.startClient.y)
       if (travel < TAP_SLOP_PX) return
       drag.moved = true
+      setPickerId(null)
     }
     const p = toBoardPoint(e)
     if (!p) return
@@ -141,8 +152,11 @@ export function TacticBoard({ state, dispatch, presenting = false }: TacticBoard
     if (finishDraft(e, true)) return
     const drag = drags.current.get(e.pointerId)
     if (!drag) return
-    // Tapping an opponent makes them the hitter; the reducer ignores taps on anyone else.
-    dispatch(drag.moved ? { type: 'drop', id: drag.id } : { type: 'setHitter', id: drag.id })
+    const icon = state.icons.find(i => i.id === drag.id)
+    if (drag.moved) dispatch({ type: 'drop', id: drag.id })
+    // Tapping one of our blockers opens their size picker; tapping an opponent makes them the hitter.
+    else if (icon && isBlocker(icon)) setPickerId(id => (id === icon.id ? null : icon.id))
+    else dispatch({ type: 'setHitter', id: drag.id })
     drags.current.delete(e.pointerId)
     syncDragging()
   }
@@ -162,36 +176,111 @@ export function TacticBoard({ state, dispatch, presenting = false }: TacticBoard
   )
 
   return (
-    <svg
-      ref={svgRef}
-      viewBox={`${view.x} ${view.y} ${view.width} ${view.height}`}
-      preserveAspectRatio="xMidYMid meet"
-      className={cn('h-full w-full touch-none select-none', isDrawing && 'cursor-crosshair')}
-      onPointerDown={handleBoardPointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerCancel}
-      role="img"
-      aria-label="Volleyball tactic board"
-    >
-      <Court />
-      {analysis && <DefenceOverlay analysis={analysis} hitView={state.hitView} labelScale={presenting ? PRESENT_LABEL_SCALE : 1} />}
-      <BlockerHands blockerXs={blockerXs} />
-      <DefenderGhosts defenders={manualDefenders} suggestions={suggestions} />
-      <DrawLayer drawings={state.drawings} draft={draft} />
-      {/* While drawing, strokes can start on top of players without grabbing them. */}
-      <g pointerEvents={isDrawing ? 'none' : undefined}>
-        {ordered.map(icon => (
-          <BoardIconView
-            key={icon.id}
-            icon={icon}
-            isHitter={icon.id === state.hitterId}
-            isDragging={draggingIds.includes(icon.id)}
-            onPointerDown={handleIconPointerDown}
-          />
+    <div className="relative h-full w-full">
+      <svg
+        ref={svgRef}
+        viewBox={`${view.x} ${view.y} ${view.width} ${view.height}`}
+        preserveAspectRatio="xMidYMid meet"
+        className={cn('h-full w-full touch-none select-none', isDrawing && 'cursor-crosshair')}
+        onPointerDown={handleBoardPointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
+        role="img"
+        aria-label="Volleyball tactic board"
+      >
+        <Court />
+        {analysis && <DefenceOverlay analysis={analysis} hitView={state.hitView} labelScale={presenting ? PRESENT_LABEL_SCALE : 1} />}
+        <BlockerHands blockers={blockers} />
+        <DefenderGhosts defenders={manualDefenders} suggestions={suggestions} />
+        <DrawLayer drawings={state.drawings} draft={draft} />
+        {/* While drawing, strokes can start on top of players without grabbing them. */}
+        <g pointerEvents={isDrawing ? 'none' : undefined}>
+          {ordered.map(icon => (
+            <BoardIconView
+              key={icon.id}
+              icon={icon}
+              isHitter={icon.id === state.hitterId}
+              isDragging={draggingIds.includes(icon.id)}
+              blockSize={isBlocker(icon) ? (icon.blockSize ?? DEFAULT_BLOCK_SIZE) : undefined}
+              onPointerDown={handleIconPointerDown}
+            />
+          ))}
+        </g>
+      </svg>
+      {pickerIcon && (
+        <BlockSizePicker
+          at={toClient(svgRef.current, pickerIcon)}
+          value={pickerIcon.blockSize ?? DEFAULT_BLOCK_SIZE}
+          label={pickerIcon.label}
+          onPick={size => {
+            dispatch({ type: 'setBlockSize', id: pickerIcon.id, size })
+            setPickerId(null)
+          }}
+          onClose={() => setPickerId(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+/** A board point in CSS px relative to the board's top-left corner. */
+function toClient(svg: SVGSVGElement | null, p: { x: number; y: number }) {
+  const ctm = svg?.getScreenCTM()
+  const box = svg?.getBoundingClientRect()
+  if (!ctm || !box) return { x: 0, y: 0 }
+  const q = new DOMPoint(p.x, p.y).matrixTransform(ctm)
+  return { x: q.x - box.left, y: q.y - box.top }
+}
+
+/** Large / medium / small, floating just above the tapped blocker (over the opponent's side). */
+function BlockSizePicker({
+  at,
+  value,
+  label,
+  onPick,
+  onClose,
+}: {
+  at: { x: number; y: number }
+  value: BlockSize
+  label: string
+  onPick: (size: BlockSize) => void
+  onClose: () => void
+}) {
+  return (
+    <>
+      <div className="fixed inset-0 z-10" onClick={onClose} aria-hidden="true" />
+      <div
+        role="radiogroup"
+        aria-label={`Block size for player ${label}`}
+        className="absolute z-20 flex -translate-x-1/2 -translate-y-full items-center gap-1 rounded-xl border border-border bg-surface-elevated p-1 shadow-lg"
+        // Kept on screen when the blocker is near a sideline.
+        style={{ left: `clamp(5.5rem, ${at.x}px, calc(100% - 5.5rem))`, top: at.y - 28 }}
+      >
+        {SIZE_OPTIONS.map(({ size, letter }) => (
+          <button
+            key={size}
+            type="button"
+            role="radio"
+            aria-checked={value === size}
+            aria-label={`${size} block`}
+            title={`${size[0].toUpperCase()}${size.slice(1)}: ${BLOCK_SIZES[size].width} m hands, ${
+              BLOCK_SIZES[size].reach === Infinity ? 'shadow to the end line' : `shadow ${BLOCK_SIZES[size].reach} m deep`
+            }`}
+            onClick={() => onPick(size)}
+            className={cn(
+              'flex h-11 w-12 flex-col items-center justify-center rounded-lg text-base font-bold leading-none',
+              value === size ? 'bg-primary text-primary-foreground' : 'text-foreground hover:bg-muted',
+            )}
+          >
+            {letter}
+            <span className="mt-0.5 text-[10px] font-medium opacity-80">
+              {BLOCK_SIZES[size].reach === Infinity ? 'full' : `${BLOCK_SIZES[size].reach}m`}
+            </span>
+          </button>
         ))}
-      </g>
-    </svg>
+      </div>
+    </>
   )
 }
 

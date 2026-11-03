@@ -1,6 +1,6 @@
 import { COURT_LENGTH, COURT_WIDTH, NET_Y, type Point } from './court'
-import { BLOCK_ZONE_DEPTH, rayPointAt, type DefenceAnalysis, type Lane } from './defence'
-import { clipPolygonToRect, polygonArea, polygonCentroid } from './geometry'
+import { BLOCK_ZONE_DEPTH, rayPointAt, type DefenceAnalysis } from './defence'
+import { clipPolygonToRect, pointInPolygon, polygonArea, polygonCentroid } from './geometry'
 
 // Suggested defender spots for a chosen defensive system.
 //
@@ -25,7 +25,7 @@ export interface DefenderTarget {
   point: Point
   /** Court positions (1-6) best suited to this job, best first. */
   zones: number[]
-  /** True when the role moved into a seam between split blockers. */
+  /** True when the role moved into a gap in the block: a seam, or deep where the shadow stops short. */
   inSeam?: boolean
 }
 
@@ -85,7 +85,7 @@ const MIN_DEFENDER_DEPTH = BLOCK_ZONE_DEPTH + 0.5
 
 export function systemTargets(analysis: DefenceAnalysis, system: DefenceSystem): DefenderTarget[] {
   const attackFromRight = analysis.contact.x >= COURT_WIDTH / 2
-  const seam = widestSeam(analysis.lanes)
+  const seam = gapToCover(analysis)
 
   return SYSTEM_ROLES[system].map(role => {
     const x = attackFromRight ? role.spot.x : COURT_WIDTH - role.spot.x
@@ -159,13 +159,21 @@ function jobCost(defender: Defender, target: DefenderTarget): number {
   return fit * OFF_ROLE_COST + Math.hypot(defender.x - target.point.x, defender.y - target.point.y)
 }
 
-function widestSeam(lanes: Lane[]): Lane | undefined {
-  return lanes
+/**
+ * The hole in the block worth sending a digger to: the widest seam, or failing that the biggest
+ * area a hit over a short block can reach.
+ */
+function gapToCover(analysis: DefenceAnalysis): { polygon: Point[] } | undefined {
+  const seam = analysis.lanes
     .filter(lane => lane.kind === 'seam' && polygonArea(lane.polygon) >= MIN_SEAM_AREA)
     .sort((a, b) => b.to - b.from - (a.to - a.from))[0]
+  if (seam) return seam
+  return analysis.over
+    .filter(zone => polygonArea(zone.polygon) >= MIN_SEAM_AREA)
+    .sort((a, b) => polygonArea(b.polygon) - polygonArea(a.polygon))[0]
 }
 
-function seamSpot(seam: Lane): Point {
+function seamSpot(seam: { polygon: Point[] }): Point {
   const band = { x: 0, y: NET_Y + DIG_DEPTH.from, width: COURT_WIDTH, height: DIG_DEPTH.to - DIG_DEPTH.from }
   const inBand = clipPolygonToRect(seam.polygon, band)
   return polygonCentroid(inBand.length >= 3 ? inBand : seam.polygon)
@@ -189,7 +197,8 @@ function outOfShadow(analysis: DefenceAnalysis, p: Point, lane: 'line' | 'cross'
     const b = rayPointAt(analysis.contact, shadow.to, p.y).x
     const left = Math.min(a, b)
     const right = Math.max(a, b)
-    if (p.x < left || p.x > right) continue
+    // The shadow may stop short of a deep digger.
+    if (!pointInPolygon(p, shadow.polygon)) continue
     const edge = towardRight ? right + SHADOW_EDGE_MARGIN : left - SHADOW_EDGE_MARGIN
     const shift = Math.max(-MAX_SHADOW_NUDGE, Math.min(MAX_SHADOW_NUDGE, edge - p.x))
     return { x: p.x + shift, y: p.y }

@@ -1,10 +1,11 @@
 import type { PointerEvent } from 'react'
+import type { BlockSize } from '../engine/defence'
 import type { BoardIcon } from '../state/boardState'
 
 /**
- * Sized so two blocker icons that touch (centres 2r apart) leave a hand gap smaller than the ball:
- * 2r - BLOCK_WIDTH < BALL_DIAMETER. "Icons touching = closed block" is how coaches read the board.
- * Revisit if BLOCK_WIDTH changes.
+ * Sized so two medium or large blocker icons that touch (centres 2r apart) leave a hand gap smaller
+ * than the ball: 2r - BLOCK_WIDTH < BALL_DIAMETER, so "icons touching = closed block". Small hands
+ * leave a seam when merely touching, as they would on court. Revisit if BLOCK_SIZES change.
  */
 export const PLAYER_RADIUS = 0.34
 export const BALL_RADIUS = 0.2
@@ -15,10 +16,12 @@ interface BoardIconViewProps {
   icon: BoardIcon
   isHitter: boolean
   isDragging: boolean
+  /** Shown as a badge on players at the net. */
+  blockSize?: BlockSize
   onPointerDown: (e: PointerEvent<SVGGElement>, icon: BoardIcon) => void
 }
 
-export function BoardIconView({ icon, isHitter, isDragging, onPointerDown }: BoardIconViewProps) {
+export function BoardIconView({ icon, isHitter, isDragging, blockSize, onPointerDown }: BoardIconViewProps) {
   return (
     <g
       // CSS transform (px = user units inside SVG) so auto-placed defenders glide rather than jump.
@@ -31,6 +34,7 @@ export function BoardIconView({ icon, isHitter, isDragging, onPointerDown }: Boa
       <circle r={TOUCH_RADIUS} fill="transparent" />
       {isDragging && <circle r={TOUCH_RADIUS * 0.9} fill="hsl(0 0% 100% / 0.25)" />}
       {icon.kind === 'ball' ? <Ball /> : <Player icon={icon} isHitter={isHitter} />}
+      {blockSize && <SizeBadge size={blockSize} />}
     </g>
   )
 }
@@ -64,6 +68,20 @@ function Player({ icon, isHitter }: { icon: BoardIcon; isHitter: boolean }) {
   )
 }
 
+const BADGE_RADIUS = 0.16
+
+function SizeBadge({ size }: { size: BlockSize }) {
+  const at = PLAYER_RADIUS * 0.8
+  return (
+    <g transform={`translate(${at} ${-at})`} style={{ pointerEvents: 'none' }}>
+      <circle r={BADGE_RADIUS} fill="hsl(0 0% 100%)" stroke="hsl(var(--team-home))" strokeWidth={0.03} />
+      <text textAnchor="middle" dy="0.35em" fontSize={0.2} fontWeight={800} fill="hsl(var(--team-home))" style={{ userSelect: 'none' }}>
+        {size[0].toUpperCase()}
+      </text>
+    </g>
+  )
+}
+
 function Ball() {
   const r = BALL_RADIUS
   return (
@@ -79,5 +97,6 @@ function Ball() {
 function iconLabel(icon: BoardIcon, isHitter: boolean) {
   if (icon.kind === 'ball') return 'Ball'
   const team = icon.kind === 'home' ? 'Home' : 'Opponent'
-  return `${team} player ${icon.label}${isHitter ? ' (hitter)' : ''}`
+  const block = icon.kind === 'home' && icon.blockSize ? `, ${icon.blockSize} block` : ''
+  return `${team} player ${icon.label}${isHitter ? ' (hitter)' : ''}${block}`
 }

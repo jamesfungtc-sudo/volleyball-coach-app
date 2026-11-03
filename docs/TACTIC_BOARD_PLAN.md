@@ -74,6 +74,26 @@ Depths are measured from the net.
 
 ## Open notes / to revisit
 
+- **Block sizes (`BLOCK_SIZES` in `engine/defence.ts`).** Tap one of our blockers
+  and pick L / M / S. Each size sets two things: how wide the hands are along the
+  net, and how far the shadow reaches past the hands, measured along the ball's
+  path. Everything past that reach is an "OVER" zone, where a hard hit that clears
+  the hands can land.
+
+  | Size | Hand width | Shadow reach |
+  |---|---|---|
+  | Large | 0.6 m | to the end line |
+  | Medium (default) | 0.5 m | 7.5 m |
+  | Small | 0.4 m | 5.5 m |
+
+  - Two Small blockers whose icons only touch leave a seam (gap 0.28 m, wider than
+    the 0.21 m ball). Tapping a hitter sets the default block squeezed tight
+    enough to close it.
+  - Where hands overlap, the longer reach wins. A gap too narrow for the ball takes
+    the shorter reach of the two blockers beside it.
+  - Auto D treats the biggest OVER zone like a seam when there is no real seam.
+  - All of these numbers are guesses; tune them against real footage.
+
 - **`BLOCK_WIDTH` = 0.5 m per blocker (hands + forearms).** This is a first guess,
   and it controls almost everything in this mode. Revisit it with real footage.
   Candidate changes:

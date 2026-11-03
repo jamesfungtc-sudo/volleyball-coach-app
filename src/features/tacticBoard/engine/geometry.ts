@@ -69,3 +69,14 @@ export function polygonCentroid(polygon: Point[]): Point {
   }
   return { x: cx / (3 * twice), y: cy / (3 * twice) }
 }
+
+/** Ray-casting point-in-polygon test (points on an edge may go either way). */
+export function pointInPolygon(p: Point, polygon: Point[]): boolean {
+  let inside = false
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const a = polygon[i]
+    const b = polygon[j]
+    if (a.y > p.y !== b.y > p.y && p.x < a.x + ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y)) inside = !inside
+  }
+  return inside
+}
