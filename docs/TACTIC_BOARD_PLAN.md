@@ -165,11 +165,34 @@ src/features/tacticBoard/
        suggested spot.
      - **Reset D** clears those overrides.
      - The board's ↺ resets everything but keeps the view settings.
-   - **To tune with the coach:** the suggestions follow geometry, not a named
-     system. For example, against a closed double block the off-blocker can be sent
-     to tip cover behind the block, rather than to the sharp cross at the attack
-     line as in a perimeter defence. Next step: offer a choice of system
-     (perimeter / rotational / middle-up) with role-based spots.
+   - **Replaced by defence systems (below):** the first version of Auto D placed
+     players from the shape of the open zones alone.
+6. ✅ Defence systems for Auto D: **Off / Perimeter / Rotational**. These are the
+   systems the coach uses. Middle-up was left out on purpose.
+   - **How spots are set.** Each system lists its jobs with a textbook spot for an
+     attack from our right (`SYSTEM_ROLES` in `engine/defenders.ts`). The spots are
+     mirrored for an attack from our left, then adjusted by the block shadow:
+     - **Line and cross diggers** stand 0.5 m outside the shadow edge, where they
+       can see the hitter. They are moved by at most 1.5 m (`MAX_SHADOW_NUDGE`).
+     - **The tip player** stands 0.6 m inside the middle of the block, 2.6 m off the
+       net.
+     - **The seam player** moves into a split block's seam: deep middle in
+       perimeter, deep cross in rotational.
+   - **Number of defenders.** Jobs are listed in priority order. With 3 defenders
+     (a triple block) the last job is dropped. With 5 (a single block) a fifth job
+     is used: tip in perimeter, deep middle in rotational.
+   - **Switching system** drops any hand placements, so defenders start again from
+     the new system's spots.
+   - **Toolbar position.** The drawing toolbar moved below the court; floating, it
+     covered the deep line corner on phones.
+   - **To check with the coach:**
+     - the textbook spots;
+     - whether the line digger should come up for tips when the block takes the
+       line away completely (right now they stay near the sideline);
+     - attacks from the middle, which use the same left/right logic split at
+       x = 4.5.
+   - **2D side effect:** the shadow runs all the way to the end line, so a deep
+     digger is often pushed toward the sideline. The 3D hands model will fix this.
 5. ✅ Drawing: lines, arrows, undo, clear (`engine/drawing.ts`, `components/DrawLayer.tsx`).
    - **Toolbar:** a floating bar at the bottom of the board with **Move / Pen /
      Arrow**, Undo and Clear.

@@ -1,6 +1,6 @@
 import { clampToRect, FULL_VIEW, type Point } from '../engine/court'
 import { analyseDefence, BLOCKER_Y, isInBlockZone } from '../engine/defence'
-import { suggestDefence, type DefenderTarget } from '../engine/defenders'
+import { suggestDefence, type DefenceSystem, type DefenderTarget } from '../engine/defenders'
 import type { HitType } from '../engine/hitZones'
 
 export type IconKind = 'home' | 'opponent' | 'ball'
@@ -12,6 +12,9 @@ export interface BoardIcon extends Point {
 }
 
 export type ZoomMode = 'full' | 'defence'
+
+/** Auto D: which system places the non-blockers, or 'off' to leave them where they are. */
+export type AutoDefence = 'off' | DefenceSystem
 
 /** 'move' drags icons; the drawing tools draw on the board instead. */
 export type Tool = 'move' | 'pen' | 'arrow'
@@ -33,8 +36,8 @@ export interface BoardState {
   zoom: ZoomMode
   showShadow: boolean
   hitView: HitView
-  /** Non-blocking home players follow the suggested defence spots. */
-  autoDefence: boolean
+  /** Non-blocking home players follow the chosen system's defence spots. */
+  autoDefence: AutoDefence
   /** Home players the coach has placed by hand; auto defence leaves them where they are. */
   manual: string[]
   tool: Tool
@@ -49,7 +52,7 @@ export type BoardAction =
   | { type: 'setZoom'; zoom: ZoomMode }
   | { type: 'toggleShadow' }
   | { type: 'setHitView'; hitView: HitView }
-  | { type: 'toggleAutoDefence' }
+  | { type: 'setAutoDefence'; autoDefence: AutoDefence }
   /** Send hand-placed defenders back to their suggested spots. */
   | { type: 'resetDefenders' }
   | { type: 'setTool'; tool: Tool }
@@ -85,7 +88,7 @@ export const initialBoardState: BoardState = withAutoDefence({
   zoom: 'full',
   showShadow: true,
   hitView: 'hard',
-  autoDefence: true,
+  autoDefence: 'perimeter',
   manual: [],
   tool: 'move',
   drawings: [],
@@ -119,8 +122,9 @@ function applyAction(state: BoardState, action: BoardAction): BoardState {
       return { ...state, showShadow: !state.showShadow }
     case 'setHitView':
       return { ...state, hitView: action.hitView }
-    case 'toggleAutoDefence':
-      return { ...state, autoDefence: !state.autoDefence, manual: [] }
+    case 'setAutoDefence':
+      // A new system starts from its own suggestions, so hand placements are dropped.
+      return { ...state, autoDefence: action.autoDefence, manual: [] }
     case 'resetDefenders':
       return { ...state, manual: [] }
     case 'setTool':
@@ -148,18 +152,19 @@ function updateIcon(state: BoardState, id: string, update: (icon: BoardIcon) => 
   return { ...state, icons: state.icons.map(icon => (icon.id === id ? update(icon) : icon)) }
 }
 
-/** Suggested spot for each non-blocking home player (empty if there's no hitter). */
+/** Suggested spot for each non-blocking home player (empty when Auto D is off or there's no hitter). */
 export function suggestedDefence(state: BoardState): Map<string, DefenderTarget> {
+  if (state.autoDefence === 'off') return new Map()
   const hitter = state.icons.find(icon => icon.id === state.hitterId)
   if (!hitter) return new Map()
   const blockerXs = state.icons.filter(isBlocker).map(icon => icon.x)
   const defenders = state.icons.filter(icon => icon.kind === 'home' && !isBlocker(icon))
-  return suggestDefence(analyseDefence({ hitter, blockerXs }), defenders)
+  return suggestDefence(analyseDefence({ hitter, blockerXs }), defenders, state.autoDefence)
 }
 
 /** Move every auto-managed defender onto its suggested spot. */
 function withAutoDefence(state: BoardState): BoardState {
-  if (!state.autoDefence) return state
+  if (state.autoDefence === 'off') return state
   const suggestions = suggestedDefence(state)
   let changed = false
   const icons = state.icons.map(icon => {

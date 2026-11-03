@@ -62,7 +62,7 @@ export function TacticBoard({ state, dispatch }: TacticBoardProps) {
     [hitter, blockerXs, state.showShadow],
   )
 
-  const manualDefenders = state.autoDefence
+  const manualDefenders = state.autoDefence !== 'off'
     ? state.icons.filter(icon => state.manual.includes(icon.id) && icon.kind === 'home' && !isBlocker(icon))
     : []
   const hasGhosts = manualDefenders.length > 0

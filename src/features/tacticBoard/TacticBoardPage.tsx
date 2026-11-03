@@ -6,6 +6,7 @@ import {
   boardReducer,
   initialBoardState,
   isBlocker,
+  type AutoDefence,
   type HitView,
   type Tool,
   type ZoomMode,
@@ -22,6 +23,12 @@ const HIT_OPTIONS: { value: HitView; label: string }[] = [
   { value: 'roll', label: 'Roll' },
   { value: 'tip', label: 'Tip' },
   { value: 'all', label: 'All' },
+]
+
+const AUTO_DEFENCE_OPTIONS: { value: AutoDefence; label: string }[] = [
+  { value: 'off', label: 'Off' },
+  { value: 'perimeter', label: 'Perimeter' },
+  { value: 'rotational', label: 'Rotational' },
 ]
 
 const TOOL_OPTIONS: { value: Tool; label: string }[] = [
@@ -48,7 +55,7 @@ const LEGEND_FOR: Record<HitView, (keyof typeof LEGEND)[]> = {
 export default function TacticBoardPage() {
   const [state, dispatch] = useReducer(boardReducer, initialBoardState)
   const hasMovedDefenders =
-    state.autoDefence &&
+    state.autoDefence !== 'off' &&
     state.icons.some(icon => state.manual.includes(icon.id) && icon.kind === 'home' && !isBlocker(icon))
 
   return (
@@ -90,15 +97,14 @@ export default function TacticBoardPage() {
             options={HIT_OPTIONS}
           />
         )}
-        <Button
-          variant={state.autoDefence ? 'default' : 'outline'}
-          className="h-11 shrink-0 px-3"
-          onClick={() => dispatch({ type: 'toggleAutoDefence' })}
-          aria-pressed={state.autoDefence}
-          title="Move non-blocking players to suggested defence spots"
-        >
-          Auto D
-        </Button>
+        <div className="flex items-center gap-1.5" title="Move non-blocking players to the chosen system's spots">
+          <span className="text-xs font-medium text-muted-foreground">Auto D</span>
+          <SegmentedControl
+            value={state.autoDefence}
+            onChange={autoDefence => dispatch({ type: 'setAutoDefence', autoDefence })}
+            options={AUTO_DEFENCE_OPTIONS}
+          />
+        </div>
         {hasMovedDefenders && (
           <Button
             variant="outline"
@@ -125,9 +131,12 @@ export default function TacticBoardPage() {
         {/* Hidden on phones to keep the court as large as possible. */}
         <span className="ml-auto hidden sm:inline">Tap opponent = hitter · Drag to net = block</span>
       </div>
-      <div className="relative min-h-0 flex-1 p-2">
+      <div className="min-h-0 flex-1 p-2">
         <TacticBoard state={state} dispatch={dispatch} />
-        <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-xl border border-border bg-surface-elevated/90 p-1 shadow-lg backdrop-blur">
+      </div>
+      {/* Below the court rather than floating over it, so it never hides a player. */}
+      <div className="flex shrink-0 justify-center pb-2">
+        <div className="flex items-center gap-1 rounded-xl border border-border bg-surface-elevated p-1 shadow-sm">
           <SegmentedControl
             value={state.tool}
             onChange={tool => dispatch({ type: 'setTool', tool })}

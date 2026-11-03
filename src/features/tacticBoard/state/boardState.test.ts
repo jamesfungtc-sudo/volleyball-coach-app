@@ -15,8 +15,7 @@ describe('auto defence', () => {
 
   it('re-places defenders when a blocker moves', () => {
     const split = boardReducer(initialBoardState, { type: 'move', id: 'h3', to: { x: 6.2, y: 9.4 } })
-    const kinds = [...suggestedDefence(split).values()].map(t => t.kind)
-    expect(kinds).toContain('seam')
+    expect([...suggestedDefence(split).values()].some(t => t.inSeam)).toBe(true)
     for (const [id, target] of suggestedDefence(split)) {
       expect(pos(split, id)).toEqual(target.point)
     }
@@ -32,7 +31,7 @@ describe('auto defence', () => {
   })
 
   it('stops moving players when switched off', () => {
-    let state = boardReducer(initialBoardState, { type: 'toggleAutoDefence' })
+    let state = boardReducer(initialBoardState, { type: 'setAutoDefence', autoDefence: 'off' })
     const before = pos(state, 'h1')
     state = boardReducer(state, { type: 'move', id: 'h3', to: { x: 6.2, y: 9.4 } })
     expect(pos(state, 'h1')).toEqual(before)
