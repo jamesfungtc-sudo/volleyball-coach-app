@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { boardReducer, initialBoardState, suggestedDefence, type BoardState } from './boardState'
+import { boardReducer, initialBoardState, isBlocker, suggestedDefence, type BoardState } from './boardState'
 
 const pos = (state: BoardState, id: string) => {
   const icon = state.icons.find(i => i.id === id)!
@@ -35,6 +35,29 @@ describe('auto defence', () => {
     const before = pos(state, 'h1')
     state = boardReducer(state, { type: 'move', id: 'h3', to: { x: 6.2, y: 9.4 } })
     expect(pos(state, 'h1')).toEqual(before)
+  })
+})
+
+describe('tapping a hitter', () => {
+  const blockers = (state: typeof initialBoardState) =>
+    state.icons.filter(isBlocker).map(i => i.label).sort()
+
+  it('lines up our default block: their 2 → our 4 + 3, their 3 → our 3, their 4 → our 2 + 3', () => {
+    expect(blockers(boardReducer(initialBoardState, { type: 'setHitter', id: 'o2' }))).toEqual(['3', '4'])
+    expect(blockers(boardReducer(initialBoardState, { type: 'setHitter', id: 'o3' }))).toEqual(['3'])
+    expect(blockers(boardReducer(initialBoardState, { type: 'setHitter', id: 'o4' }))).toEqual(['2', '3'])
+  })
+
+  it('gives the same picture whichever way you got there', () => {
+    let state = boardReducer(initialBoardState, { type: 'setHitter', id: 'o2' })
+    state = boardReducer(state, { type: 'setHitter', id: 'o3' })
+    state = boardReducer(state, { type: 'setHitter', id: 'o4' })
+    expect(state.icons).toEqual(initialBoardState.icons)
+  })
+
+  it('puts 6 in the deep middle and 1 on the line against their 4 (perimeter)', () => {
+    const jobs = Object.fromEntries([...suggestedDefence(initialBoardState)].map(([id, t]) => [id, t.kind]))
+    expect(jobs).toEqual({ h1: 'line', h6: 'deepMiddle', h5: 'deepCross', h4: 'sharpCross' })
   })
 })
 

@@ -51,7 +51,8 @@ function Player({ icon, isHitter }: { icon: BoardIcon; isHitter: boolean }) {
       <circle r={PLAYER_RADIUS} fill={fill} stroke="hsl(0 0% 100%)" strokeWidth={0.05} />
       <text
         textAnchor="middle"
-        dominantBaseline="central"
+        // iOS Safari ignores dominant-baseline; dy centres cap-height digits and letters everywhere.
+        dy="0.35em"
         fontSize={0.38}
         fontWeight={700}
         fill="hsl(0 0% 100%)"

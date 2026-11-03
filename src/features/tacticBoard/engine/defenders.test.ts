@@ -86,10 +86,10 @@ describe('systemTargets', () => {
 })
 
 describe('assignDefenders', () => {
-  it('matches defenders to the nearest spots overall', () => {
+  it('falls back to the nearest spots overall for players without a court position', () => {
     const targets = [
-      { kind: 'line' as const, point: { x: 8, y: 15 } },
-      { kind: 'deepCross' as const, point: { x: 1, y: 15 } },
+      { kind: 'line' as const, point: { x: 8, y: 15 }, zones: [1] },
+      { kind: 'deepCross' as const, point: { x: 1, y: 15 }, zones: [5] },
     ]
     const result = assignDefenders(
       [
@@ -110,6 +110,32 @@ describe('assignDefenders', () => {
       expect(new Set([...result.values()].map(t => t.kind)).size).toBe(4)
       expect([...result.values()].map(t => t.kind)).not.toContain(SYSTEM_ROLES[system][4].kind)
     }
+  })
+
+  // Players stand anywhere (even on each other's spots): jobs still follow court positions.
+  const shuffled = [
+    { id: 'h1', zone: 1, x: 1, y: 16 },
+    { id: 'h6', zone: 6, x: 8, y: 15 },
+    { id: 'h5', zone: 5, x: 4.5, y: 17 },
+    { id: 'h4', zone: 4, x: 7, y: 13 },
+    { id: 'h2', zone: 2, x: 2, y: 12 },
+  ]
+  const jobs = (system: DefenceSystem, h: { x: number; y: number }, blockerXs: number[], ids: string[]) => {
+    const result = suggestDefence(analyseDefence({ hitter: h, blockerXs }), shuffled.filter(d => ids.includes(d.id)), system)
+    return Object.fromEntries([...result].map(([id, t]) => [id, t.kind]))
+  }
+
+  it('gives jobs by court position against an attack from our right', () => {
+    const ids = ['h1', 'h6', 'h5', 'h4']
+    expect(jobs('perimeter', hitter, closedBlock, ids)).toEqual({ h1: 'line', h6: 'deepMiddle', h5: 'deepCross', h4: 'sharpCross' })
+    expect(jobs('rotational', hitter, closedBlock, ids)).toEqual({ h1: 'tip', h6: 'deepLine', h5: 'deepCross', h4: 'sharpCross' })
+  })
+
+  it('mirrors the positions against an attack from our left', () => {
+    const left = { x: 1, y: NET_Y - 1 }
+    const ids = ['h1', 'h6', 'h5', 'h2']
+    expect(jobs('perimeter', left, [1.1, 1.78], ids)).toEqual({ h5: 'line', h6: 'deepMiddle', h1: 'deepCross', h2: 'sharpCross' })
+    expect(jobs('rotational', left, [1.1, 1.78], ids)).toEqual({ h5: 'tip', h6: 'deepLine', h1: 'deepCross', h2: 'sharpCross' })
   })
 
   it('drops the lowest-priority job against a triple block', () => {

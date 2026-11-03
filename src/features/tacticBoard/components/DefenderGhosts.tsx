@@ -44,7 +44,7 @@ export function DefenderGhosts({ defenders, suggestions }: DefenderGhostsProps) 
               x={x}
               y={y}
               textAnchor="middle"
-              dominantBaseline="central"
+              dy="0.35em"
               fontSize={0.32}
               fontWeight={700}
               fill="hsl(0 0% 100%)"

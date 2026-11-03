@@ -89,7 +89,7 @@ function Label({ at, text, scale }: { at: Point; text: string; scale: number }) 
       x={Math.min(COURT_WIDTH - LABEL_INSET, Math.max(LABEL_INSET, at.x))}
       y={at.y}
       textAnchor="middle"
-      dominantBaseline="central"
+      dy="0.35em"
       fontSize={0.42 * scale}
       fontWeight={700}
       letterSpacing={0.04}

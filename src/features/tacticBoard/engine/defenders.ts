@@ -10,7 +10,11 @@ import { clipPolygonToRect, polygonArea, polygonCentroid } from './geometry'
 //   - The tip player tucks in behind wherever the block actually is.
 //   - The seam player moves into the seam when the block splits.
 // Jobs are listed in priority order: with fewer defenders (a triple block) the last job is dropped,
-// with more (a single block) the extra job is used. Players get jobs by least total distance.
+// with more (a single block) the extra job is used.
+//
+// Jobs go to players by court position (1-6), as a coach would call them: against an attack from
+// our right in perimeter, 1 takes the line, 6 the deep middle, 5 the deep cross, 4 the sharp cross.
+// Distance only breaks ties, so the same scene always gives the same answer.
 
 export type DefenceSystem = 'perimeter' | 'rotational'
 
@@ -19,6 +23,8 @@ export type RoleKind = 'line' | 'deepLine' | 'deepCross' | 'sharpCross' | 'deepM
 export interface DefenderTarget {
   kind: RoleKind
   point: Point
+  /** Court positions (1-6) best suited to this job, best first. */
+  zones: number[]
   /** True when the role moved into a seam between split blockers. */
   inSeam?: boolean
 }
@@ -31,26 +37,33 @@ interface Role {
   lane?: 'line' | 'cross'
   /** Moves into the seam when the block splits. */
   takesSeam?: boolean
+  /** Who normally does this job against an attack from our right, best first. */
+  zones: number[]
 }
 
 export const SYSTEM_ROLES: Record<DefenceSystem, Role[]> = {
   // Everyone not blocking spreads to the edges; the block takes the middle. Nobody is set for tips.
   perimeter: [
-    { kind: 'line', spot: { x: 8.3, depth: 6.2 }, lane: 'line' },
-    { kind: 'deepCross', spot: { x: 1.0, depth: 7.2 }, lane: 'cross' },
-    { kind: 'deepMiddle', spot: { x: 4.6, depth: 8.3 }, takesSeam: true },
-    { kind: 'sharpCross', spot: { x: 1.0, depth: 3.6 }, lane: 'cross' },
-    { kind: 'tip', spot: { x: 6.5, depth: 2.6 } },
+    { kind: 'line', spot: { x: 8.3, depth: 6.2 }, lane: 'line', zones: [1, 6, 5] },
+    { kind: 'deepCross', spot: { x: 1.0, depth: 7.2 }, lane: 'cross', zones: [5, 6, 1] },
+    { kind: 'deepMiddle', spot: { x: 4.6, depth: 8.3 }, takesSeam: true, zones: [6, 5, 1] },
+    { kind: 'sharpCross', spot: { x: 1.0, depth: 3.6 }, lane: 'cross', zones: [4, 3, 2] },
+    // Only used with a single block: the free front-row player on the hitter's side.
+    { kind: 'tip', spot: { x: 6.5, depth: 2.6 }, zones: [2, 3, 4] },
   ],
   // The back row rotates toward the attack: line player up for tips, middle back to the deep line.
   rotational: [
-    { kind: 'tip', spot: { x: 7.4, depth: 2.6 } },
-    { kind: 'deepLine', spot: { x: 8.2, depth: 8.2 }, lane: 'line' },
-    { kind: 'deepCross', spot: { x: 3.0, depth: 7.6 }, lane: 'cross', takesSeam: true },
-    { kind: 'sharpCross', spot: { x: 1.0, depth: 3.4 }, lane: 'cross' },
-    { kind: 'deepMiddle', spot: { x: 4.5, depth: 8.3 } },
+    // 1 rotates up when 2 is blocking; with a single block, 2 is free and takes it.
+    { kind: 'tip', spot: { x: 7.4, depth: 2.6 }, zones: [2, 1, 3] },
+    { kind: 'deepLine', spot: { x: 8.2, depth: 8.2 }, lane: 'line', zones: [6, 1, 5] },
+    { kind: 'deepCross', spot: { x: 3.0, depth: 7.6 }, lane: 'cross', takesSeam: true, zones: [5, 6, 1] },
+    { kind: 'sharpCross', spot: { x: 1.0, depth: 3.4 }, lane: 'cross', zones: [4, 3, 2] },
+    { kind: 'deepMiddle', spot: { x: 4.5, depth: 8.3 }, zones: [6, 5, 1] },
   ],
 }
+
+/** Court positions swap sides when the attack comes from our left. */
+const MIRROR_ZONE: Record<number, number> = { 1: 5, 2: 4, 3: 3, 4: 2, 5: 1, 6: 6 }
 
 /** Back-court band where a seam digger stands (metres from the net). */
 export const DIG_DEPTH = { from: 3.5, to: 8.3 }
@@ -87,17 +100,24 @@ export function systemTargets(analysis: DefenceAnalysis, system: DefenceSystem):
     } else if (role.lane) {
       point = outOfShadow(analysis, point, role.lane, attackFromRight)
     }
-    return { kind: role.kind, point: insideCourt(point), ...(inSeam && { inSeam }) }
+    const zones = attackFromRight ? role.zones : role.zones.map(z => MIRROR_ZONE[z])
+    return { kind: role.kind, point: insideCourt(point), zones, ...(inSeam && { inSeam }) }
   })
 }
 
 export interface Defender extends Point {
   id: string
+  /** Court position 1-6, if the player has one. */
+  zone?: number
 }
 
+/** Cost of a player outside a job's preferred positions; dwarfs any distance on the court. */
+const OFF_ROLE_COST = 1000
+
 /**
- * Give the first `defenders.length` targets to defenders, choosing the matching with the least
- * total distance. Returns a target per defender id; defenders beyond the target count get none.
+ * Give the first `defenders.length` targets to defenders. The matching keeps players in the jobs
+ * their court position normally does; total distance only breaks ties. Returns a target per
+ * defender id; defenders beyond the target count get none.
  */
 export function assignDefenders(defenders: Defender[], targets: DefenderTarget[]): Map<string, DefenderTarget> {
   const chosen = targets.slice(0, defenders.length)
@@ -116,7 +136,7 @@ export function assignDefenders(defenders: Defender[], targets: DefenderTarget[]
       if (used.has(d)) continue
       used.add(d)
       picks.push(d)
-      search(t + 1, cost + Math.hypot(defenders[d].x - chosen[t].point.x, defenders[d].y - chosen[t].point.y))
+      search(t + 1, cost + jobCost(defenders[d], chosen[t]))
       picks.pop()
       used.delete(d)
     }
@@ -131,6 +151,12 @@ export function suggestDefence(
   system: DefenceSystem,
 ): Map<string, DefenderTarget> {
   return assignDefenders(defenders, systemTargets(analysis, system))
+}
+
+function jobCost(defender: Defender, target: DefenderTarget): number {
+  const rank = defender.zone === undefined ? -1 : target.zones.indexOf(defender.zone)
+  const fit = rank === -1 ? target.zones.length : rank
+  return fit * OFF_ROLE_COST + Math.hypot(defender.x - target.point.x, defender.y - target.point.y)
 }
 
 function widestSeam(lanes: Lane[]): Lane | undefined {
