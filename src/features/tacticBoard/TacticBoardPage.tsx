@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useState, type Dispatch } from 'react'
+import { useCallback, useEffect, useId, useReducer, useState, type Dispatch } from 'react'
 import { Button } from '@/components/ui/button'
 import { SegmentedControl } from '@/components/ui/segmented-control'
 import { cn } from '@/lib/utils'
@@ -60,9 +60,6 @@ export default function TacticBoardPage() {
   const [presenting, setPresenting] = useState(false)
   // Stable, so PresentView's full-screen effect runs once per visit rather than on every render.
   const exitPresent = useCallback(() => setPresenting(false), [])
-  const hasMovedDefenders =
-    state.autoDefence !== 'off' &&
-    state.icons.some(icon => state.manual.includes(icon.id) && icon.kind === 'home' && !isBlocker(icon))
 
   if (presenting) {
     return <PresentView state={state} dispatch={dispatch} onExit={exitPresent} />
@@ -96,40 +93,7 @@ export default function TacticBoardPage() {
       </header>
 
       <div className="flex shrink-0 flex-wrap items-center gap-2 px-3 pt-2">
-        <Button
-          variant={state.showShadow ? 'secondary' : 'outline'}
-          className="h-10 shrink-0 px-3"
-          onClick={() => dispatch({ type: 'toggleShadow' })}
-          aria-pressed={state.showShadow}
-        >
-          Shadow {state.showShadow ? 'on' : 'off'}
-        </Button>
-        {state.showShadow && (
-          <NativeSelect
-            id="tb-hit"
-            label="Hit"
-            value={state.hitView}
-            options={HIT_OPTIONS}
-            onChange={hitView => dispatch({ type: 'setHitView', hitView })}
-          />
-        )}
-        <NativeSelect
-          id="tb-auto-d"
-          label="Auto D"
-          value={state.autoDefence}
-          options={AUTO_DEFENCE_OPTIONS}
-          onChange={autoDefence => dispatch({ type: 'setAutoDefence', autoDefence })}
-        />
-        {hasMovedDefenders && (
-          <Button
-            variant="outline"
-            className="h-10 shrink-0 px-3"
-            onClick={() => dispatch({ type: 'resetDefenders' })}
-            title="Send hand-placed defenders back to their suggested spots"
-          >
-            Reset D
-          </Button>
-        )}
+        <DefenceSettings state={state} dispatch={dispatch} />
       </div>
 
       <div className="relative min-h-0 flex-1 p-2">
@@ -151,7 +115,8 @@ interface BoardProps {
 }
 
 /**
- * Court only, filling the screen, for showing a player face to face. Covers the app's tab bar.
+ * The board filling the screen, for showing a player face to face. Covers the app's tab bar; view and
+ * drawing controls stay on screen, the rest sit behind a menu so the court keeps the space.
  * Browsers that allow it (Android, desktop) also go truly full screen; iPhone Safari doesn't, but
  * the app opened from the Home Screen has no browser bars anyway.
  */
@@ -174,16 +139,13 @@ function PresentView({ state, dispatch, onExit }: BoardProps & { onExit: () => v
           value={state.zoom}
           onChange={zoom => dispatch({ type: 'setZoom', zoom })}
           options={ZOOM_OPTIONS}
+          className="mr-auto"
         />
-        <SegmentedControl
-          value={state.tool}
-          onChange={tool => dispatch({ type: 'setTool', tool })}
-          options={TOOL_OPTIONS.slice(0, 2)}
-        />
+        <SettingsMenu state={state} dispatch={dispatch} />
         <Button
           variant="outline"
           size="icon"
-          className="ml-auto h-11 w-11 shrink-0"
+          className="h-11 w-11 shrink-0"
           onClick={onExit}
           aria-label="Exit present mode"
           title="Exit present mode"
@@ -191,9 +153,96 @@ function PresentView({ state, dispatch, onExit }: BoardProps & { onExit: () => v
           <CloseIcon />
         </Button>
       </div>
-      <div className="min-h-0 flex-1 p-1">
+      <div className="relative min-h-0 flex-1 p-1">
         <TacticBoard state={state} dispatch={dispatch} presenting />
+        {state.showShadow && <Legend hitView={state.hitView} />}
       </div>
+      <div className="flex shrink-0 justify-center pb-1">
+        <DrawingToolbar state={state} dispatch={dispatch} />
+      </div>
+    </div>
+  )
+}
+
+/** Shadow, hit type, Auto D and defender reset: a wrapping row on the page, a panel in present mode. */
+function DefenceSettings({ state, dispatch }: BoardProps) {
+  const hasMovedDefenders =
+    state.autoDefence !== 'off' &&
+    state.icons.some(icon => state.manual.includes(icon.id) && icon.kind === 'home' && !isBlocker(icon))
+  return (
+    <>
+      <Button
+        variant={state.showShadow ? 'secondary' : 'outline'}
+        className="h-10 shrink-0 px-3"
+        onClick={() => dispatch({ type: 'toggleShadow' })}
+        aria-pressed={state.showShadow}
+      >
+        Shadow {state.showShadow ? 'on' : 'off'}
+      </Button>
+      {state.showShadow && (
+        <NativeSelect
+          label="Hit"
+          value={state.hitView}
+          options={HIT_OPTIONS}
+          onChange={hitView => dispatch({ type: 'setHitView', hitView })}
+        />
+      )}
+      <NativeSelect
+        label="Auto D"
+        value={state.autoDefence}
+        options={AUTO_DEFENCE_OPTIONS}
+        onChange={autoDefence => dispatch({ type: 'setAutoDefence', autoDefence })}
+      />
+      {hasMovedDefenders && (
+        <Button
+          variant="outline"
+          className="h-10 shrink-0 px-3"
+          onClick={() => dispatch({ type: 'resetDefenders' })}
+          title="Send hand-placed defenders back to their suggested spots"
+        >
+          Reset D
+        </Button>
+      )}
+    </>
+  )
+}
+
+/** Present mode's "more" button: the defence settings and board reset in a panel over the court. */
+function SettingsMenu({ state, dispatch }: BoardProps) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="relative">
+      <Button
+        variant={open ? 'secondary' : 'outline'}
+        size="icon"
+        className="h-11 w-11 shrink-0"
+        onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+        aria-label="More settings"
+        title="More settings"
+      >
+        <MoreIcon />
+      </Button>
+      {open && (
+        <>
+          {/* Tap anywhere else to close. */}
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} aria-hidden="true" />
+          <div className="absolute right-0 top-12 z-20 flex w-64 flex-col items-stretch gap-2 rounded-xl border border-border bg-surface-elevated p-3 shadow-lg">
+            <DefenceSettings state={state} dispatch={dispatch} />
+            <Button
+              variant="outline"
+              className="h-10 gap-1.5"
+              onClick={() => {
+                dispatch({ type: 'reset' })
+                setOpen(false)
+              }}
+            >
+              <ResetIcon />
+              Reset board
+            </Button>
+          </div>
+        </>
+      )}
     </div>
   )
 }
@@ -255,18 +304,17 @@ function Legend({ hitView }: { hitView: HitView }) {
 
 /** Native select: compact, and opens the system picker on phones. */
 function NativeSelect<T extends string>({
-  id,
   label,
   value,
   options,
   onChange,
 }: {
-  id: string
   label: string
   value: T
   options: { value: T; label: string }[]
   onChange: (value: T) => void
 }) {
+  const id = useId()
   return (
     <label htmlFor={id} className="flex h-10 items-center gap-1.5 rounded-md border border-input bg-background pl-3 text-sm">
       <span className="text-muted-foreground">{label}</span>
@@ -293,6 +341,16 @@ function PresentIcon() {
       <path d="M21 8V5a2 2 0 0 0-2-2h-3" />
       <path d="M3 16v3a2 2 0 0 0 2 2h3" />
       <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
+    </svg>
+  )
+}
+
+function MoreIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor">
+      <circle cx="5" cy="12" r="1.8" />
+      <circle cx="12" cy="12" r="1.8" />
+      <circle cx="19" cy="12" r="1.8" />
     </svg>
   )
 }
