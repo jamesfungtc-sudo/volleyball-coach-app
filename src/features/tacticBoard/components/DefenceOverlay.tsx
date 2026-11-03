@@ -1,5 +1,5 @@
-import { COURT_WIDTH, NET_Y, type Point } from '../engine/court'
-import { BLOCK_SIZES, DEFAULT_BLOCK_SIZE, type Blocker, type DefenceAnalysis, type LaneKind } from '../engine/defence'
+import { COURT_LENGTH, COURT_WIDTH, NET_Y, type Point } from '../engine/court'
+import { BLOCK_SIZES, DEFAULT_BLOCK_SIZE, rayPointAt, type Blocker, type DefenceAnalysis, type LaneKind } from '../engine/defence'
 import { polygonArea, polygonCentroid } from '../engine/geometry'
 import { rollZones, tipZone } from '../engine/hitZones'
 import type { HitView } from '../state/boardState'
@@ -45,6 +45,23 @@ export function DefenceOverlay({ analysis, hitView, labelScale = 1 }: DefenceOve
       {analysis.shadows.map(shadow => (
         <polygon key={`shadow-${shadow.from}`} points={toPoints(shadow.polygon)} fill="hsl(var(--tb-shadow))" />
       ))}
+
+      {/* Dotted edges running out from the gap in the block, so a seam reads as a path. */}
+      <g
+        opacity={showHard ? 1 : BACKGROUND_LANE_OPACITY}
+        stroke="hsl(var(--tb-seam-stroke))"
+        strokeWidth={0.07}
+        strokeDasharray="0.01 0.16"
+        strokeLinecap="round"
+      >
+        {analysis.lanes
+          .filter(lane => lane.kind === 'seam')
+          .flatMap(lane => [lane.from, lane.to])
+          .map(netX => {
+            const end = rayExit(contact, netX)
+            return <line key={`seam-edge-${netX}`} x1={netX} y1={NET_Y} x2={end.x} y2={end.y} />
+          })}
+      </g>
 
       {showHard &&
         analysis.over.map(zone =>
@@ -133,6 +150,14 @@ export function BlockerHands({ blockers }: { blockers: Blocker[] }) {
       ))}
     </g>
   )
+}
+
+/** Where the ray through `netX` leaves our court: the end line, or a sideline first. */
+function rayExit(contact: Point, netX: number): Point {
+  const end = rayPointAt(contact, netX, COURT_LENGTH)
+  if (end.x >= 0 && end.x <= COURT_WIDTH) return end
+  const side = end.x < 0 ? 0 : COURT_WIDTH
+  return { x: side, y: contact.y + ((side - contact.x) / (netX - contact.x)) * (NET_Y - contact.y) }
 }
 
 function toPoints(polygon: Point[]) {
