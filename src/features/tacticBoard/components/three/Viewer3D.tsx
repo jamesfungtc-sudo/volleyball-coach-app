@@ -969,6 +969,8 @@ function Figure({
   const [x, , z] = toWorld(icon)
   const shoulderY = lift + height * SHOULDER_RATIO
   const shoulders: Vec3[] = [-1, 1].map(side => [x + side * SHOULDER_HALF_WIDTH, shoulderY, z])
+  // Right-handed: facing us (+Z) a player's right hand is on the -X side, facing them it's +X.
+  const hittingArm = facing === 1 ? 0 : 1
 
   // Blockers: arms pressed forward over the net, spread across the width their size covers on the 2D board.
   const handSpread = BLOCK_SIZES[size].width / 2 - LIMB_RADIUS
@@ -976,7 +978,7 @@ function Figure({
 
   const hands: Vec3[] = shoulders.map(([sx, , sz], i): Vec3 => {
     if (pose === 'blocker') return [x + (i === 0 ? -1 : 1) * handSpread, reach, handZ]
-    if (pose === 'hitter' && i === 1) {
+    if (pose === 'hitter' && i === hittingArm) {
       const [bx, by, bz] = toWorld(ball, reach)
       const atBall: Vec3 = [bx, by - BALL_RADIUS, bz]
       if (swing === undefined) return atBall
