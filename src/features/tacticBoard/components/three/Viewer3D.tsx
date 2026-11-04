@@ -70,6 +70,9 @@ const MAX_PITCH = 1.2
 const HORIZONTAL_FOV = 80
 const VERTICAL_FOV = { min: 50, max: 100 }
 const ZOOM = { min: 0.35, max: 1.2 }
+/** Wide views use a longer lens than the eyes, so the court isn't stretched at the edges. */
+const WIDE_HORIZONTAL_FOV = 55
+const WIDE_VERTICAL_FOV = { min: 35, max: 75 }
 /** Share of the view's height the ball sits above the centre. */
 const BALL_ABOVE_CENTRE = 0.18
 /** One tap of a nudge arrow. */
@@ -108,6 +111,19 @@ const ATTACK_CHOICES: { value: AttackChoice; label: string }[] = [
   { value: 'cross', label: 'Hard: cross' },
   { value: 'seam', label: 'Hard: seam' },
   { value: 'touch', label: 'Off the block' },
+]
+
+/**
+ * Where the camera is. 'eyes' is the defender's own view; the rest are wide views that orbit
+ * (drag) and zoom (pinch) around the court.
+ */
+type CameraMode = 'eyes' | 'behind' | 'side' | 'hitter' | 'above'
+const CAMERA_OPTIONS: { value: CameraMode; label: string }[] = [
+  { value: 'eyes', label: 'Eyes' },
+  { value: 'behind', label: 'Behind' },
+  { value: 'side', label: 'Side' },
+  { value: 'hitter', label: 'Hitter' },
+  { value: 'above', label: 'Above' },
 ]
 
 interface AttackRunState {
@@ -151,6 +167,9 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
   const [run, setRun] = useState<AttackRunState | null>(null)
   const [speedIndex, setSpeedIndex] = useState(0)
   const [chooserOpen, setChooserOpen] = useState(false)
+  // Changing the camera keeps the attack, so "Again" replays the same hit from the new angle.
+  const [cameraMode, setCameraMode] = useState<CameraMode>('eyes')
+  const wide = cameraMode !== 'eyes'
   // Anything that changes the play makes the last attack stale.
   useEffect(() => setRun(null), [state.icons, state.hitterId, state.net, state.contactAboveNet, viewerId])
   const viewerIcon = state.icons.find(icon => icon.id === viewerId)
@@ -176,7 +195,7 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
     if (blocker) dispatch({ type: 'drop', id })
   }
 
-  const look = useLook(viewerId, {
+  const look = useLook(`${viewerId}:${cameraMode}`, {
     grab,
     onDrag(dxPx, dyPx) {
       const id = grab.current?.id
@@ -220,7 +239,8 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
     setRun(prev => ({ id: (prev?.id ?? 0) + 1, plan, finished: false }))
   }
   const replay = () => setRun(prev => prev && { id: prev.id + 1, plan: prev.plan, finished: false })
-  const result = run?.finished ? describeAttack(run.plan, viewer) : null
+  const who = wide ? viewer.label : 'you'
+  const result = run?.finished ? describeAttack(run.plan, viewer, who) : null
 
   return (
     <div className="fixed inset-0 z-[70] flex flex-col bg-background pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pt-[env(safe-area-inset-top)]">
@@ -233,11 +253,25 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
           <Button variant="ghost" size="icon" className="h-11 w-11" onClick={() => step(-1)} aria-label="Previous player">
             <ChevronIcon direction="left" />
           </Button>
-          <span className="whitespace-nowrap text-sm font-semibold">Player {viewer.label}'s view</span>
+          <span className="whitespace-nowrap text-sm font-semibold">{wide ? `Player ${viewer.label}` : `Player ${viewer.label}'s view`}</span>
           <Button variant="ghost" size="icon" className="h-11 w-11" onClick={() => step(1)} aria-label="Next player">
             <ChevronIcon direction="right" />
           </Button>
         </div>
+      </div>
+
+      <div className="flex shrink-0 items-center justify-center gap-1 px-2 pb-1" role="group" aria-label="Camera">
+        {CAMERA_OPTIONS.map(option => (
+          <Button
+            key={option.value}
+            variant={cameraMode === option.value ? 'secondary' : 'ghost'}
+            className="h-9 px-2.5 text-sm"
+            aria-pressed={cameraMode === option.value}
+            onClick={() => setCameraMode(option.value)}
+          >
+            {option.label}
+          </Button>
+        ))}
       </div>
 
       <div
@@ -249,14 +283,15 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
         onPointerCancel={look.onPointerUp}
         onWheel={look.onWheel}
       >
-        <Canvas frameloop="demand" dpr={[1, 2]} camera={{ near: 0.05, far: 200 }} aria-label={`3D view from player ${viewer.label}`}>
+        <Canvas frameloop="demand" dpr={[1, 2]} camera={{ near: 0.05, far: 200 }} aria-label={wide ? `3D view of the court, ${cameraMode}` : `3D view from player ${viewer.label}`}>
           <Scene
             state={state}
             viewer={viewer}
             stance={stance}
             look={look}
             selectedId={selectedId}
-            movableIds={movable.map(icon => icon.id).filter(id => id !== viewer.id)}
+            movableIds={movable.map(icon => icon.id).filter(id => wide || id !== viewer.id)}
+            cameraMode={cameraMode}
             onGrab={(id, pointerId) => {
               grab.current = { id, pointerId }
               setSelectedId(id)
@@ -313,7 +348,7 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
                   disabled={!choices.has(choice.value)}
                   onClick={() => startAttack(choice.value)}
                 >
-                  {choice.label}
+                  {choiceLabel(choice.value, choice.label, wide ? viewer.label : null)}
                 </Button>
               ))}
             </div>
@@ -336,7 +371,9 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
             ? 'Arrows move you, as you face the net · hold to keep moving'
             : selected
               ? 'Drag the player, or use the arrows'
-              : 'Drag to look around · pinch to zoom'}
+              : wide
+                ? 'Drag to turn the view · pinch to zoom · drag a player to move them'
+                : 'Drag to look around · pinch to zoom'}
         </p>
       </div>
 
@@ -418,9 +455,9 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
       </div>
 
       <div className="flex shrink-0 items-center justify-center gap-2 px-2 py-1">
-        <SegmentedControl value={stance} onChange={setStance} options={STANCE_OPTIONS} />
+        {!wide && <SegmentedControl value={stance} onChange={setStance} options={STANCE_OPTIONS} />}
         <Button variant="outline" className="h-11 px-3" onClick={look.reset}>
-          Face hitter
+          {wide ? 'Reset view' : 'Face hitter'}
         </Button>
       </div>
     </div>
@@ -465,7 +502,8 @@ interface LookOptions {
 }
 
 /** Drag to turn the head, pinch or wheel to zoom. Resets when the viewer changes. */
-function useLook(viewerId: string, { grab, onDrag, onTapEmpty }: LookOptions) {
+/** `resetKey` changes (another defender, another camera) put the view back to its starting angle. */
+function useLook(resetKey: string, { grab, onDrag, onTapEmpty }: LookOptions) {
   const [yaw, setYaw] = useState(0)
   const [pitch, setPitch] = useState(0)
   const [zoom, setZoom] = useState(1)
@@ -480,7 +518,7 @@ function useLook(viewerId: string, { grab, onDrag, onTapEmpty }: LookOptions) {
     setZoom(1)
     setAimVersion(v => v + 1)
   }
-  useEffect(reset, [viewerId])
+  useEffect(reset, [resetKey])
 
   const clampZoom = (v: number) => Math.min(ZOOM.max, Math.max(ZOOM.min, v))
   const spread = () => {
@@ -544,9 +582,24 @@ interface SceneProps {
   run: AttackRunState | null
   speed: number
   onRunFinished: () => void
+  cameraMode: CameraMode
 }
 
-function Scene({ state, viewer, stance, look, selectedId, movableIds, onGrab, cameraRef, run, speed, onRunFinished }: SceneProps) {
+function Scene({
+  state,
+  viewer,
+  stance,
+  look,
+  selectedId,
+  movableIds,
+  onGrab,
+  cameraRef,
+  run,
+  speed,
+  onRunFinished,
+  cameraMode,
+}: SceneProps) {
+  const wide = cameraMode !== 'eyes'
   const colors = useBoardColors()
   const hitter = state.icons.find(icon => icon.id === state.hitterId)
   const blockers = useMemo(() => blockersOf(state.icons), [state.icons])
@@ -568,14 +621,24 @@ function Scene({ state, viewer, stance, look, selectedId, movableIds, onGrab, ca
       <color attach="background" args={[colors.sky]} />
       <ambientLight intensity={1.1} />
       <directionalLight position={[4, 12, 10]} intensity={1.6} />
-      <FirstPersonCamera eye={eye} target={target} yaw={look.yaw} pitch={look.pitch} zoom={look.zoom} cameraRef={cameraRef} />
+      {wide ? (
+        <OrbitCamera
+          {...cameraPreset(cameraMode, hitter)}
+          yaw={look.yaw}
+          pitch={look.pitch}
+          zoom={look.zoom}
+          cameraRef={cameraRef}
+        />
+      ) : (
+        <FirstPersonCamera eye={eye} target={target} yaw={look.yaw} pitch={look.pitch} zoom={look.zoom} cameraRef={cameraRef} />
+      )}
 
       <CourtFloor colors={colors} />
       {analysis && state.showShadow && <Zones analysis={analysis} state={state} colors={colors} />}
       <Net net={state.net} colors={colors} />
 
       {state.icons.map(icon =>
-        icon.kind === 'ball' || icon.id === viewer.id || (run && icon.id === state.hitterId) ? null : (
+        icon.kind === 'ball' || (!wide && icon.id === viewer.id) || (run && icon.id === state.hitterId) ? null : (
           <Figure
             key={icon.id}
             icon={icon}
@@ -585,6 +648,7 @@ function Scene({ state, viewer, stance, look, selectedId, movableIds, onGrab, ca
             ball={contact}
             colors={colors}
             selected={icon.id === selectedId}
+            marked={wide && icon.id === viewer.id}
             onGrab={
               movableIds.includes(icon.id)
                 ? (e: ThreeEvent<PointerEvent>) => {
@@ -747,6 +811,82 @@ function FirstPersonCamera({
   return null
 }
 
+interface CameraPreset {
+  /** Which way the camera sits from the target (only the direction counts). */
+  from: Vec3
+  target: Vec3
+  /** Metres that should fit across and up the screen; the distance is worked out from these. */
+  span: { across: number; up: number }
+}
+
+/**
+ * Starting angle for each wide view (world metres; our end line is at Z = +9). The hitter's view
+ * follows the hitter.
+ */
+function cameraPreset(mode: Exclude<CameraMode, 'eyes'>, hitter: BoardIcon | undefined): CameraPreset {
+  switch (mode) {
+    case 'behind':
+      return { from: [0, 0.7, 1], target: [0, 0.5, 3], span: { across: 11, up: 13 } }
+    case 'side':
+      return { from: [-1, 0.55, 0.15], target: [0, 0.5, 1.5], span: { across: 20, up: 9 } }
+    case 'hitter': {
+      // Up and behind the hitter, on the line from our court through them, so they're in the foreground.
+      const [hx, , hz] = toWorld(hitter ?? { x: COURT_WIDTH / 2, y: NET_Y - 1 })
+      const target: Vec3 = [hx * 0.3, 0.5, 3.5]
+      return { from: [hx - target[0], 4, hz - target[2]], target, span: { across: 11, up: 13 } }
+    }
+    case 'above':
+      // Centred a little toward our end, leaving room for the result line at the bottom.
+      return { from: [0, 1, 0.12], target: [0, 0, 1.5], span: { across: 11, up: 22 } }
+  }
+}
+
+/** How far back the camera has to be for `span` to fill the screen at this aspect ratio. */
+function fitDistance(span: CameraPreset['span'], aspect: number): number {
+  const vertical = (wideVerticalFov(aspect) * Math.PI) / 180
+  const horizontal = 2 * Math.atan(Math.tan(vertical / 2) * aspect)
+  return Math.max(span.up / 2 / Math.tan(vertical / 2), span.across / 2 / Math.tan(horizontal / 2))
+}
+
+/** Wide views: drag swings the camera round the target, pinch moves it closer or further. */
+function OrbitCamera({
+  from,
+  target,
+  span,
+  yaw,
+  pitch,
+  zoom,
+  cameraRef,
+}: CameraPreset & {
+  yaw: number
+  pitch: number
+  zoom: number
+  cameraRef: MutableRefObject<THREE.PerspectiveCamera | null>
+}) {
+  const camera = useThree(s => s.camera) as THREE.PerspectiveCamera
+  const invalidate = useThree(s => s.invalidate)
+  const aspect = useThree(s => s.size.width / Math.max(1, s.size.height))
+  cameraRef.current = camera
+  const [fx, fy, fz] = from
+  const [tx, ty, tz] = target
+  const { across, up } = span
+
+  useLayoutEffect(() => {
+    const orbit = new THREE.Spherical().setFromVector3(new THREE.Vector3(fx, fy, fz))
+    orbit.theta += yaw
+    // Never quite straight down (the view would spin) and never under the floor.
+    orbit.phi = Math.min(Math.PI / 2 - 0.03, Math.max(0.05, orbit.phi - pitch))
+    orbit.radius = fitDistance({ across, up }, aspect) * zoom
+    camera.position.setFromSpherical(orbit).add(new THREE.Vector3(tx, ty, tz))
+    camera.lookAt(tx, ty, tz)
+    camera.fov = wideVerticalFov(aspect)
+    camera.updateProjectionMatrix()
+    invalidate()
+  }, [camera, invalidate, fx, fy, fz, tx, ty, tz, across, up, yaw, pitch, zoom, aspect])
+
+  return null
+}
+
 /**
  * Turn a finger drag into a step on the floor, in board metres: sideways in the direction the
  * camera faces, and up the screen = away from you. Scaled to the player's distance, so a drag
@@ -759,6 +899,12 @@ function dragToBoard(camera: THREE.PerspectiveCamera, at: Vec3, dxPx: number, dy
   const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).setY(0).normalize()
   const step = right.multiplyScalar(dxPx * metresPerPx).add(forward.multiplyScalar(-dyPx * metresPerPx * DEPTH_DRAG_GAIN))
   return { x: step.x, y: step.z }
+}
+
+function wideVerticalFov(aspect: number): number {
+  const half = (WIDE_HORIZONTAL_FOV * Math.PI) / 360
+  const vertical = (2 * Math.atan(Math.tan(half) / aspect) * 180) / Math.PI
+  return Math.min(WIDE_VERTICAL_FOV.max, Math.max(WIDE_VERTICAL_FOV.min, vertical))
 }
 
 function verticalFov(aspect: number): number {
@@ -944,6 +1090,7 @@ function Figure({
   ball,
   colors,
   selected = false,
+  marked = false,
   onGrab,
   swing,
 }: {
@@ -954,6 +1101,8 @@ function Figure({
   ball: Point
   colors: BoardColors
   selected?: boolean
+  /** The defender the wide view is about. */
+  marked?: boolean
   onGrab?: (e: ThreeEvent<PointerEvent>) => void
   /** Hitter only: seconds from contact, to animate the arm swing (negative = winding up). */
   swing?: number
@@ -1004,10 +1153,10 @@ function Figure({
       {shoulders.map((from, i) => (
         <Limb key={i} from={from} to={hands[i]} color={color} />
       ))}
-      {selected && (
+      {(selected || marked) && (
         <mesh rotation-x={-Math.PI / 2} position={[x, 0.012, z]}>
           <ringGeometry args={[0.38, 0.5, 40]} />
-          <meshBasicMaterial color="#facc15" />
+          <meshBasicMaterial color={selected ? '#facc15' : '#ffffff'} />
         </mesh>
       )}
       {onGrab && (
@@ -1071,7 +1220,7 @@ const HARD_TITLE: Partial<Record<AttackChoice, string>> = {
 }
 
 /** "Hard cross · 1.2 m left, 0.4 m back of you · 0.46 s" */
-function describeAttack(plan: AttackPlan, viewer: Point) {
+function describeAttack(plan: AttackPlan, viewer: Point, who: string) {
   const aimedAtYou = plan.choice === 'hardMe' || plan.choice === 'hardLeft' || plan.choice === 'hardRight'
   const title =
     plan.outcome !== 'hard'
@@ -1087,9 +1236,18 @@ function describeAttack(plan: AttackPlan, viewer: Point) {
       : x < 0 || x > COURT_WIDTH || y > COURT_LENGTH
         ? 'out'
         : Math.hypot(offset.x, offset.y) < 0.5
-          ? 'right at you'
-          : `${describeOffset(offset)} of you`
+          ? `right at ${who}`
+          : `${describeOffset(offset)} of ${who}`
   return { title, where, time: `${plan.landedAt.toFixed(2)} s` }
+}
+
+/** "Hard: at me" in the defender's eyes; "Hard: at 6" in a wide view. */
+function choiceLabel(choice: AttackChoice, label: string, defender: string | null) {
+  if (!defender) return label
+  if (choice === 'hardMe') return `Hard: at ${defender}`
+  if (choice === 'hardLeft') return `Hard: ${defender}'s left`
+  if (choice === 'hardRight') return `Hard: ${defender}'s right`
+  return label
 }
 
 function PlayIcon() {
