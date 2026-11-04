@@ -219,8 +219,11 @@ export default function Viewer3D({ state, dispatch, initialViewerId, onClose }: 
   const [speedIndex, setSpeedIndex] = useState(0)
   const [chooserOpen, setChooserOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  // Anything that changes the play makes the last attack stale.
-  useEffect(() => setRun(null), [state.icons, state.hitterId, state.net, state.contactAboveNet])
+  // The play is the ball's flight, so it stays through selecting and moving our players (Again
+  // replays it: does the defender get there now?). Only a change to where the ball starts (another
+  // hitter, the hitter moved, their contact height, the net) makes it stale.
+  const ballStart = hitter && `${hitter.id}:${hitter.x}:${hitter.y}:${state.net}:${state.contactAboveNet}`
+  useEffect(() => setRun(null), [ballStart])
   const viewerIcon = viewerId ? state.icons.find(icon => icon.id === viewerId) : undefined
   const selected = state.icons.find(icon => icon.id === selectedId && (icon.kind === 'home' || icon.id === state.hitterId))
   const canFollow = (icon: BoardIcon | undefined): icon is BoardIcon => icon?.kind === 'home' && !isBlocker(icon)

@@ -257,7 +257,9 @@ src/features/tacticBoard/
      right / line / cross / seam, off the block). Real projectile motion, a
      trail, one bounce and a landing ring. Whether a hard hit is blocked
      follows the 2D shadow; blocked hits deflect (stuffed, short, up, out).
-     Random is weighted to what's open. Speed real (default), ½×, ¼×. The
+     Random is weighted to what's open. Speed real (default), ½×, ¼×. The play (the ball's flight) stays while
+     you select or move our players, so Again shows whether a defender now gets
+     there; a new hitter, moving the hitter, contact height or the net clear it. The
      attack survives a camera change, so Again replays it from another angle.
    - **First guesses to tune:** spike speed 24 / 20 m/s (men / women), hand
      penetration 25 / 15 / 8 cm (L / M / S), Random's mix, bounce.
