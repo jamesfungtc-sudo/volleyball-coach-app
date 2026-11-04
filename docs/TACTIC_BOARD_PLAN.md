@@ -233,7 +233,8 @@ src/features/tacticBoard/
 7. ✅ 3D view (`components/three/Viewer3D.tsx`, `engine/view3d.ts`, `engine/attack.ts`).
    Opened from a defender on the 2D board ("View from N"); three.js only loads then.
    - **Cameras:** Eyes (the defender's own view: Ready crouch or Standing),
-     Behind, Side, Hitter (over the hitter's shoulder) and Above. Wide views orbit
+     Follow (third-person, just behind and above the defender: their body and
+     the floor round them, moving with them), Behind, Side, Hitter (over the hitter's shoulder) and Above. Wide views orbit
      on drag, zoom on pinch, and fit the court to the screen's shape.
    - **Heights:** players by block size (L 1.9 / M 1.8 / S 1.6 m); blockers'
      arms over the net by L/M/S; men's 2.43 m or women's 2.24 m net (⋯ menu).

@@ -70,6 +70,12 @@ const MAX_PITCH = 1.2
 const HORIZONTAL_FOV = 80
 const VERTICAL_FOV = { min: 50, max: 100 }
 const ZOOM = { min: 0.35, max: 1.2 }
+/**
+ * Follow camera, from the defender (metres): it looks at a spot this far ahead of them toward the
+ * hitter, at this height, from this far behind them, this high, and a little to their right so
+ * their head doesn't hide the hitter. A wider lens than the court views shows the floor around them.
+ */
+const FOLLOW = { ahead: 1.2, lookHeight: 0.9, behind: 2.6, height: 2.3, side: 0.45, horizontalFov: 68 }
 /** Wide views use a longer lens than the eyes, so the court isn't stretched at the edges. */
 const WIDE_HORIZONTAL_FOV = 55
 const WIDE_VERTICAL_FOV = { min: 35, max: 75 }
@@ -114,12 +120,14 @@ const ATTACK_CHOICES: { value: AttackChoice; label: string }[] = [
 ]
 
 /**
- * Where the camera is. 'eyes' is the defender's own view; the rest are wide views that orbit
- * (drag) and zoom (pinch) around the court.
+ * Where the camera is. 'eyes' is the defender's own view; 'follow' is a third-person camera just
+ * behind them (their body in view, and the floor round them). The rest are wide views of the court.
+ * All but 'eyes' orbit on drag and zoom on pinch.
  */
-type CameraMode = 'eyes' | 'behind' | 'side' | 'hitter' | 'above'
+type CameraMode = 'eyes' | 'follow' | 'behind' | 'side' | 'hitter' | 'above'
 const CAMERA_OPTIONS: { value: CameraMode; label: string }[] = [
   { value: 'eyes', label: 'Eyes' },
+  { value: 'follow', label: 'Follow' },
   { value: 'behind', label: 'Behind' },
   { value: 'side', label: 'Side' },
   { value: 'hitter', label: 'Hitter' },
@@ -181,6 +189,8 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
   // Changing the camera keeps the attack, so "Again" replays the same hit from the new angle.
   const [cameraMode, setCameraMode] = useState<CameraMode>('eyes')
   const wide = cameraMode !== 'eyes'
+  // Eyes and Follow are about the defender ("you", "Hard: at me"); the court views name them.
+  const aboutYou = cameraMode === 'eyes' || cameraMode === 'follow'
   // Anything that changes the play makes the last attack stale.
   useEffect(() => setRun(null), [state.icons, state.hitterId, state.net, state.contactAboveNet, viewerId])
   const viewerIcon = state.icons.find(icon => icon.id === viewerId)
@@ -288,7 +298,7 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
     setRun(prev => ({ id: (prev?.id ?? 0) + 1, plan, finished: false }))
   }
   const replay = () => setRun(prev => prev && { id: prev.id + 1, plan: prev.plan, finished: false })
-  const who = wide ? viewer.label : 'you'
+  const who = aboutYou ? 'you' : viewer.label
   const result = run?.finished ? describeAttack(run.plan, viewer, who) : null
 
   return (
@@ -302,7 +312,7 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
           <Button variant="ghost" size="icon" className="h-11 w-11" onClick={() => step(-1)} aria-label="Previous player">
             <ChevronIcon direction="left" />
           </Button>
-          <span className="whitespace-nowrap text-sm font-semibold">{wide ? `Player ${viewer.label}` : `Player ${viewer.label}'s view`}</span>
+          <span className="whitespace-nowrap text-sm font-semibold">{aboutYou ? `Player ${viewer.label}'s view` : `Player ${viewer.label}`}</span>
           <Button variant="ghost" size="icon" className="h-11 w-11" onClick={() => step(1)} aria-label="Next player">
             <ChevronIcon direction="right" />
           </Button>
@@ -319,12 +329,12 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
         </Button>
       </div>
 
-      <div className="flex shrink-0 items-center justify-center gap-1 px-2 pb-1" role="group" aria-label="Camera">
+      <div className="flex shrink-0 items-center justify-center gap-0.5 overflow-x-auto px-2 pb-1" role="group" aria-label="Camera">
         {CAMERA_OPTIONS.map(option => (
           <Button
             key={option.value}
             variant={cameraMode === option.value ? 'secondary' : 'ghost'}
-            className="h-9 px-2.5 text-sm"
+            className="h-9 shrink-0 px-2 text-sm"
             aria-pressed={cameraMode === option.value}
             onClick={() => setCameraMode(option.value)}
           >
@@ -350,7 +360,7 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
             look={look}
             selectedId={selectedId}
             movableIds={state.icons
-              .filter(icon => (icon.kind === 'home' && (wide || icon.id !== viewer.id)) || icon.id === state.hitterId)
+              .filter(icon => (icon.kind === 'home' && (!aboutYou || icon.id !== viewer.id)) || icon.id === state.hitterId)
               .map(icon => icon.id)}
             cameraMode={cameraMode}
             onGrab={(id, pointerId) => {
@@ -425,7 +435,7 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
                   disabled={!choices.has(choice.value)}
                   onClick={() => startAttack(choice.value)}
                 >
-                  {choiceLabel(choice.value, choice.label, wide ? viewer.label : null)}
+                  {choiceLabel(choice.value, choice.label, aboutYou ? null : viewer.label)}
                 </Button>
               ))}
             </div>
@@ -444,13 +454,15 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
         <p
           className={`pointer-events-none absolute bottom-2 left-0 right-0 text-center text-xs text-white/80 [text-shadow:0_1px_2px_rgb(0_0_0/0.8)] ${result || chooserOpen ? 'hidden' : ''}`}
         >
-          {selected?.id === viewer.id && !wide
+          {selected?.id === viewer.id && aboutYou
             ? 'Arrows move you, as you face the net · hold to keep moving'
             : selected
               ? 'Drag the player, or use the arrows'
-              : wide
-                ? 'Drag players to move them · tap an opponent to make them the hitter'
-                : 'Drag to look around · tap an opponent to make them the hitter'}
+              : cameraMode === 'follow'
+                ? 'Drag to swing round · pinch to zoom · Me (arrows) to move'
+                : wide
+                  ? 'Drag players to move them · tap an opponent to make them the hitter'
+                  : 'Drag to look around · tap an opponent to make them the hitter'}
         </p>
       </div>
 
@@ -539,7 +551,7 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
       <div className="flex shrink-0 items-center justify-center gap-2 px-2 py-1">
         {!wide && <SegmentedControl value={stance} onChange={setStance} options={STANCE_OPTIONS} />}
         <Button variant="outline" className="h-11 px-3" onClick={look.reset}>
-          {wide ? 'Reset view' : 'Face hitter'}
+          {aboutYou ? 'Face hitter' : 'Reset view'}
         </Button>
       </div>
     </div>
@@ -711,7 +723,7 @@ function Scene({
       <directionalLight position={[4, 12, 10]} intensity={1.6} />
       {wide ? (
         <OrbitCamera
-          {...cameraPreset(cameraMode, hitter)}
+          {...(cameraMode === 'follow' ? followPreset(viewer, aim.current.direction) : cameraPreset(cameraMode, hitter))}
           yaw={look.yaw}
           pitch={look.pitch}
           zoom={look.zoom}
@@ -899,18 +911,40 @@ function FirstPersonCamera({
 }
 
 interface CameraPreset {
-  /** Which way the camera sits from the target (only the direction counts). */
+  /** Which way the camera sits from the target (only the direction counts, unless `distance` is unset and there's no span). */
   from: Vec3
   target: Vec3
   /** Metres that should fit across and up the screen; the distance is worked out from these. */
-  span: { across: number; up: number }
+  span?: { across: number; up: number }
+  /** A fixed distance instead (the follow camera). */
+  distance?: number
+  horizontalFov?: number
+}
+
+/**
+ * Third-person camera behind the defender, facing the way they looked at the last "Face hitter"
+ * (so moving the hitter or the block doesn't swing it). It moves with them.
+ */
+function followPreset(viewer: Point, looking: Vec3): CameraPreset {
+  const flat = Math.hypot(looking[0], looking[2]) || 1
+  const forward = [looking[0] / flat, looking[2] / flat]
+  const right = [-forward[1], forward[0]]
+  const [vx, , vz] = toWorld(viewer)
+  const target: Vec3 = [vx + forward[0] * FOLLOW.ahead, FOLLOW.lookHeight, vz + forward[1] * FOLLOW.ahead]
+  const back = FOLLOW.ahead + FOLLOW.behind
+  const from: Vec3 = [
+    -forward[0] * back + right[0] * FOLLOW.side,
+    FOLLOW.height - FOLLOW.lookHeight,
+    -forward[1] * back + right[1] * FOLLOW.side,
+  ]
+  return { from, target, distance: Math.hypot(...from), horizontalFov: FOLLOW.horizontalFov }
 }
 
 /**
  * Starting angle for each wide view (world metres; our end line is at Z = +9). The hitter's view
  * follows the hitter.
  */
-function cameraPreset(mode: Exclude<CameraMode, 'eyes'>, hitter: BoardIcon | undefined): CameraPreset {
+function cameraPreset(mode: Exclude<CameraMode, 'eyes' | 'follow'>, hitter: BoardIcon | undefined): CameraPreset {
   switch (mode) {
     case 'behind':
       return { from: [0, 0.7, 1], target: [0, 0.5, 3], span: { across: 11, up: 13 } }
@@ -929,7 +963,7 @@ function cameraPreset(mode: Exclude<CameraMode, 'eyes'>, hitter: BoardIcon | und
 }
 
 /** How far back the camera has to be for `span` to fill the screen at this aspect ratio. */
-function fitDistance(span: CameraPreset['span'], aspect: number): number {
+function fitDistance(span: NonNullable<CameraPreset['span']>, aspect: number): number {
   const vertical = (wideVerticalFov(aspect) * Math.PI) / 180
   const horizontal = 2 * Math.atan(Math.tan(vertical / 2) * aspect)
   return Math.max(span.up / 2 / Math.tan(vertical / 2), span.across / 2 / Math.tan(horizontal / 2))
@@ -940,6 +974,8 @@ function OrbitCamera({
   from,
   target,
   span,
+  distance,
+  horizontalFov = WIDE_HORIZONTAL_FOV,
   yaw,
   pitch,
   zoom,
@@ -956,20 +992,21 @@ function OrbitCamera({
   cameraRef.current = camera
   const [fx, fy, fz] = from
   const [tx, ty, tz] = target
-  const { across, up } = span
+  const across = span?.across ?? 0
+  const up = span?.up ?? 0
 
   useLayoutEffect(() => {
     const orbit = new THREE.Spherical().setFromVector3(new THREE.Vector3(fx, fy, fz))
     orbit.theta += yaw
     // Never quite straight down (the view would spin) and never under the floor.
     orbit.phi = Math.min(Math.PI / 2 - 0.03, Math.max(0.05, orbit.phi - pitch))
-    orbit.radius = fitDistance({ across, up }, aspect) * zoom
+    orbit.radius = (distance ?? fitDistance({ across, up }, aspect)) * zoom
     camera.position.setFromSpherical(orbit).add(new THREE.Vector3(tx, ty, tz))
     camera.lookAt(tx, ty, tz)
-    camera.fov = wideVerticalFov(aspect)
+    camera.fov = wideVerticalFov(aspect, horizontalFov)
     camera.updateProjectionMatrix()
     invalidate()
-  }, [camera, invalidate, fx, fy, fz, tx, ty, tz, across, up, yaw, pitch, zoom, aspect])
+  }, [camera, invalidate, fx, fy, fz, tx, ty, tz, across, up, distance, horizontalFov, yaw, pitch, zoom, aspect])
 
   return null
 }
@@ -988,8 +1025,8 @@ function dragToBoard(camera: THREE.PerspectiveCamera, at: Vec3, dxPx: number, dy
   return { x: step.x, y: step.z }
 }
 
-function wideVerticalFov(aspect: number): number {
-  const half = (WIDE_HORIZONTAL_FOV * Math.PI) / 360
+function wideVerticalFov(aspect: number, horizontalFov = WIDE_HORIZONTAL_FOV): number {
+  const half = (horizontalFov * Math.PI) / 360
   const vertical = (2 * Math.atan(Math.tan(half) / aspect) * 180) / Math.PI
   return Math.min(WIDE_VERTICAL_FOV.max, Math.max(WIDE_VERTICAL_FOV.min, vertical))
 }
@@ -1325,7 +1362,7 @@ function describeAttack(plan: AttackPlan, viewer: Point, who: string) {
   return { title, where, time: `${plan.landedAt.toFixed(2)} s` }
 }
 
-/** "Hard: at me" in the defender's eyes; "Hard: at 6" in a wide view. */
+/** "Hard: at me" in the defender's eyes or follow view; "Hard: at 6" in a court view. */
 function choiceLabel(choice: AttackChoice, label: string, defender: string | null) {
   if (!defender) return label
   if (choice === 'hardMe') return `Hard: at ${defender}`
