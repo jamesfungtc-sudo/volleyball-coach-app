@@ -9,10 +9,11 @@ import {
   type PointerEvent as ReactPointerEvent,
   type WheelEvent,
 } from 'react'
-import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber'
+import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
 import { Button } from '@/components/ui/button'
 import { SegmentedControl } from '@/components/ui/segmented-control'
+import { availableChoices, ballAt, planAttack, type AttackChoice, type AttackPlan } from '../../engine/attack'
 import { ATTACK_LINE_DISTANCE, COURT_LENGTH, COURT_WIDTH, LINE_WIDTH, NET_Y, type Point } from '../../engine/court'
 import { analyseDefence, BLOCK_SIZES, BLOCK_ZONE_DEPTH, DEFAULT_BLOCK_SIZE, type BlockSize, type DefenceAnalysis } from '../../engine/defence'
 import { rollZones, tipZone } from '../../engine/hitZones'
@@ -88,6 +89,32 @@ const REPEAT_DELAY = 350
 const REPEAT_EVERY = 90
 /** Below this a move of your own isn't worth mentioning. */
 const MOVED_HINT_MIN = 0.05
+/** The hitter's arm swing before contact (seconds, before slow motion). */
+const WINDUP = 0.45
+/** Playback speeds; slow is the default, for teaching. */
+const SPEEDS = [
+  { value: 0.5, label: '½× speed' },
+  { value: 0.25, label: '¼× speed' },
+  { value: 1, label: 'Real speed' },
+]
+const TRAIL_SAMPLES = 40
+const ATTACK_CHOICES: { value: AttackChoice; label: string }[] = [
+  { value: 'tip', label: 'Tip' },
+  { value: 'roll', label: 'Roll shot' },
+  { value: 'hardMe', label: 'Hard: at me' },
+  { value: 'hardLeft', label: 'Hard: my left' },
+  { value: 'hardRight', label: 'Hard: my right' },
+  { value: 'line', label: 'Hard: line' },
+  { value: 'cross', label: 'Hard: cross' },
+  { value: 'seam', label: 'Hard: seam' },
+  { value: 'touch', label: 'Off the block' },
+]
+
+interface AttackRunState {
+  id: number
+  plan: AttackPlan
+  finished: boolean
+}
 /** Below this the Auto D spot isn't worth mentioning. */
 const AUTO_SPOT_HINT_MIN = 0.25
 /** Invisible grab area round a movable player, so they're easy to tap from across the court. */
@@ -119,6 +146,13 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
   const start = useStartSpot(viewerId, stateRef)
 
   const hitter = state.icons.find(icon => icon.id === state.hitterId)
+  const blockers = useMemo(() => blockersOf(state.icons), [state.icons])
+  const analysis = useMemo(() => (hitter ? analyseDefence({ hitter, blockers }) : null), [hitter, blockers])
+  const [run, setRun] = useState<AttackRunState | null>(null)
+  const [speedIndex, setSpeedIndex] = useState(0)
+  const [chooserOpen, setChooserOpen] = useState(false)
+  // Anything that changes the play makes the last attack stale.
+  useEffect(() => setRun(null), [state.icons, state.hitterId, state.net, state.contactAboveNet, viewerId])
   const viewerIcon = state.icons.find(icon => icon.id === viewerId)
   const movable = [
     ...(viewerIcon ? [viewerIcon] : []),
@@ -175,6 +209,18 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
   const moved = start && { x: viewer.x - start.x, y: viewer.y - start.y }
   const showMoved = !!moved && Math.hypot(moved.x, moved.y) > MOVED_HINT_MIN
   const contact = contactHeight(state.net, state.contactAboveNet)
+  const speed = SPEEDS[speedIndex]
+  const choices = analysis ? availableChoices(analysis) : new Set<AttackChoice>()
+
+  const startAttack = (choice: AttackChoice | 'random') => {
+    if (!analysis) return
+    setChooserOpen(false)
+    setSelectedId(null)
+    const plan = planAttack(choice, { analysis, blockers, net: state.net, contactAboveNet: state.contactAboveNet, viewer })
+    setRun(prev => ({ id: (prev?.id ?? 0) + 1, plan, finished: false }))
+  }
+  const replay = () => setRun(prev => prev && { id: prev.id + 1, plan: prev.plan, finished: false })
+  const result = run?.finished ? describeAttack(run.plan, viewer) : null
 
   return (
     <div className="fixed inset-0 z-[70] flex flex-col bg-background pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pt-[env(safe-area-inset-top)]">
@@ -216,6 +262,9 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
               setSelectedId(id)
             }}
             cameraRef={camera}
+            run={run}
+            speed={speed.value}
+            onRunFinished={() => setRun(prev => prev && { ...prev, finished: true })}
           />
         </Canvas>
         {(showAuto || showMoved) && (
@@ -247,7 +296,42 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
             )}
           </div>
         )}
-        <p className="pointer-events-none absolute bottom-2 left-0 right-0 text-center text-xs text-white/80 [text-shadow:0_1px_2px_rgb(0_0_0/0.8)]">
+        {chooserOpen && (
+          <div data-ui className="absolute inset-x-2 bottom-2 rounded-lg bg-background/95 p-2 shadow-lg backdrop-blur-sm">
+            <div className="mb-1.5 flex items-center justify-between px-1">
+              <span className="text-sm font-semibold">Choose the attack</span>
+              <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setChooserOpen(false)} aria-label="Close">
+                ✕
+              </Button>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              {ATTACK_CHOICES.map(choice => (
+                <Button
+                  key={choice.value}
+                  variant="outline"
+                  className="h-11 justify-start px-3"
+                  disabled={!choices.has(choice.value)}
+                  onClick={() => startAttack(choice.value)}
+                >
+                  {choice.label}
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
+        {result && !chooserOpen && (
+          <div data-ui className="absolute inset-x-2 bottom-2 flex items-center justify-between gap-2 rounded-lg bg-background/85 px-3 py-1.5 text-xs backdrop-blur-sm">
+            <span>
+              <strong>{result.title}</strong> · {result.where} · {result.time}
+            </span>
+            <Button variant="secondary" className="h-8 shrink-0 px-3 text-xs" onClick={replay}>
+              Again
+            </Button>
+          </div>
+        )}
+        <p
+          className={`pointer-events-none absolute bottom-2 left-0 right-0 text-center text-xs text-white/80 [text-shadow:0_1px_2px_rgb(0_0_0/0.8)] ${result || chooserOpen ? 'hidden' : ''}`}
+        >
           {selected?.id === viewer.id
             ? 'Arrows move you, as you face the net · hold to keep moving'
             : selected
@@ -307,6 +391,30 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
             ))}
           </>
         )}
+      </div>
+
+      <div className="flex shrink-0 items-center justify-center gap-2 px-2 pt-1">
+        <Button className="h-11 gap-1.5 px-4" onClick={() => startAttack('random')} disabled={!analysis}>
+          <PlayIcon />
+          Random
+        </Button>
+        <Button
+          variant="outline"
+          className="h-11 px-3"
+          onClick={() => setChooserOpen(open => !open)}
+          aria-expanded={chooserOpen}
+          disabled={!analysis}
+        >
+          Choose…
+        </Button>
+        <Button
+          variant="outline"
+          className="h-11 px-3"
+          onClick={() => setSpeedIndex(i => (i + 1) % SPEEDS.length)}
+          aria-label={`${speed.label}, tap to change`}
+        >
+          {speed.label}
+        </Button>
       </div>
 
       <div className="flex shrink-0 items-center justify-center gap-2 px-2 py-1">
@@ -387,7 +495,7 @@ function useLook(viewerId: string, { grab, onDrag, onTapEmpty }: LookOptions) {
     aimVersion,
     reset,
     onPointerDown(e: ReactPointerEvent<HTMLDivElement>) {
-      if ((e.target as HTMLElement).closest('button')) return
+      if ((e.target as HTMLElement).closest('button, [data-ui]')) return
       e.currentTarget.setPointerCapture(e.pointerId)
       pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY, travel: 0 })
       if (pointers.current.size === 2 && !grab.current) pinch.current = { distance: spread(), zoom }
@@ -433,9 +541,12 @@ interface SceneProps {
   movableIds: string[]
   onGrab: (id: string, pointerId: number) => void
   cameraRef: MutableRefObject<THREE.PerspectiveCamera | null>
+  run: AttackRunState | null
+  speed: number
+  onRunFinished: () => void
 }
 
-function Scene({ state, viewer, stance, look, selectedId, movableIds, onGrab, cameraRef }: SceneProps) {
+function Scene({ state, viewer, stance, look, selectedId, movableIds, onGrab, cameraRef, run, speed, onRunFinished }: SceneProps) {
   const colors = useBoardColors()
   const hitter = state.icons.find(icon => icon.id === state.hitterId)
   const blockers = useMemo(() => blockersOf(state.icons), [state.icons])
@@ -464,7 +575,7 @@ function Scene({ state, viewer, stance, look, selectedId, movableIds, onGrab, ca
       <Net net={state.net} colors={colors} />
 
       {state.icons.map(icon =>
-        icon.kind === 'ball' || icon.id === viewer.id ? null : (
+        icon.kind === 'ball' || icon.id === viewer.id || (run && icon.id === state.hitterId) ? null : (
           <Figure
             key={icon.id}
             icon={icon}
@@ -486,10 +597,112 @@ function Scene({ state, viewer, stance, look, selectedId, movableIds, onGrab, ca
           />
         ),
       )}
-      <mesh position={ball}>
-        <sphereGeometry args={[BALL_RADIUS, 24, 16]} />
-        <meshStandardMaterial color={colors.ball} roughness={0.6} />
-      </mesh>
+      {run && hitter ? (
+        <AttackRun
+          key={run.id}
+          plan={run.plan}
+          speed={speed}
+          hitter={hitter}
+          net={state.net}
+          contactAboveNet={state.contactAboveNet}
+          contact={contact}
+          colors={colors}
+          onFinished={onRunFinished}
+        />
+      ) : (
+        <Ball at={ball} colors={colors} />
+      )}
+    </>
+  )
+}
+
+function Ball({ at, colors }: { at: Vec3; colors: BoardColors }) {
+  return (
+    <mesh position={at}>
+      <sphereGeometry args={[BALL_RADIUS, 24, 16]} />
+      <meshStandardMaterial color={colors.ball} roughness={0.6} />
+    </mesh>
+  )
+}
+
+/**
+ * One attack, played once: the hitter's swing, the flight with a fading trail, then a marker where
+ * it landed. Time runs from -WINDUP (start of the swing) to the end of the bounce, slowed by `speed`.
+ */
+function AttackRun({
+  plan,
+  speed,
+  hitter,
+  net,
+  contactAboveNet,
+  contact,
+  colors,
+  onFinished,
+}: {
+  plan: AttackPlan
+  speed: number
+  hitter: BoardIcon
+  net: NetKind
+  contactAboveNet: number
+  contact: Point
+  colors: BoardColors
+  onFinished: () => void
+}) {
+  const [t, setT] = useState(-WINDUP)
+  const invalidate = useThree(s => s.invalidate)
+  const startedAt = useRef<number | null>(null)
+  const done = useRef(false)
+  const finished = useRef(onFinished)
+  finished.current = onFinished
+  useEffect(() => invalidate(), [invalidate])
+
+  useFrame(() => {
+    if (done.current) return
+    const now = performance.now() / 1000
+    startedAt.current ??= now
+    const next = (now - startedAt.current) * speed - WINDUP
+    if (next >= plan.duration) {
+      done.current = true
+      setT(plan.duration)
+      finished.current()
+      return
+    }
+    setT(next)
+    invalidate()
+  })
+
+  const trail = useMemo(
+    () => new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.6 })),
+    [],
+  )
+  useEffect(
+    () => () => {
+      trail.geometry.dispose()
+      ;(trail.material as THREE.Material).dispose()
+    },
+    [trail],
+  )
+  const flown = Math.max(0, t)
+  trail.geometry.setFromPoints(
+    Array.from({ length: TRAIL_SAMPLES + 1 }, (_, i) => {
+      const b = ballAt(plan, (flown * i) / TRAIL_SAMPLES)
+      return new THREE.Vector3(...toWorld(b, b.h))
+    }),
+  )
+  const now = ballAt(plan, flown)
+  const [lx, , lz] = toWorld(plan.landing)
+
+  return (
+    <>
+      <Figure icon={hitter} pose="hitter" net={net} contactAboveNet={contactAboveNet} ball={contact} colors={colors} swing={t} />
+      {t > 0 && <primitive object={trail} />}
+      <Ball at={toWorld(now, now.h)} colors={colors} />
+      {t >= plan.landedAt && (
+        <mesh rotation-x={-Math.PI / 2} position={[lx, 0.015, lz]}>
+          <ringGeometry args={[0.16, 0.24, 32]} />
+          <meshBasicMaterial color="#facc15" />
+        </mesh>
+      )}
     </>
   )
 }
@@ -732,6 +945,7 @@ function Figure({
   colors,
   selected = false,
   onGrab,
+  swing,
 }: {
   icon: BoardIcon
   pose: Pose
@@ -741,6 +955,8 @@ function Figure({
   colors: BoardColors
   selected?: boolean
   onGrab?: (e: ThreeEvent<PointerEvent>) => void
+  /** Hitter only: seconds from contact, to animate the arm swing (negative = winding up). */
+  swing?: number
 }) {
   const size: BlockSize = icon.kind === 'home' ? (icon.blockSize ?? DEFAULT_BLOCK_SIZE) : DEFAULT_BLOCK_SIZE
   const height = PLAYER_HEIGHT[size]
@@ -762,7 +978,11 @@ function Figure({
     if (pose === 'blocker') return [x + (i === 0 ? -1 : 1) * handSpread, reach, handZ]
     if (pose === 'hitter' && i === 1) {
       const [bx, by, bz] = toWorld(ball, reach)
-      return [bx, by - BALL_RADIUS, bz]
+      const atBall: Vec3 = [bx, by - BALL_RADIUS, bz]
+      if (swing === undefined) return atBall
+      const cocked: Vec3 = [sx + 0.05, shoulderY + 0.45, sz - facing * 0.45]
+      const followThrough: Vec3 = [sx - 0.05, shoulderY - 0.3, sz + facing * 0.55]
+      return swingHand(swing, atBall, cocked, followThrough)
     }
     if (pose === 'hitter') return [sx - 0.1, shoulderY + 0.25, sz - facing * 0.3]
     // Ready position: arms out in front, hands about waist height.
@@ -814,6 +1034,67 @@ function Limb({ from, to, color }: { from: Vec3; to: Vec3; color: string }) {
       <capsuleGeometry args={[LIMB_RADIUS, Math.max(0.01, length - LIMB_RADIUS * 2), 4, 8]} />
       <meshLambertMaterial color={color} />
     </mesh>
+  )
+}
+
+/** Hitting hand along the swing: draw back, whip through the ball, follow through. */
+function swingHand(t: number, atBall: Vec3, cocked: Vec3, followThrough: Vec3): Vec3 {
+  const drawBack = WINDUP * 0.4
+  if (t < -WINDUP + drawBack) return lerp3(atBall, cocked, (t + WINDUP) / drawBack)
+  if (t < 0) return lerp3(cocked, atBall, (t + WINDUP - drawBack) / (WINDUP - drawBack))
+  return lerp3(atBall, followThrough, t / 0.25)
+}
+
+function lerp3(a: Vec3, b: Vec3, k: number): Vec3 {
+  const u = Math.min(1, Math.max(0, k))
+  return [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u]
+}
+
+const OUTCOME_TITLE: Record<AttackPlan['outcome'], string> = {
+  tip: 'Tip',
+  roll: 'Roll shot',
+  hard: 'Hard',
+  touchUp: 'Off the block, up',
+  touchOut: 'Off the block, out',
+  touchDrop: 'Off the block, short',
+  stuff: 'Stuffed',
+}
+const HARD_TITLE: Partial<Record<AttackChoice, string>> = {
+  hardMe: 'Hard at you',
+  hardLeft: 'Hard to your left',
+  hardRight: 'Hard to your right',
+  line: 'Hard line',
+  cross: 'Hard cross',
+  seam: 'Hard seam',
+}
+
+/** "Hard cross · 1.2 m left, 0.4 m back of you · 0.46 s" */
+function describeAttack(plan: AttackPlan, viewer: Point) {
+  const aimedAtYou = plan.choice === 'hardMe' || plan.choice === 'hardLeft' || plan.choice === 'hardRight'
+  const title =
+    plan.outcome !== 'hard'
+      ? OUTCOME_TITLE[plan.outcome]
+      : plan.overBlock && !aimedAtYou
+        ? 'Hard over the block'
+        : (HARD_TITLE[plan.choice] ?? 'Hard')
+  const { x, y } = plan.landing
+  const offset = { x: x - viewer.x, y: y - viewer.y }
+  const where =
+    y < NET_Y
+      ? 'back on their side'
+      : x < 0 || x > COURT_WIDTH || y > COURT_LENGTH
+        ? 'out'
+        : Math.hypot(offset.x, offset.y) < 0.5
+          ? 'right at you'
+          : `${describeOffset(offset)} of you`
+  return { title, where, time: `${plan.landedAt.toFixed(2)} s` }
+}
+
+function PlayIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden="true">
+      <path d="M7 4.5v15l12-7.5z" />
+    </svg>
   )
 }
 
