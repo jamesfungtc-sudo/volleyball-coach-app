@@ -16,7 +16,7 @@ export const NET_DEPTH = 1
 export const ANTENNA_ABOVE_NET = 0.8
 
 /** Standing height by block size: the same L / M / S sets how tall a player is drawn. */
-export const PLAYER_HEIGHT: Record<BlockSize, number> = { large: 2.0, medium: 1.9, small: 1.8 }
+export const PLAYER_HEIGHT: Record<BlockSize, number> = { large: 1.9, medium: 1.8, small: 1.6 }
 /** How far above the net tape a blocker gets their hands (sets how much hitting window they take). */
 export const HAND_ABOVE_NET: Record<BlockSize, number> = { large: 0.45, medium: 0.3, small: 0.15 }
 /** Hitter's contact point above the net tape. */
