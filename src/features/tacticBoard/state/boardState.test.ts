@@ -96,7 +96,7 @@ describe('hitter contact height', () => {
     for (let i = 0; i < 3; i++) state = boardReducer(state, { type: 'setContact', aboveNet: state.contactAboveNet + 0.05 })
     expect(state.contactAboveNet).toBe(1.05)
     expect(boardReducer(state, { type: 'setContact', aboveNet: 9 }).contactAboveNet).toBe(1.3)
-    expect(boardReducer(state, { type: 'setContact', aboveNet: 0 }).contactAboveNet).toBe(0.5)
+    expect(boardReducer(state, { type: 'setContact', aboveNet: 0 }).contactAboveNet).toBe(0.15)
   })
 })
 

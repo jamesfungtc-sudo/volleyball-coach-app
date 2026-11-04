@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button'
 import { SegmentedControl } from '@/components/ui/segmented-control'
 import { availableChoices, ballAt, planAttack, type AttackChoice, type AttackPlan } from '../../engine/attack'
 import { ATTACK_LINE_DISTANCE, COURT_LENGTH, COURT_WIDTH, LINE_WIDTH, NET_Y, type Point } from '../../engine/court'
-import { analyseDefence, BLOCK_SIZES, BLOCK_ZONE_DEPTH, DEFAULT_BLOCK_SIZE, type BlockSize, type DefenceAnalysis } from '../../engine/defence'
+import { analyseDefence, BLOCK_SIZES, BLOCK_ZONE_DEPTH, BLOCKER_Y, DEFAULT_BLOCK_SIZE, type BlockSize, type DefenceAnalysis } from '../../engine/defence'
 import { rollZones, tipZone } from '../../engine/hitZones'
 import {
   ANTENNA_ABOVE_NET,
@@ -139,7 +139,16 @@ const GRAB_RADIUS = 0.45
 interface Grab {
   id: string
   pointerId: number
+  /** Opponents other than the hitter can't be dragged; a tap makes them the hitter. */
+  tapOnly: boolean
 }
+
+/** Stepping a blocker back off the net puts them this far behind the block zone. */
+const OFF_NET_STEP_BACK = 0.6
+const NET_OPTIONS: { value: NetKind; label: string }[] = [
+  { value: 'men', label: "Men's" },
+  { value: 'women', label: "Women's" },
+]
 
 interface Viewer3DProps {
   state: BoardState
@@ -159,7 +168,8 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
   stateRef.current = state
 
   const movedSelf = useHoldViewer(viewerId, stateRef, dispatch)
-  const start = useStartSpot(viewerId, stateRef)
+  // A new hitter is a new play, so "You moved" counts from where Auto D puts you for it.
+  const start = useStartSpot(viewerId, state.hitterId, stateRef)
 
   const hitter = state.icons.find(icon => icon.id === state.hitterId)
   const blockers = useMemo(() => blockersOf(state.icons), [state.icons])
@@ -167,6 +177,7 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
   const [run, setRun] = useState<AttackRunState | null>(null)
   const [speedIndex, setSpeedIndex] = useState(0)
   const [chooserOpen, setChooserOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   // Changing the camera keeps the attack, so "Again" replays the same hit from the new angle.
   const [cameraMode, setCameraMode] = useState<CameraMode>('eyes')
   const wide = cameraMode !== 'eyes'
@@ -178,21 +189,33 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
     ...(hitter ? [hitter] : []),
     ...state.icons.filter(isBlocker).sort((a, b) => a.x - b.x),
   ]
-  const selected = movable.find(icon => icon.id === selectedId)
+  const selected = state.icons.find(icon => icon.id === selectedId && (icon.kind === 'home' || icon.id === state.hitterId))
 
-  /** Move a player by a board-space step: blockers stay on the net, the hitter on their side, you off the net. */
-  const moveBy = (id: string, dx: number, dy: number) => {
+  /**
+   * Move a player by a board-space step. The hitter stays on their side and you stay clear of the
+   * block zone. Our players can go anywhere on our side: into the block zone they become blockers
+   * (snapping onto the net when let go), out of it they stop blocking.
+   */
+  const moveBy = (id: string, dx: number, dy: number, { release = true } = {}) => {
     const icon = stateRef.current.icons.find(i => i.id === id)
     if (!icon) return
-    const blocker = isBlocker(icon)
-    const y = blocker
-      ? icon.y
-      : id === viewerId
+    const home = icon.kind === 'home'
+    const y =
+      id === viewerId
         ? Math.max(NET_Y + VIEWER_MIN_OFF_NET, icon.y + dy)
-        : Math.min(NET_Y - HITTER_MIN_OFF_NET, icon.y + dy)
+        : home
+          ? Math.max(NET_Y, icon.y + dy)
+          : Math.min(NET_Y - HITTER_MIN_OFF_NET, icon.y + dy)
     if (id === viewerId) movedSelf.current = true
     dispatch({ type: 'move', id, to: { x: icon.x + dx, y } })
-    if (blocker) dispatch({ type: 'drop', id })
+    if (home && release) dispatch({ type: 'drop', id })
+  }
+
+  /** A blocker steps back off the net and stops blocking; a defender at the net steps up to block. */
+  const toggleBlocking = (icon: BoardIcon) => {
+    const to = isBlocker(icon) ? NET_Y + BLOCK_ZONE_DEPTH + OFF_NET_STEP_BACK : BLOCKER_Y
+    dispatch({ type: 'move', id: icon.id, to: { x: icon.x, y: to } })
+    dispatch({ type: 'drop', id: icon.id })
   }
 
   const look = useLook(`${viewerId}:${cameraMode}`, {
@@ -200,9 +223,17 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
     onDrag(dxPx, dyPx) {
       const id = grab.current?.id
       const icon = stateRef.current.icons.find(i => i.id === id)
-      if (!id || !icon || !camera.current || !stage.current) return
+      if (!id || !icon || grab.current?.tapOnly || !camera.current || !stage.current) return
       const d = dragToBoard(camera.current, toWorld(icon, 1.2), dxPx, dyPx, stage.current.clientHeight)
-      moveBy(id, d.x, isBlocker(icon) ? 0 : d.y)
+      // Snapping onto the net waits for the finger to lift, so a blocker can be pulled off it.
+      moveBy(id, d.x, d.y, { release: false })
+    },
+    onRelease(released, tapped) {
+      const icon = stateRef.current.icons.find(i => i.id === released.id)
+      if (!icon) return
+      if (released.tapOnly) {
+        if (tapped) chooseHitter(icon.id)
+      } else if (icon.kind === 'home') dispatch({ type: 'drop', id: icon.id })
     },
     onTapEmpty: () => setSelectedId(null),
   })
@@ -213,6 +244,24 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
   const viewer = defenders.find(icon => icon.id === viewerId)
   const index = defenders.findIndex(icon => icon.id === viewerId)
   const step = (by: number) => onChangeViewer(defenders[(index + by + defenders.length) % defenders.length].id)
+
+  // The defender we follow went up to block (a new hitter's default block, or dragged to the net):
+  // follow another defender rather than show nothing.
+  const fallbackViewer = viewer ? undefined : defenders[0]?.id
+  useEffect(() => {
+    if (fallbackViewer) onChangeViewer(fallbackViewer)
+  }, [fallbackViewer, onChangeViewer])
+
+  /** Same as tapping an opponent on the 2D board: a new attack with its default block. */
+  function chooseHitter(id: string) {
+    if (id === stateRef.current.hitterId) return
+    setSelectedId(null)
+    dispatch({ type: 'setHitter', id })
+    // A new play: the defender we follow takes their Auto D spot, then holds it again.
+    if (stateRef.current.autoDefence !== 'off') dispatch({ type: 'setManual', id: viewerId, manual: true })
+    movedSelf.current = false
+    look.reset()
+  }
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
@@ -258,6 +307,16 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
             <ChevronIcon direction="right" />
           </Button>
         </div>
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-11 w-11 shrink-0 text-lg"
+          onClick={() => setSettingsOpen(open => !open)}
+          aria-expanded={settingsOpen}
+          aria-label="3D settings"
+        >
+          ⋯
+        </Button>
       </div>
 
       <div className="flex shrink-0 items-center justify-center gap-1 px-2 pb-1" role="group" aria-label="Camera">
@@ -290,11 +349,14 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
             stance={stance}
             look={look}
             selectedId={selectedId}
-            movableIds={movable.map(icon => icon.id).filter(id => wide || id !== viewer.id)}
+            movableIds={state.icons
+              .filter(icon => (icon.kind === 'home' && (wide || icon.id !== viewer.id)) || icon.id === state.hitterId)
+              .map(icon => icon.id)}
             cameraMode={cameraMode}
             onGrab={(id, pointerId) => {
-              grab.current = { id, pointerId }
-              setSelectedId(id)
+              const tapOnly = state.icons.find(icon => icon.id === id)?.kind === 'opponent' && id !== state.hitterId
+              grab.current = { id, pointerId, tapOnly }
+              if (!tapOnly) setSelectedId(id)
             }}
             cameraRef={camera}
             run={run}
@@ -302,6 +364,21 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
             onRunFinished={() => setRun(prev => prev && { ...prev, finished: true })}
           />
         </Canvas>
+        {settingsOpen && (
+          <div data-ui className="absolute right-2 top-2 z-10 w-64 space-y-2 rounded-lg bg-background/95 p-3 shadow-lg backdrop-blur-sm">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm">Net</span>
+              <SegmentedControl value={state.net} onChange={net => dispatch({ type: 'setNet', net })} options={NET_OPTIONS} />
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm">Zones on the floor</span>
+              <Button variant="outline" className="h-9 px-3" onClick={() => dispatch({ type: 'toggleShadow' })}>
+                {state.showShadow ? 'On' : 'Off'}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">Net height: {NET_HEIGHT[state.net].toFixed(2)} m</p>
+          </div>
+        )}
         {(showAuto || showMoved) && (
           <div className="absolute left-2 right-2 top-2 flex items-center justify-between gap-2 rounded-lg bg-background/85 px-3 py-1.5 text-xs backdrop-blur-sm">
             <div className="min-w-0">
@@ -367,13 +444,13 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
         <p
           className={`pointer-events-none absolute bottom-2 left-0 right-0 text-center text-xs text-white/80 [text-shadow:0_1px_2px_rgb(0_0_0/0.8)] ${result || chooserOpen ? 'hidden' : ''}`}
         >
-          {selected?.id === viewer.id
+          {selected?.id === viewer.id && !wide
             ? 'Arrows move you, as you face the net · hold to keep moving'
             : selected
               ? 'Drag the player, or use the arrows'
               : wide
-                ? 'Drag to turn the view · pinch to zoom · drag a player to move them'
-                : 'Drag to look around · pinch to zoom'}
+                ? 'Drag players to move them · tap an opponent to make them the hitter'
+                : 'Drag to look around · tap an opponent to make them the hitter'}
         </p>
       </div>
 
@@ -408,11 +485,16 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
                 <NudgeButton label="Move toward the net" onStep={() => moveBy(selected.id, 0, NUDGE_STEP)} icon="down" />
               </>
             )}
-            {selected.id === viewer.id && (
+            {selected.kind === 'home' && !isBlocker(selected) && (
               <>
                 <NudgeButton label="Move toward the net" onStep={() => moveBy(selected.id, 0, -NUDGE_STEP)} icon="up" />
                 <NudgeButton label="Move back" onStep={() => moveBy(selected.id, 0, NUDGE_STEP)} icon="down" />
               </>
+            )}
+            {selected.kind === 'home' && selected.id !== viewer.id && (isBlocker(selected) || selected.y < NET_Y + 2.5) && (
+              <Button variant="outline" className="h-11 shrink-0 px-3" onClick={() => toggleBlocking(selected)}>
+                {isBlocker(selected) ? 'Off the net' : 'Block'}
+              </Button>
             )}
             <Button variant="secondary" className="ml-1 h-11 px-4" onClick={() => setSelectedId(null)}>
               Done
@@ -484,26 +566,29 @@ function useHoldViewer(viewerId: string, stateRef: MutableRefObject<BoardState>,
   return movedSelf
 }
 
-/** Where the defender stood when you started looking through them, for "You moved …". */
-function useStartSpot(viewerId: string, stateRef: MutableRefObject<BoardState>): Point | undefined {
-  const [start, setStart] = useState<{ id: string; at: Point }>()
+/** Where the defender stood when you started looking through them (for this hitter), for "You moved …". */
+function useStartSpot(viewerId: string, hitterId: string, stateRef: MutableRefObject<BoardState>): Point | undefined {
+  const [start, setStart] = useState<{ key: string; at: Point }>()
+  const key = `${viewerId}:${hitterId}`
   useEffect(() => {
     const icon = stateRef.current.icons.find(i => i.id === viewerId)
-    if (icon) setStart({ id: viewerId, at: { x: icon.x, y: icon.y } })
-  }, [viewerId, stateRef])
-  return start?.id === viewerId ? start.at : undefined
+    if (icon) setStart({ key, at: { x: icon.x, y: icon.y } })
+  }, [key, viewerId, stateRef])
+  return start?.key === key ? start.at : undefined
 }
 
 interface LookOptions {
   /** Set when a press landed on a movable player: that pointer drags them instead of the view. */
   grab: MutableRefObject<Grab | null>
   onDrag: (dxPx: number, dyPx: number) => void
+  /** The finger lifted off a grabbed player; `tapped` if it barely moved. */
+  onRelease: (grab: Grab, tapped: boolean) => void
   onTapEmpty: () => void
 }
 
 /** Drag to turn the head, pinch or wheel to zoom. Resets when the viewer changes. */
 /** `resetKey` changes (another defender, another camera) put the view back to its starting angle. */
-function useLook(resetKey: string, { grab, onDrag, onTapEmpty }: LookOptions) {
+function useLook(resetKey: string, { grab, onDrag, onRelease, onTapEmpty }: LookOptions) {
   const [yaw, setYaw] = useState(0)
   const [pitch, setPitch] = useState(0)
   const [zoom, setZoom] = useState(1)
@@ -561,8 +646,11 @@ function useLook(resetKey: string, { grab, onDrag, onTapEmpty }: LookOptions) {
       const press = pointers.current.get(e.pointerId)
       pointers.current.delete(e.pointerId)
       if (pointers.current.size < 2) pinch.current = null
-      if (grab.current?.pointerId === e.pointerId) grab.current = null
-      else if (press && press.travel < TAP_SLOP_PX && pointers.current.size === 0) onTapEmpty()
+      if (grab.current?.pointerId === e.pointerId) {
+        const released = grab.current
+        grab.current = null
+        onRelease(released, (press?.travel ?? 0) < TAP_SLOP_PX)
+      } else if (press && press.travel < TAP_SLOP_PX && pointers.current.size === 0) onTapEmpty()
     },
     onWheel(e: WheelEvent<HTMLDivElement>) {
       setZoom(z => clampZoom(z * (1 + e.deltaY * 0.001)))
@@ -650,7 +738,7 @@ function Scene({
             selected={icon.id === selectedId}
             marked={wide && icon.id === viewer.id}
             onGrab={
-              movableIds.includes(icon.id)
+              movableIds.includes(icon.id) || icon.kind === 'opponent'
                 ? (e: ThreeEvent<PointerEvent>) => {
                     // Nearest player only; the press drags them rather than the view.
                     e.stopPropagation()
@@ -1260,7 +1348,8 @@ function PlayIcon() {
 
 function playerName(icon: BoardIcon, hitterId: string, viewerId: string) {
   if (icon.id === viewerId) return `Me (${icon.label})`
-  return icon.id === hitterId ? `Hitter ${icon.label}` : `Blocker ${icon.label}`
+  if (icon.id === hitterId) return `Hitter ${icon.label}`
+  return isBlocker(icon) ? `Blocker ${icon.label}` : `Player ${icon.label}`
 }
 
 /** "0.6 m left, 0.4 m back", as the defender facing the net would say it. */

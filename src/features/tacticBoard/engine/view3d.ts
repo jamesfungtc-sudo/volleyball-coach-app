@@ -24,7 +24,7 @@ export const HAND_PENETRATION: Record<BlockSize, number> = { large: 0.25, medium
 
 /** Hitter's contact point above the net tape: the default, and how far the coach can set it. */
 export const CONTACT_ABOVE_NET = 0.9
-export const CONTACT_ABOVE_NET_RANGE = { min: 0.5, max: 1.3 }
+export const CONTACT_ABOVE_NET_RANGE = { min: 0.15, max: 1.3 }
 
 /** Body proportions as a share of standing height. */
 export const SHOULDER_RATIO = 0.82
