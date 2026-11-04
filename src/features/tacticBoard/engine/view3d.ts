@@ -22,8 +22,8 @@ export const HAND_ABOVE_NET: Record<BlockSize, number> = { large: 0.45, medium: 
 /** How far a blocker's hands reach over the net into the opponent's side. */
 export const HAND_PENETRATION: Record<BlockSize, number> = { large: 0.25, medium: 0.15, small: 0.08 }
 
-/** Hitter's contact point above the net tape: the default, and how far the coach can set it. */
-export const CONTACT_ABOVE_NET = 0.9
+/** Hitter's contact point above the net tape: the default (3.00 m on a men's net), and how far the coach can set it. */
+export const CONTACT_ABOVE_NET = 0.57
 export const CONTACT_ABOVE_NET_RANGE = { min: 0.15, max: 1.3 }
 
 /** Body proportions as a share of standing height. */

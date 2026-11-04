@@ -252,12 +252,12 @@ src/features/tacticBoard/
    - **Holding the viewer:** the defender you look through stays put while the
      block moves, so the camera doesn't jump; a banner shows the Auto D spot
      ("Go there"). Moving yourself keeps you hand-placed after leaving 3D.
-   - **Contact height:** net + 0.15 to + 1.3 m, 5 cm steps (3D only for now).
+   - **Contact height:** net + 0.15 to + 1.3 m, 5 cm steps (3D only for now); default 3.00 m on a men's net.
    - **Attack animation:** ▶ Random or Choose… (tip, roll, hard at me / left /
      right / line / cross / seam, off the block). Real projectile motion, a
      trail, one bounce and a landing ring. Whether a hard hit is blocked
      follows the 2D shadow; blocked hits deflect (stuffed, short, up, out).
-     Random is weighted to what's open. Speed ½× (default), ¼×, real. The
+     Random is weighted to what's open. Speed real (default), ½×, ¼×. The
      attack survives a camera change, so Again replays it from another angle.
    - **First guesses to tune:** spike speed 24 / 20 m/s (men / women), hand
      penetration 25 / 15 / 8 cm (L / M / S), Random's mix, bounce.

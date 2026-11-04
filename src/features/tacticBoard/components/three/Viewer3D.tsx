@@ -70,6 +70,8 @@ const MAX_PITCH = 1.2
 const HORIZONTAL_FOV = 80
 const VERTICAL_FOV = { min: 50, max: 100 }
 const ZOOM = { min: 0.35, max: 1.2 }
+/** Follow can pull much further back (about 11 m behind you), to see you and the court round you. */
+const FOLLOW_MAX_ZOOM = 3
 /**
  * Follow camera, from the defender (metres): it looks at a spot this far ahead of them toward the
  * hitter, at this height, from this far behind them, this high, and a little to their right so
@@ -100,11 +102,11 @@ const REPEAT_EVERY = 90
 const MOVED_HINT_MIN = 0.05
 /** The hitter's arm swing before contact (seconds, before slow motion). */
 const WINDUP = 0.45
-/** Playback speeds; slow is the default, for teaching. */
+/** Playback speeds, real first; tap to step down to slow motion for teaching. */
 const SPEEDS = [
+  { value: 1, label: 'Real speed' },
   { value: 0.5, label: '½× speed' },
   { value: 0.25, label: '¼× speed' },
-  { value: 1, label: 'Real speed' },
 ]
 const TRAIL_SAMPLES = 40
 const ATTACK_CHOICES: { value: AttackChoice; label: string }[] = [
@@ -283,6 +285,7 @@ export default function Viewer3D({ state, dispatch, initialViewerId, onClose }: 
       if (again && canFollow(stateRef.current.icons.find(i => i.id === icon.id))) follow(icon.id)
     },
     onTapEmpty: () => setSelectedId(null),
+    maxZoom: layer === 'follow' ? FOLLOW_MAX_ZOOM : ZOOM.max,
   })
 
   const defenders = state.icons
@@ -394,12 +397,13 @@ export default function Viewer3D({ state, dispatch, initialViewerId, onClose }: 
         </Button>
       </div>
 
-      {/* Bird: which angle to start from. Follow / Eyes: switch between the two on this defender. */}
+      {/* Bird: which angle to start from. Follow / Eyes: switch between the two on this defender.
+          Tapping the one you're on puts the camera back (facing the hitter in Follow / Eyes). */}
       <div className="flex shrink-0 items-center justify-center px-2 pb-1">
         {layer === 'bird' ? (
-          <SegmentedControl value={birdAngle} onChange={setBirdAngle} options={BIRD_ANGLES} />
+          <SegmentedControl value={birdAngle} onChange={angle => (angle === birdAngle ? look.reset() : setBirdAngle(angle))} options={BIRD_ANGLES} />
         ) : (
-          <SegmentedControl value={layer} onChange={setLayer} options={PLAYER_LAYERS} />
+          <SegmentedControl value={layer} onChange={to => (to === layer ? look.reset() : setLayer(to))} options={PLAYER_LAYERS} />
         )}
       </div>
 
@@ -605,12 +609,11 @@ export default function Viewer3D({ state, dispatch, initialViewerId, onClose }: 
         </Button>
       </div>
 
-      <div className="flex shrink-0 items-center justify-center gap-2 px-2 py-1">
-        {!wide && <SegmentedControl value={stance} onChange={setStance} options={STANCE_OPTIONS} />}
-        <Button variant="outline" className="h-11 px-3" onClick={look.reset}>
-          {aboutYou ? 'Face hitter' : 'Reset view'}
-        </Button>
-      </div>
+      {!wide && (
+        <div className="flex shrink-0 items-center justify-center gap-2 px-2 py-1">
+          <SegmentedControl value={stance} onChange={setStance} options={STANCE_OPTIONS} />
+        </div>
+      )}
     </div>
   )
 }
@@ -654,11 +657,13 @@ interface LookOptions {
   /** The finger lifted off a grabbed player; `tapped` if it barely moved. */
   onRelease: (grab: Grab, tapped: boolean) => void
   onTapEmpty: () => void
+  /** How far pinch / wheel can zoom out (default ZOOM.max). */
+  maxZoom?: number
 }
 
 /** Drag to turn the head, pinch or wheel to zoom. Resets when the viewer changes. */
 /** `resetKey` changes (another defender, another camera) put the view back to its starting angle. */
-function useLook(resetKey: string, { grab, onDrag, onRelease, onTapEmpty }: LookOptions) {
+function useLook(resetKey: string, { grab, onDrag, onRelease, onTapEmpty, maxZoom = ZOOM.max }: LookOptions) {
   const [yaw, setYaw] = useState(0)
   const [pitch, setPitch] = useState(0)
   const [zoom, setZoom] = useState(1)
@@ -675,7 +680,7 @@ function useLook(resetKey: string, { grab, onDrag, onRelease, onTapEmpty }: Look
   }
   useEffect(reset, [resetKey])
 
-  const clampZoom = (v: number) => Math.min(ZOOM.max, Math.max(ZOOM.min, v))
+  const clampZoom = (v: number) => Math.min(maxZoom, Math.max(ZOOM.min, v))
   const spread = () => {
     const [a, b] = [...pointers.current.values()]
     return Math.hypot(a.x - b.x, a.y - b.y)
@@ -983,7 +988,7 @@ interface CameraPreset {
 }
 
 /**
- * Third-person camera behind the defender, facing the way they looked at the last "Face hitter"
+ * Third-person camera behind the defender, facing the way they looked at the last reset (tap Follow again)
  * (so moving the hitter or the block doesn't swing it). It moves with them.
  */
 function followPreset(viewer: Point, looking: Vec3): CameraPreset {
