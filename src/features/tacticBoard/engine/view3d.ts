@@ -19,6 +19,11 @@ export const ANTENNA_ABOVE_NET = 0.8
 export const PLAYER_HEIGHT: Record<BlockSize, number> = { large: 1.9, medium: 1.8, small: 1.6 }
 /** How far above the net tape a blocker gets their hands (sets how much hitting window they take). */
 export const HAND_ABOVE_NET: Record<BlockSize, number> = { large: 0.45, medium: 0.3, small: 0.15 }
+/** How far a blocker's hands reach over the net into the opponent's side. */
+export const HAND_PENETRATION: Record<BlockSize, number> = { large: 0.25, medium: 0.15, small: 0.08 }
+/** Height of a blocking hand, wrist to fingertips. */
+export const HAND_LENGTH = 0.2
+
 /** Hitter's contact point above the net tape. */
 export const CONTACT_ABOVE_NET = 0.9
 

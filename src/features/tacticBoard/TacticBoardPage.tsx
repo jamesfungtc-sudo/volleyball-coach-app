@@ -75,7 +75,7 @@ export default function TacticBoardPage() {
 
   const viewer = viewFrom && (
     <Suspense fallback={<Loading3D />}>
-      <Viewer3D state={state} viewerId={viewFrom} onChangeViewer={setViewFrom} onClose={closeView} />
+      <Viewer3D state={state} dispatch={dispatch} viewerId={viewFrom} onChangeViewer={setViewFrom} onClose={closeView} />
     </Suspense>
   )
 

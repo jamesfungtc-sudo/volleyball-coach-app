@@ -1,10 +1,20 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type WheelEvent } from 'react'
-import { Canvas, useThree } from '@react-three/fiber'
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Dispatch,
+  type MutableRefObject,
+  type PointerEvent as ReactPointerEvent,
+  type WheelEvent,
+} from 'react'
+import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
 import { Button } from '@/components/ui/button'
 import { SegmentedControl } from '@/components/ui/segmented-control'
 import { ATTACK_LINE_DISTANCE, COURT_LENGTH, COURT_WIDTH, LINE_WIDTH, NET_Y, type Point } from '../../engine/court'
-import { analyseDefence, DEFAULT_BLOCK_SIZE, type BlockSize, type DefenceAnalysis } from '../../engine/defence'
+import { analyseDefence, BLOCK_SIZES, DEFAULT_BLOCK_SIZE, type BlockSize, type DefenceAnalysis } from '../../engine/defence'
 import { rollZones, tipZone } from '../../engine/hitZones'
 import {
   ANTENNA_ABOVE_NET,
@@ -12,6 +22,8 @@ import {
   blockHandHeight,
   contactHeight,
   eyeHeight,
+  HAND_LENGTH,
+  HAND_PENETRATION,
   HEAD_RATIO,
   jumpFor,
   NET_DEPTH,
@@ -23,7 +35,14 @@ import {
   type NetKind,
   type Stance,
 } from '../../engine/view3d'
-import { blockersOf, isBlocker, type BoardIcon, type BoardState } from '../../state/boardState'
+import {
+  blockersOf,
+  isBlocker,
+  suggestedDefence,
+  type BoardAction,
+  type BoardIcon,
+  type BoardState,
+} from '../../state/boardState'
 
 // First-person 3D view from one of our defenders, built from the same board state as the 2D view.
 // Loaded on demand (React.lazy) so three.js only downloads when someone opens it.
@@ -52,17 +71,68 @@ const VERTICAL_FOV = { min: 50, max: 100 }
 const ZOOM = { min: 0.35, max: 1.2 }
 /** Share of the view's height the ball sits above the centre. */
 const BALL_ABOVE_CENTRE = 0.18
+/** One tap of a nudge arrow. */
+const NUDGE_STEP = 0.1
+/** Pointer travel (CSS px) below which a press is a tap. */
+const TAP_SLOP_PX = 6
+/** Dragging toward or away from you covers more ground per pixel: the floor is seen at a low angle. */
+const DEPTH_DRAG_GAIN = 2.5
+/** Hitters stay on their side, at least this far off the net. */
+const HITTER_MIN_OFF_NET = 0.2
+/** Below this the Auto D spot isn't worth mentioning. */
+const AUTO_SPOT_HINT_MIN = 0.25
+/** Invisible grab area round a movable player, so they're easy to tap from across the court. */
+const GRAB_RADIUS = 0.45
+
+interface Grab {
+  id: string
+  pointerId: number
+}
 
 interface Viewer3DProps {
   state: BoardState
+  dispatch: Dispatch<BoardAction>
   viewerId: string
   onChangeViewer: (id: string) => void
   onClose: () => void
 }
 
-export default function Viewer3D({ state, viewerId, onChangeViewer, onClose }: Viewer3DProps) {
+export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, onClose }: Viewer3DProps) {
   const [stance, setStance] = useState<Stance>('crouch')
-  const look = useLook(viewerId)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const grab = useRef<Grab | null>(null)
+  const camera = useRef<THREE.PerspectiveCamera | null>(null)
+  const stage = useRef<HTMLDivElement>(null)
+  const stateRef = useRef(state)
+  stateRef.current = state
+
+  useHoldViewer(viewerId, stateRef, dispatch)
+
+  const hitter = state.icons.find(icon => icon.id === state.hitterId)
+  const movable = [...(hitter ? [hitter] : []), ...state.icons.filter(isBlocker).sort((a, b) => a.x - b.x)]
+  const selected = movable.find(icon => icon.id === selectedId)
+
+  /** Move a player by a board-space step, keeping blockers on the net and the hitter on their side. */
+  const moveBy = (id: string, dx: number, dy: number) => {
+    const icon = stateRef.current.icons.find(i => i.id === id)
+    if (!icon) return
+    const blocker = isBlocker(icon)
+    const to = { x: icon.x + dx, y: blocker ? icon.y : Math.min(NET_Y - HITTER_MIN_OFF_NET, icon.y + dy) }
+    dispatch({ type: 'move', id, to })
+    if (blocker) dispatch({ type: 'drop', id })
+  }
+
+  const look = useLook(viewerId, {
+    grab,
+    onDrag(dxPx, dyPx) {
+      const id = grab.current?.id
+      const icon = stateRef.current.icons.find(i => i.id === id)
+      if (!id || !icon || !camera.current || !stage.current) return
+      const d = dragToBoard(camera.current, toWorld(icon, 1.2), dxPx, dyPx, stage.current.clientHeight)
+      moveBy(id, d.x, isBlocker(icon) ? 0 : d.y)
+    },
+    onTapEmpty: () => setSelectedId(null),
+  })
 
   const defenders = state.icons
     .filter(icon => icon.kind === 'home' && !isBlocker(icon))
@@ -78,6 +148,9 @@ export default function Viewer3D({ state, viewerId, onChangeViewer, onClose }: V
   }, [onClose])
 
   if (!viewer) return null
+
+  const autoSpot = state.autoDefence === 'off' ? undefined : suggestedDefence(state).get(viewer.id)?.point
+  const autoOffset = autoSpot && { x: autoSpot.x - viewer.x, y: autoSpot.y - viewer.y }
 
   return (
     <div className="fixed inset-0 z-[70] flex flex-col bg-background pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pt-[env(safe-area-inset-top)]">
@@ -98,6 +171,7 @@ export default function Viewer3D({ state, viewerId, onChangeViewer, onClose }: V
       </div>
 
       <div
+        ref={stage}
         className="relative min-h-0 flex-1 touch-none select-none"
         onPointerDown={look.onPointerDown}
         onPointerMove={look.onPointerMove}
@@ -106,11 +180,65 @@ export default function Viewer3D({ state, viewerId, onChangeViewer, onClose }: V
         onWheel={look.onWheel}
       >
         <Canvas frameloop="demand" dpr={[1, 2]} camera={{ near: 0.05, far: 200 }} aria-label={`3D view from player ${viewer.label}`}>
-          <Scene state={state} viewer={viewer} stance={stance} yaw={look.yaw} pitch={look.pitch} zoom={look.zoom} />
+          <Scene
+            state={state}
+            viewer={viewer}
+            stance={stance}
+            look={look}
+            selectedId={selectedId}
+            movableIds={movable.map(icon => icon.id)}
+            onGrab={(id, pointerId) => {
+              grab.current = { id, pointerId }
+              setSelectedId(id)
+            }}
+            cameraRef={camera}
+          />
         </Canvas>
+        {autoOffset && Math.hypot(autoOffset.x, autoOffset.y) > AUTO_SPOT_HINT_MIN && (
+          <div className="absolute left-2 right-2 top-2 flex items-center justify-between gap-2 rounded-lg bg-background/85 px-3 py-1.5 text-xs backdrop-blur-sm">
+            <span>
+              Auto D spot: <strong>{describeOffset(autoOffset)}</strong>
+            </span>
+            <Button
+              variant="secondary"
+              className="h-8 shrink-0 px-3 text-xs"
+              onClick={() => autoSpot && dispatch({ type: 'move', id: viewer.id, to: autoSpot })}
+            >
+              Go there
+            </Button>
+          </div>
+        )}
         <p className="pointer-events-none absolute bottom-2 left-0 right-0 text-center text-xs text-white/80 [text-shadow:0_1px_2px_rgb(0_0_0/0.8)]">
-          Drag to look around · pinch to zoom
+          {selected ? 'Drag the player, or use the arrows' : 'Drag to look around · pinch to zoom'}
         </p>
+      </div>
+
+      <div className="flex min-h-[3.25rem] shrink-0 items-center justify-center gap-1.5 overflow-x-auto px-2 pt-1">
+        {selected ? (
+          <>
+            <span className="mr-1 whitespace-nowrap text-sm font-semibold">{playerName(selected, state.hitterId)}</span>
+            <NudgeButton label="Move left" onClick={() => moveBy(selected.id, -NUDGE_STEP, 0)} icon="left" />
+            <NudgeButton label="Move right" onClick={() => moveBy(selected.id, NUDGE_STEP, 0)} icon="right" />
+            {selected.id === state.hitterId && (
+              <>
+                <NudgeButton label="Move off the net" onClick={() => moveBy(selected.id, 0, -NUDGE_STEP)} icon="up" />
+                <NudgeButton label="Move toward the net" onClick={() => moveBy(selected.id, 0, NUDGE_STEP)} icon="down" />
+              </>
+            )}
+            <Button variant="secondary" className="ml-1 h-11 px-4" onClick={() => setSelectedId(null)}>
+              Done
+            </Button>
+          </>
+        ) : (
+          <>
+            <span className="mr-1 text-sm text-muted-foreground">Adjust</span>
+            {movable.map(icon => (
+              <Button key={icon.id} variant="outline" className="h-11 shrink-0 px-3" onClick={() => setSelectedId(icon.id)}>
+                {playerName(icon, state.hitterId)}
+              </Button>
+            ))}
+          </>
+        )}
       </div>
 
       <div className="flex shrink-0 items-center justify-center gap-2 px-2 py-1">
@@ -123,18 +251,42 @@ export default function Viewer3D({ state, viewerId, onChangeViewer, onClose }: V
   )
 }
 
+/**
+ * Hold the defender we're looking through while the 3D view is open, so moving the block doesn't
+ * make the camera jump; hand them back to Auto D on the way out. Players already placed by hand
+ * stay as they were.
+ */
+function useHoldViewer(viewerId: string, stateRef: MutableRefObject<BoardState>, dispatch: Dispatch<BoardAction>) {
+  useEffect(() => {
+    const { autoDefence, manual } = stateRef.current
+    if (autoDefence === 'off' || manual.includes(viewerId)) return
+    dispatch({ type: 'setManual', id: viewerId, manual: true })
+    return () => dispatch({ type: 'setManual', id: viewerId, manual: false })
+  }, [viewerId, stateRef, dispatch])
+}
+
+interface LookOptions {
+  /** Set when a press landed on a movable player: that pointer drags them instead of the view. */
+  grab: MutableRefObject<Grab | null>
+  onDrag: (dxPx: number, dyPx: number) => void
+  onTapEmpty: () => void
+}
+
 /** Drag to turn the head, pinch or wheel to zoom. Resets when the viewer changes. */
-function useLook(viewerId: string) {
+function useLook(viewerId: string, { grab, onDrag, onTapEmpty }: LookOptions) {
   const [yaw, setYaw] = useState(0)
   const [pitch, setPitch] = useState(0)
   const [zoom, setZoom] = useState(1)
-  const pointers = useRef(new Map<number, { x: number; y: number }>())
+  // Bumped on reset: the view re-aims at the hitter then, and only then (moving the hitter doesn't turn your head).
+  const [aimVersion, setAimVersion] = useState(0)
+  const pointers = useRef(new Map<number, { x: number; y: number; travel: number }>())
   const pinch = useRef<{ distance: number; zoom: number } | null>(null)
 
   const reset = () => {
     setYaw(0)
     setPitch(0)
     setZoom(1)
+    setAimVersion(v => v + 1)
   }
   useEffect(reset, [viewerId])
 
@@ -148,29 +300,39 @@ function useLook(viewerId: string) {
     yaw,
     pitch,
     zoom,
+    aimVersion,
     reset,
     onPointerDown(e: ReactPointerEvent<HTMLDivElement>) {
       if ((e.target as HTMLElement).closest('button')) return
       e.currentTarget.setPointerCapture(e.pointerId)
-      pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
-      if (pointers.current.size === 2) pinch.current = { distance: spread(), zoom }
+      pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY, travel: 0 })
+      if (pointers.current.size === 2 && !grab.current) pinch.current = { distance: spread(), zoom }
     },
     onPointerMove(e: ReactPointerEvent<HTMLDivElement>) {
       const last = pointers.current.get(e.pointerId)
       if (!last) return
-      pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+      const dx = e.clientX - last.x
+      const dy = e.clientY - last.y
+      pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY, travel: last.travel + Math.hypot(dx, dy) })
+      if (grab.current?.pointerId === e.pointerId) {
+        onDrag(dx, dy)
+        return
+      }
       if (pinch.current && pointers.current.size === 2) {
         setZoom(clampZoom(pinch.current.zoom * (pinch.current.distance / Math.max(1, spread()))))
         return
       }
       // Turning slower when zoomed in keeps the drag feeling the same.
       const scale = LOOK_RADIANS_PER_PX * zoom
-      setYaw(y => y - (e.clientX - last.x) * scale)
-      setPitch(p => Math.min(MAX_PITCH, Math.max(-MAX_PITCH, p + (e.clientY - last.y) * scale)))
+      setYaw(y => y - dx * scale)
+      setPitch(p => Math.min(MAX_PITCH, Math.max(-MAX_PITCH, p + dy * scale)))
     },
     onPointerUp(e: ReactPointerEvent<HTMLDivElement>) {
+      const press = pointers.current.get(e.pointerId)
       pointers.current.delete(e.pointerId)
       if (pointers.current.size < 2) pinch.current = null
+      if (grab.current?.pointerId === e.pointerId) grab.current = null
+      else if (press && press.travel < TAP_SLOP_PX && pointers.current.size === 0) onTapEmpty()
     },
     onWheel(e: WheelEvent<HTMLDivElement>) {
       setZoom(z => clampZoom(z * (1 + e.deltaY * 0.001)))
@@ -182,12 +344,14 @@ interface SceneProps {
   state: BoardState
   viewer: BoardIcon
   stance: Stance
-  yaw: number
-  pitch: number
-  zoom: number
+  look: { yaw: number; pitch: number; zoom: number; aimVersion: number }
+  selectedId: string | null
+  movableIds: string[]
+  onGrab: (id: string, pointerId: number) => void
+  cameraRef: MutableRefObject<THREE.PerspectiveCamera | null>
 }
 
-function Scene({ state, viewer, stance, yaw, pitch, zoom }: SceneProps) {
+function Scene({ state, viewer, stance, look, selectedId, movableIds, onGrab, cameraRef }: SceneProps) {
   const colors = useBoardColors()
   const hitter = state.icons.find(icon => icon.id === state.hitterId)
   const blockers = useMemo(() => blockersOf(state.icons), [state.icons])
@@ -195,13 +359,16 @@ function Scene({ state, viewer, stance, yaw, pitch, zoom }: SceneProps) {
   const contact = analysis?.contact ?? hitter ?? { x: COURT_WIDTH / 2, y: NET_Y - 1 }
   const ball = toWorld(contact, contactHeight(state.net))
   const eye = toWorld(viewer, eyeHeight(viewer.blockSize ?? DEFAULT_BLOCK_SIZE, stance))
+  // Aim at the ball as it was when the view was last reset, so moving the hitter doesn't turn your head.
+  const aim = useRef<{ version: number; target: Vec3 }>({ version: -1, target: ball })
+  if (aim.current.version !== look.aimVersion) aim.current = { version: look.aimVersion, target: ball }
 
   return (
     <>
       <color attach="background" args={[colors.sky]} />
       <ambientLight intensity={1.1} />
       <directionalLight position={[4, 12, 10]} intensity={1.6} />
-      <FirstPersonCamera eye={eye} target={ball} yaw={yaw} pitch={pitch} zoom={zoom} />
+      <FirstPersonCamera eye={eye} target={aim.current.target} yaw={look.yaw} pitch={look.pitch} zoom={look.zoom} cameraRef={cameraRef} />
 
       <CourtFloor colors={colors} />
       {analysis && state.showShadow && <Zones analysis={analysis} state={state} colors={colors} />}
@@ -216,6 +383,16 @@ function Scene({ state, viewer, stance, yaw, pitch, zoom }: SceneProps) {
             net={state.net}
             ball={contact}
             colors={colors}
+            selected={icon.id === selectedId}
+            onGrab={
+              movableIds.includes(icon.id)
+                ? (e: ThreeEvent<PointerEvent>) => {
+                    // Nearest player only; the press drags them rather than the view.
+                    e.stopPropagation()
+                    onGrab(icon.id, e.pointerId)
+                  }
+                : undefined
+            }
           />
         ),
       )}
@@ -227,10 +404,25 @@ function Scene({ state, viewer, stance, yaw, pitch, zoom }: SceneProps) {
   )
 }
 
-function FirstPersonCamera({ eye, target, yaw, pitch, zoom }: { eye: Vec3; target: Vec3; yaw: number; pitch: number; zoom: number }) {
+function FirstPersonCamera({
+  eye,
+  target,
+  yaw,
+  pitch,
+  zoom,
+  cameraRef,
+}: {
+  eye: Vec3
+  target: Vec3
+  yaw: number
+  pitch: number
+  zoom: number
+  cameraRef: MutableRefObject<THREE.PerspectiveCamera | null>
+}) {
   const camera = useThree(s => s.camera) as THREE.PerspectiveCamera
   const invalidate = useThree(s => s.invalidate)
   const aspect = useThree(s => s.size.width / Math.max(1, s.size.height))
+  cameraRef.current = camera
   const [ex, ey, ez] = eye
   const [tx, ty, tz] = target
 
@@ -250,6 +442,20 @@ function FirstPersonCamera({ eye, target, yaw, pitch, zoom }: { eye: Vec3; targe
   }, [camera, invalidate, ex, ey, ez, tx, ty, tz, yaw, pitch, zoom, aspect])
 
   return null
+}
+
+/**
+ * Turn a finger drag into a step on the floor, in board metres: sideways in the direction the
+ * camera faces, and up the screen = away from you. Scaled to the player's distance, so a drag
+ * moves them about as far as it looks like it should.
+ */
+function dragToBoard(camera: THREE.PerspectiveCamera, at: Vec3, dxPx: number, dyPx: number, heightPx: number): Point {
+  const distance = camera.position.distanceTo(new THREE.Vector3(...at))
+  const metresPerPx = (2 * distance * Math.tan((camera.fov * Math.PI) / 360)) / Math.max(1, heightPx)
+  const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion).setY(0).normalize()
+  const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).setY(0).normalize()
+  const step = right.multiplyScalar(dxPx * metresPerPx).add(forward.multiplyScalar(-dyPx * metresPerPx * DEPTH_DRAG_GAIN))
+  return { x: step.x, y: step.z }
 }
 
 function verticalFov(aspect: number): number {
@@ -427,7 +633,23 @@ function Antenna({ x, bottom, top }: { x: number; bottom: number; top: number })
 type Pose = 'hitter' | 'blocker' | 'ready'
 
 /** A simple player: body, head and arms. No number tag: it sat over the heads and hid the view. */
-function Figure({ icon, pose, net, ball, colors }: { icon: BoardIcon; pose: Pose; net: NetKind; ball: Point; colors: BoardColors }) {
+function Figure({
+  icon,
+  pose,
+  net,
+  ball,
+  colors,
+  selected = false,
+  onGrab,
+}: {
+  icon: BoardIcon
+  pose: Pose
+  net: NetKind
+  ball: Point
+  colors: BoardColors
+  selected?: boolean
+  onGrab?: (e: ThreeEvent<PointerEvent>) => void
+}) {
   const size: BlockSize = icon.kind === 'home' ? (icon.blockSize ?? DEFAULT_BLOCK_SIZE) : DEFAULT_BLOCK_SIZE
   const height = PLAYER_HEIGHT[size]
   const color = icon.kind === 'home' ? colors.home : colors.opponent
@@ -440,8 +662,13 @@ function Figure({ icon, pose, net, ball, colors }: { icon: BoardIcon; pose: Pose
   const shoulderY = lift + height * SHOULDER_RATIO
   const shoulders: Vec3[] = [-1, 1].map(side => [x + side * SHOULDER_HALF_WIDTH, shoulderY, z])
 
+  // Blockers: hands pressed over the net, side by side across the width their size covers on the 2D board.
+  const handWidth = BLOCK_SIZES[size].width / 2
+  const handZ = facing * HAND_PENETRATION[size]
+  const blockHands: Vec3[] = [-1, 1].map(side => [x + (side * handWidth) / 2, reach - HAND_LENGTH / 2, handZ])
+
   const hands: Vec3[] = shoulders.map(([sx, , sz], i): Vec3 => {
-    if (pose === 'blocker') return [sx, reach, sz + facing * 0.15]
+    if (pose === 'blocker') return [blockHands[i][0], reach - HAND_LENGTH, handZ]
     if (pose === 'hitter' && i === 1) {
       const [bx, by, bz] = toWorld(ball, reach)
       return [bx, by - BALL_RADIUS, bz]
@@ -464,6 +691,26 @@ function Figure({ icon, pose, net, ball, colors }: { icon: BoardIcon; pose: Pose
       {shoulders.map((from, i) => (
         <Limb key={i} from={from} to={hands[i]} color={color} />
       ))}
+      {pose === 'blocker' &&
+        blockHands.map((at, i) => (
+          // Flat hands, tilted forward over the net.
+          <mesh key={`hand-${i}`} position={at} rotation-x={-facing * 0.35}>
+            <boxGeometry args={[handWidth - 0.02, HAND_LENGTH, 0.03]} />
+            <meshLambertMaterial color="#f1c9a5" />
+          </mesh>
+        ))}
+      {selected && (
+        <mesh rotation-x={-Math.PI / 2} position={[x, 0.012, z]}>
+          <ringGeometry args={[0.38, 0.5, 40]} />
+          <meshBasicMaterial color="#facc15" />
+        </mesh>
+      )}
+      {onGrab && (
+        <mesh position={[x, Math.max(height, reach) / 2, z]} onPointerDown={onGrab}>
+          <cylinderGeometry args={[GRAB_RADIUS, GRAB_RADIUS, Math.max(height, reach), 12]} />
+          <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+        </mesh>
+      )}
     </group>
   )
 }
@@ -487,10 +734,32 @@ function Limb({ from, to, color }: { from: Vec3; to: Vec3; color: string }) {
   )
 }
 
-function ChevronIcon({ direction }: { direction: 'left' | 'right' }) {
+function playerName(icon: BoardIcon, hitterId: string) {
+  return icon.id === hitterId ? `Hitter ${icon.label}` : `Blocker ${icon.label}`
+}
+
+/** "0.6 m left, 0.4 m back", as the defender facing the net would say it. */
+function describeOffset({ x, y }: Point) {
+  const parts = []
+  if (Math.abs(x) >= 0.1) parts.push(`${Math.abs(x).toFixed(1)} m ${x > 0 ? 'right' : 'left'}`)
+  if (Math.abs(y) >= 0.1) parts.push(`${Math.abs(y).toFixed(1)} m ${y < 0 ? 'forward' : 'back'}`)
+  return parts.join(', ')
+}
+
+function NudgeButton({ label, icon, onClick }: { label: string; icon: 'left' | 'right' | 'up' | 'down'; onClick: () => void }) {
+  return (
+    <Button variant="outline" size="icon" className="h-11 w-11 shrink-0" onClick={onClick} aria-label={label} title={label}>
+      <ChevronIcon direction={icon} />
+    </Button>
+  )
+}
+
+const CHEVRON_PATH = { left: 'm15 18-6-6 6-6', right: 'm9 18 6-6-6-6', up: 'm18 15-6-6-6 6', down: 'm6 9 6 6 6-6' }
+
+function ChevronIcon({ direction }: { direction: keyof typeof CHEVRON_PATH }) {
   return (
     <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-      <path d={direction === 'left' ? 'm15 18-6-6 6-6' : 'm9 18 6-6-6-6'} />
+      <path d={CHEVRON_PATH[direction]} />
     </svg>
   )
 }

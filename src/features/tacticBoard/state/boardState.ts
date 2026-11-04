@@ -71,6 +71,8 @@ export type BoardAction =
   | { type: 'setAutoDefence'; autoDefence: AutoDefence }
   /** Send hand-placed defenders back to their suggested spots. */
   | { type: 'resetDefenders' }
+  /** Hold a defender where they are (Auto D leaves them alone), or hand them back to Auto D. */
+  | { type: 'setManual'; id: string; manual: boolean }
   | { type: 'setTool'; tool: Tool }
   | { type: 'setNet'; net: NetKind }
   | { type: 'addDrawing'; drawing: Drawing }
@@ -149,6 +151,10 @@ function applyAction(state: BoardState, action: BoardAction): BoardState {
       return { ...state, autoDefence: action.autoDefence, manual: [] }
     case 'resetDefenders':
       return { ...state, manual: [] }
+    case 'setManual': {
+      const others = state.manual.filter(id => id !== action.id)
+      return { ...state, manual: action.manual ? [...others, action.id] : others }
+    }
     case 'setTool':
       return { ...state, tool: action.tool }
     case 'setNet':

@@ -79,6 +79,17 @@ describe('block size', () => {
   })
 })
 
+describe('holding a defender', () => {
+  it('keeps them still while held and hands them back to Auto D on release', () => {
+    let state = boardReducer(initialBoardState, { type: 'setManual', id: 'h6', manual: true })
+    const held = pos(state, 'h6')
+    state = boardReducer(state, { type: 'move', id: 'h3', to: { x: 6.2, y: 9.4 } })
+    expect(pos(state, 'h6')).toEqual(held)
+    state = boardReducer(state, { type: 'setManual', id: 'h6', manual: false })
+    expect(pos(state, 'h6')).toEqual(suggestedDefence(state).get('h6')!.point)
+  })
+})
+
 describe('drawings', () => {
   const arrow = { id: 'a', kind: 'arrow' as const, points: [{ x: 1, y: 10 }, { x: 4, y: 14 }] }
   const pen = { id: 'p', kind: 'pen' as const, points: [{ x: 2, y: 12 }, { x: 3, y: 12 }] }
