@@ -216,7 +216,6 @@ function Scene({ state, viewer, stance, yaw, pitch, zoom }: SceneProps) {
             net={state.net}
             ball={contact}
             colors={colors}
-            alwaysTagged={icon.id === state.hitterId}
           />
         ),
       )}
@@ -427,23 +426,8 @@ function Antenna({ x, bottom, top }: { x: number; bottom: number; top: number })
 
 type Pose = 'hitter' | 'blocker' | 'ready'
 
-/** A simple player: body, head, arms, and their number floating above. */
-function Figure({
-  icon,
-  pose,
-  net,
-  ball,
-  colors,
-  alwaysTagged = false,
-}: {
-  icon: BoardIcon
-  pose: Pose
-  net: NetKind
-  ball: Point
-  colors: BoardColors
-  /** Show the number even through other players (the hitter, so you can always find them). */
-  alwaysTagged?: boolean
-}) {
+/** A simple player: body, head and arms. No number tag: it sat over the heads and hid the view. */
+function Figure({ icon, pose, net, ball, colors }: { icon: BoardIcon; pose: Pose; net: NetKind; ball: Point; colors: BoardColors }) {
   const size: BlockSize = icon.kind === 'home' ? (icon.blockSize ?? DEFAULT_BLOCK_SIZE) : DEFAULT_BLOCK_SIZE
   const height = PLAYER_HEIGHT[size]
   const color = icon.kind === 'home' ? colors.home : colors.opponent
@@ -480,7 +464,6 @@ function Figure({
       {shoulders.map((from, i) => (
         <Limb key={i} from={from} to={hands[i]} color={color} />
       ))}
-      <NumberTag label={icon.label} color={color} position={[x, lift + height + 0.35, z]} throughBodies={alwaysTagged} />
     </group>
   )
 }
@@ -501,36 +484,6 @@ function Limb({ from, to, color }: { from: Vec3; to: Vec3; color: string }) {
       <capsuleGeometry args={[LIMB_RADIUS, Math.max(0.01, length - LIMB_RADIUS * 2), 4, 8]} />
       <meshLambertMaterial color={color} />
     </mesh>
-  )
-}
-
-/** Player number on a little disc that always faces the camera. */
-function NumberTag({ label, color, position, throughBodies }: { label: string; color: string; position: Vec3; throughBodies: boolean }) {
-  const texture = useMemo(() => {
-    const canvas = document.createElement('canvas')
-    canvas.width = canvas.height = 128
-    const ctx = canvas.getContext('2d')!
-    ctx.fillStyle = color
-    ctx.beginPath()
-    ctx.arc(64, 64, 58, 0, Math.PI * 2)
-    ctx.fill()
-    ctx.lineWidth = 8
-    ctx.strokeStyle = '#ffffff'
-    ctx.stroke()
-    ctx.fillStyle = '#ffffff'
-    ctx.font = 'bold 72px system-ui, sans-serif'
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.fillText(label, 64, 68)
-    const t = new THREE.CanvasTexture(canvas)
-    t.colorSpace = THREE.SRGBColorSpace
-    return t
-  }, [label, color])
-  useEffect(() => () => texture.dispose(), [texture])
-  return (
-    <sprite position={position} scale={[0.32, 0.32, 0.32]}>
-      <spriteMaterial map={texture} depthTest={!throughBodies} />
-    </sprite>
   )
 }
 
