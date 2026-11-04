@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button'
 import { SegmentedControl } from '@/components/ui/segmented-control'
 import { availableChoices, ballAt, planAttack, type AttackChoice, type AttackPlan } from '../../engine/attack'
 import { ATTACK_LINE_DISTANCE, COURT_LENGTH, COURT_WIDTH, LINE_WIDTH, NET_Y, type Point } from '../../engine/court'
-import { analyseDefence, BLOCK_SIZES, BLOCK_ZONE_DEPTH, BLOCKER_Y, DEFAULT_BLOCK_SIZE, type BlockSize, type DefenceAnalysis } from '../../engine/defence'
+import { analyseDefence, BLOCK_SIZES, BLOCK_ZONE_DEPTH, DEFAULT_BLOCK_SIZE, type BlockSize, type DefenceAnalysis } from '../../engine/defence'
 import { rollZones, tipZone } from '../../engine/hitZones'
 import {
   ANTENNA_ABOVE_NET,
@@ -167,8 +167,11 @@ interface Grab {
   tapOnly: boolean
 }
 
-/** Stepping a blocker back off the net puts them this far behind the block zone. */
-const OFF_NET_STEP_BACK = 0.6
+/** A blocker's size, with the standing height it gives them in 3D. */
+const SIZE_OPTIONS: { value: BlockSize; label: string }[] = (['large', 'medium', 'small'] as const).map(size => ({
+  value: size,
+  label: `${size[0].toUpperCase()} ${PLAYER_HEIGHT[size].toFixed(1)} m`,
+}))
 const NET_OPTIONS: { value: NetKind; label: string }[] = [
   { value: 'men', label: "Men's" },
   { value: 'women', label: "Women's" },
@@ -217,11 +220,6 @@ export default function Viewer3D({ state, dispatch, initialViewerId, onClose }: 
   // Anything that changes the play makes the last attack stale.
   useEffect(() => setRun(null), [state.icons, state.hitterId, state.net, state.contactAboveNet])
   const viewerIcon = viewerId ? state.icons.find(icon => icon.id === viewerId) : undefined
-  const movable = [
-    ...(viewerIcon ? [viewerIcon] : []),
-    ...(hitter ? [hitter] : []),
-    ...state.icons.filter(isBlocker).sort((a, b) => a.x - b.x),
-  ]
   const selected = state.icons.find(icon => icon.id === selectedId && (icon.kind === 'home' || icon.id === state.hitterId))
   const canFollow = (icon: BoardIcon | undefined): icon is BoardIcon => icon?.kind === 'home' && !isBlocker(icon)
 
@@ -257,13 +255,6 @@ export default function Viewer3D({ state, dispatch, initialViewerId, onClose }: 
     if (id === viewerId) movedSelf.current = true
     dispatch({ type: 'move', id, to: { x: icon.x + dx, y } })
     if (home && release) dispatch({ type: 'drop', id })
-  }
-
-  /** A blocker steps back off the net and stops blocking; a defender at the net steps up to block. */
-  const toggleBlocking = (icon: BoardIcon) => {
-    const to = isBlocker(icon) ? NET_Y + BLOCK_ZONE_DEPTH + OFF_NET_STEP_BACK : BLOCKER_Y
-    dispatch({ type: 'move', id: icon.id, to: { x: icon.x, y: to } })
-    dispatch({ type: 'drop', id: icon.id })
   }
 
   const look = useLook(`${viewerId ?? ''}:${cameraMode}`, {
@@ -528,77 +519,65 @@ export default function Viewer3D({ state, dispatch, initialViewerId, onClose }: 
             : followable
               ? `Drag to move · Follow ${followable.label} to see the play from there`
               : selected
-                ? 'Drag the player, or use the arrows'
+                ? 'Drag to move · tap empty space when done'
                 : layer === 'bird'
-                  ? 'Tap a player to select · double-tap to follow · tap an opponent to make them hitter'
+                  ? 'Drag to swing round · pinch to zoom · tap an opponent to make them hitter'
                   : layer === 'follow'
-                    ? 'Drag to swing round · pinch to zoom · Me (arrows) to move'
-                    : 'Drag to look around · tap an opponent to make them the hitter'}
+                    ? 'Drag to swing round · pinch to zoom · tap a player to move them'
+                    : 'Drag to look around · tap a player to move them'}
         </p>
       </div>
 
-      {selected?.id === state.hitterId && (
-        <div className="flex shrink-0 items-center justify-center gap-1.5 px-2 pt-1">
-          <span className="mr-1 text-sm text-muted-foreground">Contact height</span>
-          <NudgeButton
-            label="Lower contact"
-            icon="down"
-            onStep={() => dispatch({ type: 'setContact', aboveNet: stateRef.current.contactAboveNet - CONTACT_STEP })}
-            disabled={state.contactAboveNet <= CONTACT_ABOVE_NET_RANGE.min}
-          />
-          <span className="w-16 text-center text-sm font-semibold tabular-nums">{contact.toFixed(2)} m</span>
-          <NudgeButton
-            label="Raise contact"
-            icon="up"
-            onStep={() => dispatch({ type: 'setContact', aboveNet: stateRef.current.contactAboveNet + CONTACT_STEP })}
-            disabled={state.contactAboveNet >= CONTACT_ABOVE_NET_RANGE.max}
-          />
-        </div>
-      )}
-
+      {/* The selected player's settings. Moving is by dragging them in the scene, except for you. */}
       <div className="flex min-h-[3.25rem] shrink-0 items-center justify-center gap-1.5 overflow-x-auto px-2 pt-1">
-        {selected ? (
+        {selected && (
+          <span className="mr-1 whitespace-nowrap text-sm font-semibold">{playerName(selected, state.hitterId, viewerId)}</span>
+        )}
+        {selected && selected.id === viewerId ? (
           <>
-            <span className="mr-1 whitespace-nowrap text-sm font-semibold">{playerName(selected, state.hitterId, viewerId)}</span>
             <NudgeButton label="Move left" onStep={() => moveBy(selected.id, -NUDGE_STEP, 0)} icon="left" />
             <NudgeButton label="Move right" onStep={() => moveBy(selected.id, NUDGE_STEP, 0)} icon="right" />
-            {selected.id === state.hitterId && (
-              <>
-                <NudgeButton label="Move off the net" onStep={() => moveBy(selected.id, 0, -NUDGE_STEP)} icon="up" />
-                <NudgeButton label="Move toward the net" onStep={() => moveBy(selected.id, 0, NUDGE_STEP)} icon="down" />
-              </>
-            )}
-            {selected.kind === 'home' && !isBlocker(selected) && (
-              <>
-                <NudgeButton label="Move toward the net" onStep={() => moveBy(selected.id, 0, -NUDGE_STEP)} icon="up" />
-                <NudgeButton label="Move back" onStep={() => moveBy(selected.id, 0, NUDGE_STEP)} icon="down" />
-              </>
-            )}
-            {selected.kind === 'home' && selected.id !== viewerId && (isBlocker(selected) || selected.y < NET_Y + 2.5) && (
-              <Button variant="outline" className="h-11 shrink-0 px-3" onClick={() => toggleBlocking(selected)}>
-                {isBlocker(selected) ? 'Off the net' : 'Block'}
-              </Button>
-            )}
-            {followable ? (
-              <Button className="ml-1 h-11 shrink-0 gap-1 px-3" onClick={() => follow(followable.id)}>
-                Follow {followable.label}
-                <ChevronIcon direction="right" />
-              </Button>
-            ) : (
-              <Button variant="secondary" className="ml-1 h-11 px-4" onClick={() => setSelectedId(null)}>
-                Done
-              </Button>
-            )}
+            <NudgeButton label="Move toward the net" onStep={() => moveBy(selected.id, 0, -NUDGE_STEP)} icon="up" />
+            <NudgeButton label="Move back" onStep={() => moveBy(selected.id, 0, NUDGE_STEP)} icon="down" />
+            <Button variant="secondary" className="ml-1 h-11 px-4" onClick={() => setSelectedId(null)}>
+              Done
+            </Button>
           </>
-        ) : (
+        ) : selected?.id === state.hitterId ? (
           <>
-            <span className="mr-1 text-sm text-muted-foreground">Adjust</span>
-            {movable.map(icon => (
-              <Button key={icon.id} variant="outline" className="h-11 shrink-0 px-3" onClick={() => setSelectedId(icon.id)}>
-                {playerName(icon, state.hitterId, viewerId)}
-              </Button>
-            ))}
+            <span className="text-sm text-muted-foreground">Contact</span>
+            <NudgeButton
+              label="Lower contact"
+              icon="down"
+              onStep={() => dispatch({ type: 'setContact', aboveNet: stateRef.current.contactAboveNet - CONTACT_STEP })}
+              disabled={state.contactAboveNet <= CONTACT_ABOVE_NET_RANGE.min}
+            />
+            <span className="w-16 text-center text-sm font-semibold tabular-nums">{contact.toFixed(2)} m</span>
+            <NudgeButton
+              label="Raise contact"
+              icon="up"
+              onStep={() => dispatch({ type: 'setContact', aboveNet: stateRef.current.contactAboveNet + CONTACT_STEP })}
+              disabled={state.contactAboveNet >= CONTACT_ABOVE_NET_RANGE.max}
+            />
           </>
+        ) : selected && isBlocker(selected) ? (
+          <SegmentedControl
+            value={selected.blockSize ?? DEFAULT_BLOCK_SIZE}
+            onChange={size => dispatch({ type: 'setBlockSize', id: selected.id, size })}
+            options={SIZE_OPTIONS}
+          />
+        ) : followable ? (
+          <Button className="h-11 shrink-0 gap-1 px-3" onClick={() => follow(followable.id)}>
+            Follow {followable.label}
+            <ChevronIcon direction="right" />
+          </Button>
+        ) : selected ? null : viewerIcon ? (
+          // You can't be tapped: in Eyes you're the camera, and in Follow the camera rides on you.
+          <Button variant="outline" className="h-11 shrink-0 px-4" onClick={() => setSelectedId(viewerIcon.id)}>
+            Move me ({viewerIcon.label})
+          </Button>
+        ) : (
+          <span className="text-sm text-muted-foreground">Tap a player to move them · double-tap to follow</span>
         )}
       </div>
 

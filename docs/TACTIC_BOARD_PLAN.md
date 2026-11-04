@@ -241,10 +241,14 @@ src/features/tacticBoard/
      **Follow N ›**, or double-tap them.
    - **Heights:** players by block size (L 1.9 / M 1.8 / S 1.6 m); blockers'
      arms over the net by L/M/S; men's 2.43 m or women's 2.24 m net (⋯ menu).
-   - **Moving players:** drag any of our players, the hitter, or use the Adjust
-     chips and arrows (hold to repeat). Blockers pulled off the net stop
-     blocking; defenders dragged into the block zone snap on. Tap an opponent
-     to make them the hitter (default block, Auto D, view re-aimed).
+   - **Moving players:** drag any of our players or the hitter in the scene.
+     Blockers pulled off the net stop blocking; defenders dragged into the
+     block zone snap on. Tap an opponent to make them the hitter (default
+     block, Auto D, view re-aimed). Tapping a player selects them and the row
+     under the scene shows only their settings: blocker size L / M / S (with
+     height), hitter contact height, or Follow N for a defender in Bird. You
+     can't be dragged in Follow / Eyes, so **Move me (N)** gives you arrows
+     (hold to repeat). Tap empty space to deselect.
    - **Holding the viewer:** the defender you look through stays put while the
      block moves, so the camera doesn't jump; a banner shows the Auto D spot
      ("Go there"). Moving yourself keeps you hand-placed after leaving 3D.
