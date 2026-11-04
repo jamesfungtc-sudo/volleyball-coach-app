@@ -230,3 +230,57 @@ src/features/tacticBoard/
    - **↺ (reset board):** clears drawings but keeps the selected tool.
    - Ideas for later: undo for player moves, several ink colours, saving and
      loading boards.
+7. ✅ 3D view (`components/three/Viewer3D.tsx`, `engine/view3d.ts`, `engine/attack.ts`).
+   Opened from a defender on the 2D board ("View from N"); three.js only loads then.
+   - **Cameras:** Eyes (the defender's own view: Ready crouch or Standing),
+     Behind, Side, Hitter (over the hitter's shoulder) and Above. Wide views orbit
+     on drag, zoom on pinch, and fit the court to the screen's shape.
+   - **Heights:** players by block size (L 1.9 / M 1.8 / S 1.6 m); blockers'
+     arms over the net by L/M/S; men's 2.43 m or women's 2.24 m net (⋯ menu).
+   - **Moving players:** drag any of our players, the hitter, or use the Adjust
+     chips and arrows (hold to repeat). Blockers pulled off the net stop
+     blocking; defenders dragged into the block zone snap on. Tap an opponent
+     to make them the hitter (default block, Auto D, view re-aimed).
+   - **Holding the viewer:** the defender you look through stays put while the
+     block moves, so the camera doesn't jump; a banner shows the Auto D spot
+     ("Go there"). Moving yourself keeps you hand-placed after leaving 3D.
+   - **Contact height:** net + 0.15 to + 1.3 m, 5 cm steps (3D only for now).
+   - **Attack animation:** ▶ Random or Choose… (tip, roll, hard at me / left /
+     right / line / cross / seam, off the block). Real projectile motion, a
+     trail, one bounce and a landing ring. Whether a hard hit is blocked
+     follows the 2D shadow; blocked hits deflect (stuffed, short, up, out).
+     Random is weighted to what's open. Speed ½× (default), ¼×, real. The
+     attack survives a camera change, so Again replays it from another angle.
+   - **First guesses to tune:** spike speed 24 / 20 m/s (men / women), hand
+     penetration 25 / 15 / 8 cm (L / M / S), Random's mix, bounce.
+
+## Ideas / roadmap
+
+Not built yet, in rough order of value (coach's call). Recorded 2026-11-04.
+
+### Tactics-board basics
+
+1. **Save and share setups.** Named plays ("vs their 4, Perimeter, Small
+   middle") that come back in one tap; a link to send one to a player. The
+   biggest gap today: everything is lost on reset.
+2. **Multi-step plays.** Step 1 serve receive → step 2 transition → step 3
+   defence, with players animating between steps in 2D and 3D.
+3. **Rotations and serve receive.** Pick rotation 1–6 and a system (5-1, 6-2)
+   and the board places all six; reuse the app's existing rotation logic
+   (`src/utils/rotationHelpers.ts`).
+4. **Undo for player moves** (undo only covers drawings now).
+5. **Names and roles.** Player names instead of numbers, libero colour,
+   setter / OH / MB labels.
+
+### 3D view
+
+- **Sightline check:** can each defender see the hitter's arm at contact?
+  ✓/✗ badges on the 2D defenders too. Warn first; maybe let Auto D nudge
+  defenders later.
+- **Defenders react** to the hit and move to dig, showing whether they can get
+  there in time.
+- **The set and the approach** before the hit (timing, reading the setter).
+- **Blockers jump in time** with the hitter instead of hanging in the air.
+- **Contact height drives the 2D shadow** (a higher hit makes a shorter
+  shadow); now it only changes the 3D flight.
+- **Left-handed hitters** (Left / Right toggle).

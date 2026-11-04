@@ -736,7 +736,6 @@ function Scene({
             ball={contact}
             colors={colors}
             selected={icon.id === selectedId}
-            marked={wide && icon.id === viewer.id}
             onGrab={
               movableIds.includes(icon.id) || icon.kind === 'opponent'
                 ? (e: ThreeEvent<PointerEvent>) => {
@@ -1178,7 +1177,6 @@ function Figure({
   ball,
   colors,
   selected = false,
-  marked = false,
   onGrab,
   swing,
 }: {
@@ -1189,8 +1187,6 @@ function Figure({
   ball: Point
   colors: BoardColors
   selected?: boolean
-  /** The defender the wide view is about. */
-  marked?: boolean
   onGrab?: (e: ThreeEvent<PointerEvent>) => void
   /** Hitter only: seconds from contact, to animate the arm swing (negative = winding up). */
   swing?: number
@@ -1241,10 +1237,10 @@ function Figure({
       {shoulders.map((from, i) => (
         <Limb key={i} from={from} to={hands[i]} color={color} />
       ))}
-      {(selected || marked) && (
+      {selected && (
         <mesh rotation-x={-Math.PI / 2} position={[x, 0.012, z]}>
           <ringGeometry args={[0.38, 0.5, 40]} />
-          <meshBasicMaterial color={selected ? '#facc15' : '#ffffff'} />
+          <meshBasicMaterial color="#facc15" />
         </mesh>
       )}
       {onGrab && (
