@@ -90,6 +90,16 @@ describe('holding a defender', () => {
   })
 })
 
+describe('hitter contact height', () => {
+  it('steps within its range without drift', () => {
+    let state = initialBoardState
+    for (let i = 0; i < 3; i++) state = boardReducer(state, { type: 'setContact', aboveNet: state.contactAboveNet + 0.05 })
+    expect(state.contactAboveNet).toBe(1.05)
+    expect(boardReducer(state, { type: 'setContact', aboveNet: 9 }).contactAboveNet).toBe(1.3)
+    expect(boardReducer(state, { type: 'setContact', aboveNet: 0 }).contactAboveNet).toBe(0.5)
+  })
+})
+
 describe('drawings', () => {
   const arrow = { id: 'a', kind: 'arrow' as const, points: [{ x: 1, y: 10 }, { x: 4, y: 14 }] }
   const pen = { id: 'p', kind: 'pen' as const, points: [{ x: 2, y: 12 }, { x: 3, y: 12 }] }

@@ -21,11 +21,10 @@ export const PLAYER_HEIGHT: Record<BlockSize, number> = { large: 1.9, medium: 1.
 export const HAND_ABOVE_NET: Record<BlockSize, number> = { large: 0.45, medium: 0.3, small: 0.15 }
 /** How far a blocker's hands reach over the net into the opponent's side. */
 export const HAND_PENETRATION: Record<BlockSize, number> = { large: 0.25, medium: 0.15, small: 0.08 }
-/** Height of a blocking hand, wrist to fingertips. */
-export const HAND_LENGTH = 0.2
 
-/** Hitter's contact point above the net tape. */
+/** Hitter's contact point above the net tape: the default, and how far the coach can set it. */
 export const CONTACT_ABOVE_NET = 0.9
+export const CONTACT_ABOVE_NET_RANGE = { min: 0.5, max: 1.3 }
 
 /** Body proportions as a share of standing height. */
 export const SHOULDER_RATIO = 0.82
@@ -45,8 +44,8 @@ export function blockHandHeight(size: BlockSize, net: NetKind): number {
   return NET_HEIGHT[net] + HAND_ABOVE_NET[size]
 }
 
-export function contactHeight(net: NetKind): number {
-  return NET_HEIGHT[net] + CONTACT_ABOVE_NET
+export function contactHeight(net: NetKind, aboveNet = CONTACT_ABOVE_NET): number {
+  return NET_HEIGHT[net] + aboveNet
 }
 
 /** How far a player has to jump for straight arms to reach `handHeight`. */

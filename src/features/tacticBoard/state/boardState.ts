@@ -11,7 +11,7 @@ import {
 } from '../engine/defence'
 import { suggestDefence, type DefenceSystem, type DefenderTarget } from '../engine/defenders'
 import type { HitType } from '../engine/hitZones'
-import type { NetKind } from '../engine/view3d'
+import { CONTACT_ABOVE_NET, CONTACT_ABOVE_NET_RANGE, type NetKind } from '../engine/view3d'
 
 export type IconKind = 'home' | 'opponent' | 'ball'
 
@@ -56,6 +56,8 @@ export interface BoardState {
   drawings: Drawing[]
   /** Net height for the 3D view. */
   net: NetKind
+  /** How high above the net tape the hitter contacts the ball (3D view only for now). */
+  contactAboveNet: number
 }
 
 export type BoardAction =
@@ -75,6 +77,7 @@ export type BoardAction =
   | { type: 'setManual'; id: string; manual: boolean }
   | { type: 'setTool'; tool: Tool }
   | { type: 'setNet'; net: NetKind }
+  | { type: 'setContact'; aboveNet: number }
   | { type: 'addDrawing'; drawing: Drawing }
   | { type: 'undoDrawing' }
   | { type: 'clearDrawings' }
@@ -112,6 +115,7 @@ export const initialBoardState: BoardState = withAutoDefence({
   tool: 'move',
   drawings: [],
   net: 'men',
+  contactAboveNet: CONTACT_ABOVE_NET,
 })
 
 export function isBlocker(icon: BoardIcon): boolean {
@@ -159,6 +163,11 @@ function applyAction(state: BoardState, action: BoardAction): BoardState {
       return { ...state, tool: action.tool }
     case 'setNet':
       return { ...state, net: action.net }
+    case 'setContact': {
+      const { min, max } = CONTACT_ABOVE_NET_RANGE
+      // Rounded to the centimetre so repeated steps don't drift.
+      return { ...state, contactAboveNet: Math.round(Math.min(max, Math.max(min, action.aboveNet)) * 100) / 100 }
+    }
     case 'addDrawing':
       return { ...state, drawings: [...state.drawings, action.drawing] }
     case 'undoDrawing':

@@ -14,15 +14,15 @@ import * as THREE from 'three'
 import { Button } from '@/components/ui/button'
 import { SegmentedControl } from '@/components/ui/segmented-control'
 import { ATTACK_LINE_DISTANCE, COURT_LENGTH, COURT_WIDTH, LINE_WIDTH, NET_Y, type Point } from '../../engine/court'
-import { analyseDefence, BLOCK_SIZES, DEFAULT_BLOCK_SIZE, type BlockSize, type DefenceAnalysis } from '../../engine/defence'
+import { analyseDefence, BLOCK_SIZES, BLOCK_ZONE_DEPTH, DEFAULT_BLOCK_SIZE, type BlockSize, type DefenceAnalysis } from '../../engine/defence'
 import { rollZones, tipZone } from '../../engine/hitZones'
 import {
   ANTENNA_ABOVE_NET,
   ARM_LENGTH,
   blockHandHeight,
+  CONTACT_ABOVE_NET_RANGE,
   contactHeight,
   eyeHeight,
-  HAND_LENGTH,
   HAND_PENETRATION,
   HEAD_RATIO,
   jumpFor,
@@ -79,6 +79,15 @@ const TAP_SLOP_PX = 6
 const DEPTH_DRAG_GAIN = 2.5
 /** Hitters stay on their side, at least this far off the net. */
 const HITTER_MIN_OFF_NET = 0.2
+/** The defender you're looking through stays clear of the block zone, or they'd become a blocker. */
+const VIEWER_MIN_OFF_NET = BLOCK_ZONE_DEPTH + 0.3
+/** One tap of the contact-height stepper. */
+const CONTACT_STEP = 0.05
+/** Holding a nudge arrow: wait this long, then repeat at this rate (ms). */
+const REPEAT_DELAY = 350
+const REPEAT_EVERY = 90
+/** Below this a move of your own isn't worth mentioning. */
+const MOVED_HINT_MIN = 0.05
 /** Below this the Auto D spot isn't worth mentioning. */
 const AUTO_SPOT_HINT_MIN = 0.25
 /** Invisible grab area round a movable player, so they're easy to tap from across the court. */
@@ -106,19 +115,30 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
   const stateRef = useRef(state)
   stateRef.current = state
 
-  useHoldViewer(viewerId, stateRef, dispatch)
+  const movedSelf = useHoldViewer(viewerId, stateRef, dispatch)
+  const start = useStartSpot(viewerId, stateRef)
 
   const hitter = state.icons.find(icon => icon.id === state.hitterId)
-  const movable = [...(hitter ? [hitter] : []), ...state.icons.filter(isBlocker).sort((a, b) => a.x - b.x)]
+  const viewerIcon = state.icons.find(icon => icon.id === viewerId)
+  const movable = [
+    ...(viewerIcon ? [viewerIcon] : []),
+    ...(hitter ? [hitter] : []),
+    ...state.icons.filter(isBlocker).sort((a, b) => a.x - b.x),
+  ]
   const selected = movable.find(icon => icon.id === selectedId)
 
-  /** Move a player by a board-space step, keeping blockers on the net and the hitter on their side. */
+  /** Move a player by a board-space step: blockers stay on the net, the hitter on their side, you off the net. */
   const moveBy = (id: string, dx: number, dy: number) => {
     const icon = stateRef.current.icons.find(i => i.id === id)
     if (!icon) return
     const blocker = isBlocker(icon)
-    const to = { x: icon.x + dx, y: blocker ? icon.y : Math.min(NET_Y - HITTER_MIN_OFF_NET, icon.y + dy) }
-    dispatch({ type: 'move', id, to })
+    const y = blocker
+      ? icon.y
+      : id === viewerId
+        ? Math.max(NET_Y + VIEWER_MIN_OFF_NET, icon.y + dy)
+        : Math.min(NET_Y - HITTER_MIN_OFF_NET, icon.y + dy)
+    if (id === viewerId) movedSelf.current = true
+    dispatch({ type: 'move', id, to: { x: icon.x + dx, y } })
     if (blocker) dispatch({ type: 'drop', id })
   }
 
@@ -151,6 +171,10 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
 
   const autoSpot = state.autoDefence === 'off' ? undefined : suggestedDefence(state).get(viewer.id)?.point
   const autoOffset = autoSpot && { x: autoSpot.x - viewer.x, y: autoSpot.y - viewer.y }
+  const showAuto = !!autoOffset && Math.hypot(autoOffset.x, autoOffset.y) > AUTO_SPOT_HINT_MIN
+  const moved = start && { x: viewer.x - start.x, y: viewer.y - start.y }
+  const showMoved = !!moved && Math.hypot(moved.x, moved.y) > MOVED_HINT_MIN
+  const contact = contactHeight(state.net, state.contactAboveNet)
 
   return (
     <div className="fixed inset-0 z-[70] flex flex-col bg-background pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pt-[env(safe-area-inset-top)]">
@@ -186,7 +210,7 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
             stance={stance}
             look={look}
             selectedId={selectedId}
-            movableIds={movable.map(icon => icon.id)}
+            movableIds={movable.map(icon => icon.id).filter(id => id !== viewer.id)}
             onGrab={(id, pointerId) => {
               grab.current = { id, pointerId }
               setSelectedId(id)
@@ -194,35 +218,79 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
             cameraRef={camera}
           />
         </Canvas>
-        {autoOffset && Math.hypot(autoOffset.x, autoOffset.y) > AUTO_SPOT_HINT_MIN && (
+        {(showAuto || showMoved) && (
           <div className="absolute left-2 right-2 top-2 flex items-center justify-between gap-2 rounded-lg bg-background/85 px-3 py-1.5 text-xs backdrop-blur-sm">
-            <span>
-              Auto D spot: <strong>{describeOffset(autoOffset)}</strong>
-            </span>
-            <Button
-              variant="secondary"
-              className="h-8 shrink-0 px-3 text-xs"
-              onClick={() => autoSpot && dispatch({ type: 'move', id: viewer.id, to: autoSpot })}
-            >
-              Go there
-            </Button>
+            <div className="min-w-0">
+              {showMoved && moved && (
+                <div>
+                  You moved: <strong>{describeOffset(moved)}</strong>
+                </div>
+              )}
+              {showAuto && autoOffset && (
+                <div>
+                  Auto D spot: <strong>{describeOffset(autoOffset)}</strong>
+                </div>
+              )}
+            </div>
+            {showAuto && (
+              <Button
+                variant="secondary"
+                className="h-8 shrink-0 px-3 text-xs"
+                onClick={() => {
+                  if (!autoSpot) return
+                  movedSelf.current = true
+                  dispatch({ type: 'move', id: viewer.id, to: autoSpot })
+                }}
+              >
+                Go there
+              </Button>
+            )}
           </div>
         )}
         <p className="pointer-events-none absolute bottom-2 left-0 right-0 text-center text-xs text-white/80 [text-shadow:0_1px_2px_rgb(0_0_0/0.8)]">
-          {selected ? 'Drag the player, or use the arrows' : 'Drag to look around · pinch to zoom'}
+          {selected?.id === viewer.id
+            ? 'Arrows move you, as you face the net · hold to keep moving'
+            : selected
+              ? 'Drag the player, or use the arrows'
+              : 'Drag to look around · pinch to zoom'}
         </p>
       </div>
+
+      {selected?.id === state.hitterId && (
+        <div className="flex shrink-0 items-center justify-center gap-1.5 px-2 pt-1">
+          <span className="mr-1 text-sm text-muted-foreground">Contact height</span>
+          <NudgeButton
+            label="Lower contact"
+            icon="down"
+            onStep={() => dispatch({ type: 'setContact', aboveNet: stateRef.current.contactAboveNet - CONTACT_STEP })}
+            disabled={state.contactAboveNet <= CONTACT_ABOVE_NET_RANGE.min}
+          />
+          <span className="w-16 text-center text-sm font-semibold tabular-nums">{contact.toFixed(2)} m</span>
+          <NudgeButton
+            label="Raise contact"
+            icon="up"
+            onStep={() => dispatch({ type: 'setContact', aboveNet: stateRef.current.contactAboveNet + CONTACT_STEP })}
+            disabled={state.contactAboveNet >= CONTACT_ABOVE_NET_RANGE.max}
+          />
+        </div>
+      )}
 
       <div className="flex min-h-[3.25rem] shrink-0 items-center justify-center gap-1.5 overflow-x-auto px-2 pt-1">
         {selected ? (
           <>
-            <span className="mr-1 whitespace-nowrap text-sm font-semibold">{playerName(selected, state.hitterId)}</span>
-            <NudgeButton label="Move left" onClick={() => moveBy(selected.id, -NUDGE_STEP, 0)} icon="left" />
-            <NudgeButton label="Move right" onClick={() => moveBy(selected.id, NUDGE_STEP, 0)} icon="right" />
+            <span className="mr-1 whitespace-nowrap text-sm font-semibold">{playerName(selected, state.hitterId, viewer.id)}</span>
+            <NudgeButton label="Move left" onStep={() => moveBy(selected.id, -NUDGE_STEP, 0)} icon="left" />
+            <NudgeButton label="Move right" onStep={() => moveBy(selected.id, NUDGE_STEP, 0)} icon="right" />
             {selected.id === state.hitterId && (
               <>
-                <NudgeButton label="Move off the net" onClick={() => moveBy(selected.id, 0, -NUDGE_STEP)} icon="up" />
-                <NudgeButton label="Move toward the net" onClick={() => moveBy(selected.id, 0, NUDGE_STEP)} icon="down" />
+                <NudgeButton label="Move off the net" onStep={() => moveBy(selected.id, 0, -NUDGE_STEP)} icon="up" />
+                <NudgeButton label="Move toward the net" onStep={() => moveBy(selected.id, 0, NUDGE_STEP)} icon="down" />
+              </>
+            )}
+            {selected.id === viewer.id && (
+              <>
+                <NudgeButton label="Move toward the net" onStep={() => moveBy(selected.id, 0, -NUDGE_STEP)} icon="up" />
+                <NudgeButton label="Move back" onStep={() => moveBy(selected.id, 0, NUDGE_STEP)} icon="down" />
               </>
             )}
             <Button variant="secondary" className="ml-1 h-11 px-4" onClick={() => setSelectedId(null)}>
@@ -234,7 +302,7 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
             <span className="mr-1 text-sm text-muted-foreground">Adjust</span>
             {movable.map(icon => (
               <Button key={icon.id} variant="outline" className="h-11 shrink-0 px-3" onClick={() => setSelectedId(icon.id)}>
-                {playerName(icon, state.hitterId)}
+                {playerName(icon, state.hitterId, viewer.id)}
               </Button>
             ))}
           </>
@@ -257,12 +325,28 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
  * stay as they were.
  */
 function useHoldViewer(viewerId: string, stateRef: MutableRefObject<BoardState>, dispatch: Dispatch<BoardAction>) {
+  // Set once you move yourself: then you stay hand-placed, as if dragged on the 2D board.
+  const movedSelf = useRef(false)
   useEffect(() => {
+    movedSelf.current = false
     const { autoDefence, manual } = stateRef.current
     if (autoDefence === 'off' || manual.includes(viewerId)) return
     dispatch({ type: 'setManual', id: viewerId, manual: true })
-    return () => dispatch({ type: 'setManual', id: viewerId, manual: false })
+    return () => {
+      if (!movedSelf.current) dispatch({ type: 'setManual', id: viewerId, manual: false })
+    }
   }, [viewerId, stateRef, dispatch])
+  return movedSelf
+}
+
+/** Where the defender stood when you started looking through them, for "You moved …". */
+function useStartSpot(viewerId: string, stateRef: MutableRefObject<BoardState>): Point | undefined {
+  const [start, setStart] = useState<{ id: string; at: Point }>()
+  useEffect(() => {
+    const icon = stateRef.current.icons.find(i => i.id === viewerId)
+    if (icon) setStart({ id: viewerId, at: { x: icon.x, y: icon.y } })
+  }, [viewerId, stateRef])
+  return start?.id === viewerId ? start.at : undefined
 }
 
 interface LookOptions {
@@ -357,18 +441,23 @@ function Scene({ state, viewer, stance, look, selectedId, movableIds, onGrab, ca
   const blockers = useMemo(() => blockersOf(state.icons), [state.icons])
   const analysis = useMemo(() => (hitter ? analyseDefence({ hitter, blockers }) : null), [hitter, blockers])
   const contact = analysis?.contact ?? hitter ?? { x: COURT_WIDTH / 2, y: NET_Y - 1 }
-  const ball = toWorld(contact, contactHeight(state.net))
+  const ball = toWorld(contact, contactHeight(state.net, state.contactAboveNet))
   const eye = toWorld(viewer, eyeHeight(viewer.blockSize ?? DEFAULT_BLOCK_SIZE, stance))
-  // Aim at the ball as it was when the view was last reset, so moving the hitter doesn't turn your head.
-  const aim = useRef<{ version: number; target: Vec3 }>({ version: -1, target: ball })
-  if (aim.current.version !== look.aimVersion) aim.current = { version: look.aimVersion, target: ball }
+  // The way you were looking at the last reset (toward the ball). Kept as a direction, so moving
+  // the hitter, the block or yourself doesn't turn your head.
+  const aim = useRef<{ version: number; direction: Vec3 }>({ version: -1, direction: [0, 0, -1] })
+  if (aim.current.version !== look.aimVersion) {
+    aim.current = { version: look.aimVersion, direction: [ball[0] - eye[0], ball[1] - eye[1], ball[2] - eye[2]] }
+  }
+  const [dx, dy, dz] = aim.current.direction
+  const target: Vec3 = [eye[0] + dx, eye[1] + dy, eye[2] + dz]
 
   return (
     <>
       <color attach="background" args={[colors.sky]} />
       <ambientLight intensity={1.1} />
       <directionalLight position={[4, 12, 10]} intensity={1.6} />
-      <FirstPersonCamera eye={eye} target={aim.current.target} yaw={look.yaw} pitch={look.pitch} zoom={look.zoom} cameraRef={cameraRef} />
+      <FirstPersonCamera eye={eye} target={target} yaw={look.yaw} pitch={look.pitch} zoom={look.zoom} cameraRef={cameraRef} />
 
       <CourtFloor colors={colors} />
       {analysis && state.showShadow && <Zones analysis={analysis} state={state} colors={colors} />}
@@ -381,6 +470,7 @@ function Scene({ state, viewer, stance, look, selectedId, movableIds, onGrab, ca
             icon={icon}
             pose={icon.id === state.hitterId ? 'hitter' : isBlocker(icon) ? 'blocker' : 'ready'}
             net={state.net}
+            contactAboveNet={state.contactAboveNet}
             ball={contact}
             colors={colors}
             selected={icon.id === selectedId}
@@ -637,6 +727,7 @@ function Figure({
   icon,
   pose,
   net,
+  contactAboveNet,
   ball,
   colors,
   selected = false,
@@ -645,6 +736,7 @@ function Figure({
   icon: BoardIcon
   pose: Pose
   net: NetKind
+  contactAboveNet: number
   ball: Point
   colors: BoardColors
   selected?: boolean
@@ -656,19 +748,18 @@ function Figure({
   // Our players face the opponents (-Z); theirs face us (+Z).
   const facing = icon.kind === 'home' ? -1 : 1
 
-  const reach = pose === 'hitter' ? contactHeight(net) : pose === 'blocker' ? blockHandHeight(size, net) : 0
+  const reach = pose === 'hitter' ? contactHeight(net, contactAboveNet) : pose === 'blocker' ? blockHandHeight(size, net) : 0
   const lift = pose === 'ready' ? 0 : jumpFor(size, reach)
   const [x, , z] = toWorld(icon)
   const shoulderY = lift + height * SHOULDER_RATIO
   const shoulders: Vec3[] = [-1, 1].map(side => [x + side * SHOULDER_HALF_WIDTH, shoulderY, z])
 
-  // Blockers: hands pressed over the net, side by side across the width their size covers on the 2D board.
-  const handWidth = BLOCK_SIZES[size].width / 2
+  // Blockers: arms pressed forward over the net, spread across the width their size covers on the 2D board.
+  const handSpread = BLOCK_SIZES[size].width / 2 - LIMB_RADIUS
   const handZ = facing * HAND_PENETRATION[size]
-  const blockHands: Vec3[] = [-1, 1].map(side => [x + (side * handWidth) / 2, reach - HAND_LENGTH / 2, handZ])
 
   const hands: Vec3[] = shoulders.map(([sx, , sz], i): Vec3 => {
-    if (pose === 'blocker') return [blockHands[i][0], reach - HAND_LENGTH, handZ]
+    if (pose === 'blocker') return [x + (i === 0 ? -1 : 1) * handSpread, reach, handZ]
     if (pose === 'hitter' && i === 1) {
       const [bx, by, bz] = toWorld(ball, reach)
       return [bx, by - BALL_RADIUS, bz]
@@ -691,14 +782,6 @@ function Figure({
       {shoulders.map((from, i) => (
         <Limb key={i} from={from} to={hands[i]} color={color} />
       ))}
-      {pose === 'blocker' &&
-        blockHands.map((at, i) => (
-          // Flat hands, tilted forward over the net.
-          <mesh key={`hand-${i}`} position={at} rotation-x={-facing * 0.35}>
-            <boxGeometry args={[handWidth - 0.02, HAND_LENGTH, 0.03]} />
-            <meshLambertMaterial color="#f1c9a5" />
-          </mesh>
-        ))}
       {selected && (
         <mesh rotation-x={-Math.PI / 2} position={[x, 0.012, z]}>
           <ringGeometry args={[0.38, 0.5, 40]} />
@@ -734,7 +817,8 @@ function Limb({ from, to, color }: { from: Vec3; to: Vec3; color: string }) {
   )
 }
 
-function playerName(icon: BoardIcon, hitterId: string) {
+function playerName(icon: BoardIcon, hitterId: string, viewerId: string) {
+  if (icon.id === viewerId) return `Me (${icon.label})`
   return icon.id === hitterId ? `Hitter ${icon.label}` : `Blocker ${icon.label}`
 }
 
@@ -746,9 +830,50 @@ function describeOffset({ x, y }: Point) {
   return parts.join(', ')
 }
 
-function NudgeButton({ label, icon, onClick }: { label: string; icon: 'left' | 'right' | 'up' | 'down'; onClick: () => void }) {
+/** One step per tap; hold to keep stepping. */
+function NudgeButton({
+  label,
+  icon,
+  onStep,
+  disabled = false,
+}: {
+  label: string
+  icon: keyof typeof CHEVRON_PATH
+  onStep: () => void
+  disabled?: boolean
+}) {
+  const timer = useRef<number | undefined>(undefined)
+  const stepRef = useRef(onStep)
+  stepRef.current = onStep
+  const stop = () => window.clearTimeout(timer.current)
+  useEffect(() => stop, [])
+  useEffect(() => {
+    if (disabled) stop()
+  }, [disabled])
+
   return (
-    <Button variant="outline" size="icon" className="h-11 w-11 shrink-0" onClick={onClick} aria-label={label} title={label}>
+    <Button
+      variant="outline"
+      size="icon"
+      className="h-11 w-11 shrink-0"
+      aria-label={label}
+      title={label}
+      disabled={disabled}
+      onPointerDown={e => {
+        if (e.button !== 0) return
+        stepRef.current()
+        const repeat = () => {
+          stepRef.current()
+          timer.current = window.setTimeout(repeat, REPEAT_EVERY)
+        }
+        timer.current = window.setTimeout(repeat, REPEAT_DELAY)
+      }}
+      onPointerUp={stop}
+      onPointerLeave={stop}
+      onPointerCancel={stop}
+      // Keyboard presses arrive as clicks with no pointer behind them.
+      onClick={e => e.detail === 0 && onStep()}
+    >
       <ChevronIcon direction={icon} />
     </Button>
   )
