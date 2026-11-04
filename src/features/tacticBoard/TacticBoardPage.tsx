@@ -69,20 +69,23 @@ export default function TacticBoardPage() {
   const [presenting, setPresenting] = useState(false)
   // Stable, so PresentView's full-screen effect runs once per visit rather than on every render.
   const exitPresent = useCallback(() => setPresenting(false), [])
-  // Defender whose 3D view is open, on top of whichever 2D screen opened it.
-  const [viewFrom, setViewFrom] = useState<string | null>(null)
-  const closeView = useCallback(() => setViewFrom(null), [])
+  // The 3D view, on top of whichever 2D screen opened it: from a defender (their eyes) or the 3D
+  // button (the bird view of the whole court).
+  const [view3d, setView3d] = useState<{ viewerId: string | null } | null>(null)
+  const closeView = useCallback(() => setView3d(null), [])
+  const viewFrom = useCallback((viewerId: string) => setView3d({ viewerId }), [])
+  const open3d = useCallback(() => setView3d({ viewerId: null }), [])
 
-  const viewer = viewFrom && (
+  const viewer = view3d && (
     <Suspense fallback={<Loading3D />}>
-      <Viewer3D state={state} dispatch={dispatch} viewerId={viewFrom} onChangeViewer={setViewFrom} onClose={closeView} />
+      <Viewer3D state={state} dispatch={dispatch} initialViewerId={view3d.viewerId} onClose={closeView} />
     </Suspense>
   )
 
   if (presenting) {
     return (
       <>
-        <PresentView state={state} dispatch={dispatch} onExit={exitPresent} onViewFrom={setViewFrom} />
+        <PresentView state={state} dispatch={dispatch} onExit={exitPresent} onViewFrom={viewFrom} onOpen3d={open3d} />
         {viewer}
       </>
     )
@@ -98,6 +101,7 @@ export default function TacticBoardPage() {
             <PresentIcon />
             Present
           </Button>
+          <Open3dButton onClick={open3d} />
           <SegmentedControl
             value={state.zoom}
             onChange={zoom => dispatch({ type: 'setZoom', zoom })}
@@ -121,7 +125,7 @@ export default function TacticBoardPage() {
         </div>
 
         <div className="relative min-h-0 flex-1 p-2">
-          <TacticBoard state={state} dispatch={dispatch} onViewFrom={setViewFrom} />
+          <TacticBoard state={state} dispatch={dispatch} onViewFrom={viewFrom} />
           {state.showShadow && <Legend hitView={state.hitView} />}
         </div>
 
@@ -159,7 +163,8 @@ function PresentView({
   dispatch,
   onExit,
   onViewFrom,
-}: BoardProps & { onExit: () => void; onViewFrom: (id: string) => void }) {
+  onOpen3d,
+}: BoardProps & { onExit: () => void; onViewFrom: (id: string) => void; onOpen3d: () => void }) {
   useEffect(() => {
     // Older browsers return nothing instead of a promise.
     document.documentElement.requestFullscreen?.()?.catch(() => {})
@@ -180,6 +185,7 @@ function PresentView({
           options={ZOOM_OPTIONS}
           className="mr-auto"
         />
+        <Open3dButton onClick={onOpen3d} />
         <SettingsMenu state={state} dispatch={dispatch} />
         <Button
           variant="outline"
@@ -200,6 +206,15 @@ function PresentView({
         <DrawingToolbar state={state} dispatch={dispatch} />
       </div>
     </div>
+  )
+}
+
+/** Opens the 3D bird view of the whole court (a defender's own view opens from tapping them). */
+function Open3dButton({ onClick }: { onClick: () => void }) {
+  return (
+    <Button variant="outline" className="h-11 shrink-0 px-3 font-semibold" onClick={onClick} title="See the court in 3D">
+      3D
+    </Button>
   )
 }
 

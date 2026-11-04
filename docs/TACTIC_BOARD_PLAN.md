@@ -231,11 +231,14 @@ src/features/tacticBoard/
    - Ideas for later: undo for player moves, several ink colours, saving and
      loading boards.
 7. ✅ 3D view (`components/three/Viewer3D.tsx`, `engine/view3d.ts`, `engine/attack.ts`).
-   Opened from a defender on the 2D board ("View from N"); three.js only loads then.
-   - **Cameras:** Eyes (the defender's own view: Ready crouch or Standing),
-     Follow (third-person, just behind and above the defender: their body and
-     the floor round them, moving with them), Behind, Side, Hitter (over the hitter's shoulder) and Above. Wide views orbit
-     on drag, zoom on pinch, and fit the court to the screen's shape.
+   Opened from the **3D** button or a defender on the 2D board; three.js only loads then.
+   - **Layers:** Bird (whole court; starting angles Side / Above / Hitter, orbit
+     on drag, zoom on pinch) → Follow N (third-person, just behind a defender:
+     their body and the floor round them) → Eyes N (their own view: Ready crouch
+     or Standing). The 2D page's **3D** button opens Bird; **View from N** on a
+     defender opens Eyes. Back (‹, or Escape) always goes up one layer, ending
+     on the 2D board. In Bird, tap a defender to select them and get
+     **Follow N ›**, or double-tap them.
    - **Heights:** players by block size (L 1.9 / M 1.8 / S 1.6 m); blockers'
      arms over the net by L/M/S; men's 2.43 m or women's 2.24 m net (⋯ menu).
    - **Moving players:** drag any of our players, the hitter, or use the Adjust

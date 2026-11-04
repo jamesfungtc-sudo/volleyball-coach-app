@@ -120,24 +120,40 @@ const ATTACK_CHOICES: { value: AttackChoice; label: string }[] = [
 ]
 
 /**
- * Where the camera is. 'eyes' is the defender's own view; 'follow' is a third-person camera just
- * behind them (their body in view, and the floor round them). The rest are wide views of the court.
- * All but 'eyes' orbit on drag and zoom on pinch.
+ * The 3D view is layered, zooming in on one player:
+ *   bird   — the whole court, from one of a few starting angles (orbit on drag, zoom on pinch)
+ *   follow — third-person, just behind one defender: their body and the floor round them
+ *   eyes   — that defender's own view
+ * Back always goes up one layer (eyes → follow → bird → the 2D board).
  */
-type CameraMode = 'eyes' | 'follow' | 'behind' | 'side' | 'hitter' | 'above'
-const CAMERA_OPTIONS: { value: CameraMode; label: string }[] = [
-  { value: 'eyes', label: 'Eyes' },
-  { value: 'follow', label: 'Follow' },
-  { value: 'behind', label: 'Behind' },
+type Layer = 'bird' | 'follow' | 'eyes'
+type BirdAngle = 'side' | 'above' | 'hitter'
+type CameraMode = BirdAngle | 'follow' | 'eyes'
+const BIRD_ANGLES: { value: BirdAngle; label: string }[] = [
   { value: 'side', label: 'Side' },
-  { value: 'hitter', label: 'Hitter' },
   { value: 'above', label: 'Above' },
+  { value: 'hitter', label: 'Hitter' },
 ]
+const PLAYER_LAYERS: { value: Exclude<Layer, 'bird'>; label: string }[] = [
+  { value: 'follow', label: 'Follow' },
+  { value: 'eyes', label: 'Eyes' },
+]
+const PARENT_LAYER: Record<Layer, { to: Layer | null; label: string }> = {
+  bird: { to: null, label: '2D' },
+  follow: { to: 'bird', label: 'Bird' },
+  eyes: { to: 'follow', label: 'Follow' },
+}
+/** Two taps on the same player within this (ms) follow them. */
+const DOUBLE_TAP_MS = 400
+/** Where "Hard: at me" style attacks aim when nobody is chosen (they're disabled then anyway). */
+const COURT_MIDDLE: Point = { x: COURT_WIDTH / 2, y: NET_Y + 4.5 }
 
 interface AttackRunState {
   id: number
   plan: AttackPlan
   finished: boolean
+  /** Who the result line is about: you (follow / eyes), a selected defender, or nobody (court terms). */
+  about: { label: string; at: Point; you: boolean } | null
 }
 /** Below this the Auto D spot isn't worth mentioning. */
 const AUTO_SPOT_HINT_MIN = 0.25
@@ -161,19 +177,30 @@ const NET_OPTIONS: { value: NetKind; label: string }[] = [
 interface Viewer3DProps {
   state: BoardState
   dispatch: Dispatch<BoardAction>
-  viewerId: string
-  onChangeViewer: (id: string) => void
+  /** Opened from a defender on the 2D board: straight into their eyes. Otherwise the bird view. */
+  initialViewerId: string | null
   onClose: () => void
 }
 
-export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, onClose }: Viewer3DProps) {
+export default function Viewer3D({ state, dispatch, initialViewerId, onClose }: Viewer3DProps) {
   const [stance, setStance] = useState<Stance>('crouch')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const grab = useRef<Grab | null>(null)
+  const lastTap = useRef<{ id: string; at: number } | null>(null)
   const camera = useRef<THREE.PerspectiveCamera | null>(null)
   const stage = useRef<HTMLDivElement>(null)
   const stateRef = useRef(state)
   stateRef.current = state
+
+  const [layer, setLayer] = useState<Layer>(initialViewerId ? 'eyes' : 'bird')
+  const [birdAngle, setBirdAngle] = useState<BirdAngle>('side')
+  const [followId, setFollowId] = useState<string | null>(initialViewerId)
+  // The defender the view is about; nobody in the bird view.
+  const viewerId = layer === 'bird' ? null : followId
+  const cameraMode: CameraMode = layer === 'bird' ? birdAngle : layer
+  const wide = cameraMode !== 'eyes'
+  // Eyes and Follow are about the defender ("you", "Hard: at me"); the bird view names them.
+  const aboutYou = layer !== 'bird'
 
   const movedSelf = useHoldViewer(viewerId, stateRef, dispatch)
   // A new hitter is a new play, so "You moved" counts from where Auto D puts you for it.
@@ -182,24 +209,35 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
   const hitter = state.icons.find(icon => icon.id === state.hitterId)
   const blockers = useMemo(() => blockersOf(state.icons), [state.icons])
   const analysis = useMemo(() => (hitter ? analyseDefence({ hitter, blockers }) : null), [hitter, blockers])
+  // Changing layer or angle keeps the attack, so "Again" replays the same hit from the new view.
   const [run, setRun] = useState<AttackRunState | null>(null)
   const [speedIndex, setSpeedIndex] = useState(0)
   const [chooserOpen, setChooserOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  // Changing the camera keeps the attack, so "Again" replays the same hit from the new angle.
-  const [cameraMode, setCameraMode] = useState<CameraMode>('eyes')
-  const wide = cameraMode !== 'eyes'
-  // Eyes and Follow are about the defender ("you", "Hard: at me"); the court views name them.
-  const aboutYou = cameraMode === 'eyes' || cameraMode === 'follow'
   // Anything that changes the play makes the last attack stale.
-  useEffect(() => setRun(null), [state.icons, state.hitterId, state.net, state.contactAboveNet, viewerId])
-  const viewerIcon = state.icons.find(icon => icon.id === viewerId)
+  useEffect(() => setRun(null), [state.icons, state.hitterId, state.net, state.contactAboveNet])
+  const viewerIcon = viewerId ? state.icons.find(icon => icon.id === viewerId) : undefined
   const movable = [
     ...(viewerIcon ? [viewerIcon] : []),
     ...(hitter ? [hitter] : []),
     ...state.icons.filter(isBlocker).sort((a, b) => a.x - b.x),
   ]
   const selected = state.icons.find(icon => icon.id === selectedId && (icon.kind === 'home' || icon.id === state.hitterId))
+  const canFollow = (icon: BoardIcon | undefined): icon is BoardIcon => icon?.kind === 'home' && !isBlocker(icon)
+
+  /** Go in one layer on a defender: follow them (from the bird view or another defender). */
+  const follow = (id: string) => {
+    setSelectedId(null)
+    setFollowId(id)
+    setLayer('follow')
+  }
+  const goUp = () => {
+    const parent = PARENT_LAYER[layer].to
+    setSelectedId(null)
+    setChooserOpen(false)
+    if (parent) setLayer(parent)
+    else onClose()
+  }
 
   /**
    * Move a player by a board-space step. The hitter stays on their side and you stay clear of the
@@ -228,7 +266,7 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
     dispatch({ type: 'drop', id: icon.id })
   }
 
-  const look = useLook(`${viewerId}:${cameraMode}`, {
+  const look = useLook(`${viewerId ?? ''}:${cameraMode}`, {
     grab,
     onDrag(dxPx, dyPx) {
       const id = grab.current?.id
@@ -243,7 +281,15 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
       if (!icon) return
       if (released.tapOnly) {
         if (tapped) chooseHitter(icon.id)
-      } else if (icon.kind === 'home') dispatch({ type: 'drop', id: icon.id })
+        return
+      }
+      if (icon.kind === 'home') dispatch({ type: 'drop', id: icon.id })
+      if (!tapped) return
+      // Double-tap a defender: follow them (the same as Select → "Follow N").
+      const now = performance.now()
+      const again = lastTap.current?.id === icon.id && now - lastTap.current.at < DOUBLE_TAP_MS
+      lastTap.current = again ? null : { id: icon.id, at: now }
+      if (again && canFollow(stateRef.current.icons.find(i => i.id === icon.id))) follow(icon.id)
     },
     onTapEmpty: () => setSelectedId(null),
   })
@@ -251,16 +297,16 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
   const defenders = state.icons
     .filter(icon => icon.kind === 'home' && !isBlocker(icon))
     .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }))
-  const viewer = defenders.find(icon => icon.id === viewerId)
+  const viewer = viewerId ? defenders.find(icon => icon.id === viewerId) : undefined
   const index = defenders.findIndex(icon => icon.id === viewerId)
-  const step = (by: number) => onChangeViewer(defenders[(index + by + defenders.length) % defenders.length].id)
+  const step = (by: number) => setFollowId(defenders[(index + by + defenders.length) % defenders.length].id)
 
   // The defender we follow went up to block (a new hitter's default block, or dragged to the net):
   // follow another defender rather than show nothing.
-  const fallbackViewer = viewer ? undefined : defenders[0]?.id
+  const fallbackViewer = viewerId && !viewer ? defenders[0]?.id : undefined
   useEffect(() => {
-    if (fallbackViewer) onChangeViewer(fallbackViewer)
-  }, [fallbackViewer, onChangeViewer])
+    if (fallbackViewer) setFollowId(fallbackViewer)
+  }, [fallbackViewer])
 
   /** Same as tapping an opponent on the 2D board: a new attack with its default block. */
   function chooseHitter(id: string) {
@@ -268,54 +314,82 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
     setSelectedId(null)
     dispatch({ type: 'setHitter', id })
     // A new play: the defender we follow takes their Auto D spot, then holds it again.
-    if (stateRef.current.autoDefence !== 'off') dispatch({ type: 'setManual', id: viewerId, manual: true })
+    if (viewerId && stateRef.current.autoDefence !== 'off') dispatch({ type: 'setManual', id: viewerId, manual: true })
     movedSelf.current = false
     look.reset()
   }
 
+  // Escape steps back out one layer, like the back button.
+  const goUpRef = useRef(goUp)
+  goUpRef.current = goUp
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && goUpRef.current()
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, [])
 
-  if (!viewer) return null
+  if (viewerId && !viewer) return null
 
-  const autoSpot = state.autoDefence === 'off' ? undefined : suggestedDefence(state).get(viewer.id)?.point
-  const autoOffset = autoSpot && { x: autoSpot.x - viewer.x, y: autoSpot.y - viewer.y }
+  const autoSpot = viewer && state.autoDefence !== 'off' ? suggestedDefence(state).get(viewer.id)?.point : undefined
+  const autoOffset = viewer && autoSpot && { x: autoSpot.x - viewer.x, y: autoSpot.y - viewer.y }
   const showAuto = !!autoOffset && Math.hypot(autoOffset.x, autoOffset.y) > AUTO_SPOT_HINT_MIN
-  const moved = start && { x: viewer.x - start.x, y: viewer.y - start.y }
+  const moved = viewer && start && { x: viewer.x - start.x, y: viewer.y - start.y }
   const showMoved = !!moved && Math.hypot(moved.x, moved.y) > MOVED_HINT_MIN
   const contact = contactHeight(state.net, state.contactAboveNet)
   const speed = SPEEDS[speedIndex]
+  // "At me / my left / my right" need someone to aim at: you, or a defender selected in the bird view.
+  const aimAt = viewer ?? (canFollow(selected) ? selected : undefined)
   const choices = analysis ? availableChoices(analysis) : new Set<AttackChoice>()
+  if (!aimAt) for (const c of ['hardMe', 'hardLeft', 'hardRight'] as const) choices.delete(c)
 
   const startAttack = (choice: AttackChoice | 'random') => {
     if (!analysis) return
     setChooserOpen(false)
     setSelectedId(null)
-    const plan = planAttack(choice, { analysis, blockers, net: state.net, contactAboveNet: state.contactAboveNet, viewer })
-    setRun(prev => ({ id: (prev?.id ?? 0) + 1, plan, finished: false }))
+    const plan = planAttack(choice, {
+      analysis,
+      blockers,
+      net: state.net,
+      contactAboveNet: state.contactAboveNet,
+      viewer: aimAt ?? COURT_MIDDLE,
+    })
+    const about = aimAt ? { label: aimAt.label, at: { x: aimAt.x, y: aimAt.y }, you: aboutYou } : null
+    setRun(prev => ({ id: (prev?.id ?? 0) + 1, plan, finished: false, about }))
   }
-  const replay = () => setRun(prev => prev && { id: prev.id + 1, plan: prev.plan, finished: false })
-  const who = aboutYou ? 'you' : viewer.label
-  const result = run?.finished ? describeAttack(run.plan, viewer, who) : null
+  const replay = () => setRun(prev => prev && { ...prev, id: prev.id + 1, finished: false })
+  // Said from where you are now: "of you" in follow / eyes, "of 6" back in the bird view.
+  const about = viewer
+    ? { label: viewer.label, at: { x: viewer.x, y: viewer.y }, you: true }
+    : run?.about && { ...run.about, you: false }
+  const result = run?.finished ? describeAttack(run.plan, about ?? null) : null
+  const followable = canFollow(selected) && selected.id !== viewerId ? selected : undefined
 
   return (
     <div className="fixed inset-0 z-[70] flex flex-col bg-background pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pt-[env(safe-area-inset-top)]">
       <div className="flex shrink-0 items-center gap-2 px-2 py-1">
-        <Button variant="outline" className="h-11 shrink-0 gap-1 px-3" onClick={onClose} aria-label="Back to the board">
+        <Button
+          variant="outline"
+          className="h-11 shrink-0 gap-1 px-3"
+          onClick={goUp}
+          aria-label={layer === 'bird' ? 'Back to the board' : `Back to ${PARENT_LAYER[layer].label.toLowerCase()} view`}
+        >
           <ChevronIcon direction="left" />
-          2D
+          {PARENT_LAYER[layer].label}
         </Button>
         <div className="flex min-w-0 flex-1 items-center justify-center gap-1">
-          <Button variant="ghost" size="icon" className="h-11 w-11" onClick={() => step(-1)} aria-label="Previous player">
-            <ChevronIcon direction="left" />
-          </Button>
-          <span className="whitespace-nowrap text-sm font-semibold">{aboutYou ? `Player ${viewer.label}'s view` : `Player ${viewer.label}`}</span>
-          <Button variant="ghost" size="icon" className="h-11 w-11" onClick={() => step(1)} aria-label="Next player">
-            <ChevronIcon direction="right" />
-          </Button>
+          {viewer ? (
+            <>
+              <Button variant="ghost" size="icon" className="h-11 w-11" onClick={() => step(-1)} aria-label="Previous player">
+                <ChevronIcon direction="left" />
+              </Button>
+              <span className="whitespace-nowrap text-sm font-semibold">Player {viewer.label}</span>
+              <Button variant="ghost" size="icon" className="h-11 w-11" onClick={() => step(1)} aria-label="Next player">
+                <ChevronIcon direction="right" />
+              </Button>
+            </>
+          ) : (
+            <span className="whitespace-nowrap text-sm font-semibold">Bird view</span>
+          )}
         </div>
         <Button
           variant="outline"
@@ -329,18 +403,13 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
         </Button>
       </div>
 
-      <div className="flex shrink-0 items-center justify-center gap-0.5 overflow-x-auto px-2 pb-1" role="group" aria-label="Camera">
-        {CAMERA_OPTIONS.map(option => (
-          <Button
-            key={option.value}
-            variant={cameraMode === option.value ? 'secondary' : 'ghost'}
-            className="h-9 shrink-0 px-2 text-sm"
-            aria-pressed={cameraMode === option.value}
-            onClick={() => setCameraMode(option.value)}
-          >
-            {option.label}
-          </Button>
-        ))}
+      {/* Bird: which angle to start from. Follow / Eyes: switch between the two on this defender. */}
+      <div className="flex shrink-0 items-center justify-center px-2 pb-1">
+        {layer === 'bird' ? (
+          <SegmentedControl value={birdAngle} onChange={setBirdAngle} options={BIRD_ANGLES} />
+        ) : (
+          <SegmentedControl value={layer} onChange={setLayer} options={PLAYER_LAYERS} />
+        )}
       </div>
 
       <div
@@ -352,15 +421,15 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
         onPointerCancel={look.onPointerUp}
         onWheel={look.onWheel}
       >
-        <Canvas frameloop="demand" dpr={[1, 2]} camera={{ near: 0.05, far: 200 }} aria-label={wide ? `3D view of the court, ${cameraMode}` : `3D view from player ${viewer.label}`}>
+        <Canvas frameloop="demand" dpr={[1, 2]} camera={{ near: 0.05, far: 200 }} aria-label={viewer ? `3D view, ${cameraMode}, player ${viewer.label}` : `3D bird view of the court, ${cameraMode}`}>
           <Scene
             state={state}
-            viewer={viewer}
+            viewer={viewer ?? null}
             stance={stance}
             look={look}
             selectedId={selectedId}
             movableIds={state.icons
-              .filter(icon => (icon.kind === 'home' && (!aboutYou || icon.id !== viewer.id)) || icon.id === state.hitterId)
+              .filter(icon => (icon.kind === 'home' && (!aboutYou || icon.id !== viewerId)) || icon.id === state.hitterId)
               .map(icon => icon.id)}
             cameraMode={cameraMode}
             onGrab={(id, pointerId) => {
@@ -408,7 +477,7 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
                 variant="secondary"
                 className="h-8 shrink-0 px-3 text-xs"
                 onClick={() => {
-                  if (!autoSpot) return
+                  if (!autoSpot || !viewer) return
                   movedSelf.current = true
                   dispatch({ type: 'move', id: viewer.id, to: autoSpot })
                 }}
@@ -435,7 +504,7 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
                   disabled={!choices.has(choice.value)}
                   onClick={() => startAttack(choice.value)}
                 >
-                  {choiceLabel(choice.value, choice.label, aboutYou ? null : viewer.label)}
+                  {choiceLabel(choice.value, choice.label, aboutYou ? null : (aimAt?.label ?? null))}
                 </Button>
               ))}
             </div>
@@ -454,15 +523,17 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
         <p
           className={`pointer-events-none absolute bottom-2 left-0 right-0 text-center text-xs text-white/80 [text-shadow:0_1px_2px_rgb(0_0_0/0.8)] ${result || chooserOpen ? 'hidden' : ''}`}
         >
-          {selected?.id === viewer.id && aboutYou
+          {selected && selected.id === viewerId
             ? 'Arrows move you, as you face the net · hold to keep moving'
-            : selected
-              ? 'Drag the player, or use the arrows'
-              : cameraMode === 'follow'
-                ? 'Drag to swing round · pinch to zoom · Me (arrows) to move'
-                : wide
-                  ? 'Drag players to move them · tap an opponent to make them the hitter'
-                  : 'Drag to look around · tap an opponent to make them the hitter'}
+            : followable
+              ? `Drag to move · Follow ${followable.label} to see the play from there`
+              : selected
+                ? 'Drag the player, or use the arrows'
+                : layer === 'bird'
+                  ? 'Tap a player to select · double-tap to follow · tap an opponent to make them hitter'
+                  : layer === 'follow'
+                    ? 'Drag to swing round · pinch to zoom · Me (arrows) to move'
+                    : 'Drag to look around · tap an opponent to make them the hitter'}
         </p>
       </div>
 
@@ -488,7 +559,7 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
       <div className="flex min-h-[3.25rem] shrink-0 items-center justify-center gap-1.5 overflow-x-auto px-2 pt-1">
         {selected ? (
           <>
-            <span className="mr-1 whitespace-nowrap text-sm font-semibold">{playerName(selected, state.hitterId, viewer.id)}</span>
+            <span className="mr-1 whitespace-nowrap text-sm font-semibold">{playerName(selected, state.hitterId, viewerId)}</span>
             <NudgeButton label="Move left" onStep={() => moveBy(selected.id, -NUDGE_STEP, 0)} icon="left" />
             <NudgeButton label="Move right" onStep={() => moveBy(selected.id, NUDGE_STEP, 0)} icon="right" />
             {selected.id === state.hitterId && (
@@ -503,21 +574,28 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
                 <NudgeButton label="Move back" onStep={() => moveBy(selected.id, 0, NUDGE_STEP)} icon="down" />
               </>
             )}
-            {selected.kind === 'home' && selected.id !== viewer.id && (isBlocker(selected) || selected.y < NET_Y + 2.5) && (
+            {selected.kind === 'home' && selected.id !== viewerId && (isBlocker(selected) || selected.y < NET_Y + 2.5) && (
               <Button variant="outline" className="h-11 shrink-0 px-3" onClick={() => toggleBlocking(selected)}>
                 {isBlocker(selected) ? 'Off the net' : 'Block'}
               </Button>
             )}
-            <Button variant="secondary" className="ml-1 h-11 px-4" onClick={() => setSelectedId(null)}>
-              Done
-            </Button>
+            {followable ? (
+              <Button className="ml-1 h-11 shrink-0 gap-1 px-3" onClick={() => follow(followable.id)}>
+                Follow {followable.label}
+                <ChevronIcon direction="right" />
+              </Button>
+            ) : (
+              <Button variant="secondary" className="ml-1 h-11 px-4" onClick={() => setSelectedId(null)}>
+                Done
+              </Button>
+            )}
           </>
         ) : (
           <>
             <span className="mr-1 text-sm text-muted-foreground">Adjust</span>
             {movable.map(icon => (
               <Button key={icon.id} variant="outline" className="h-11 shrink-0 px-3" onClick={() => setSelectedId(icon.id)}>
-                {playerName(icon, state.hitterId, viewer.id)}
+                {playerName(icon, state.hitterId, viewerId)}
               </Button>
             ))}
           </>
@@ -563,13 +641,13 @@ export default function Viewer3D({ state, dispatch, viewerId, onChangeViewer, on
  * make the camera jump; hand them back to Auto D on the way out. Players already placed by hand
  * stay as they were.
  */
-function useHoldViewer(viewerId: string, stateRef: MutableRefObject<BoardState>, dispatch: Dispatch<BoardAction>) {
+function useHoldViewer(viewerId: string | null, stateRef: MutableRefObject<BoardState>, dispatch: Dispatch<BoardAction>) {
   // Set once you move yourself: then you stay hand-placed, as if dragged on the 2D board.
   const movedSelf = useRef(false)
   useEffect(() => {
     movedSelf.current = false
     const { autoDefence, manual } = stateRef.current
-    if (autoDefence === 'off' || manual.includes(viewerId)) return
+    if (!viewerId || autoDefence === 'off' || manual.includes(viewerId)) return
     dispatch({ type: 'setManual', id: viewerId, manual: true })
     return () => {
       if (!movedSelf.current) dispatch({ type: 'setManual', id: viewerId, manual: false })
@@ -579,10 +657,11 @@ function useHoldViewer(viewerId: string, stateRef: MutableRefObject<BoardState>,
 }
 
 /** Where the defender stood when you started looking through them (for this hitter), for "You moved …". */
-function useStartSpot(viewerId: string, hitterId: string, stateRef: MutableRefObject<BoardState>): Point | undefined {
+function useStartSpot(viewerId: string | null, hitterId: string, stateRef: MutableRefObject<BoardState>): Point | undefined {
   const [start, setStart] = useState<{ key: string; at: Point }>()
-  const key = `${viewerId}:${hitterId}`
+  const key = `${viewerId ?? ''}:${hitterId}`
   useEffect(() => {
+    if (!viewerId) return
     const icon = stateRef.current.icons.find(i => i.id === viewerId)
     if (icon) setStart({ key, at: { x: icon.x, y: icon.y } })
   }, [key, viewerId, stateRef])
@@ -672,7 +751,8 @@ function useLook(resetKey: string, { grab, onDrag, onRelease, onTapEmpty }: Look
 
 interface SceneProps {
   state: BoardState
-  viewer: BoardIcon
+  /** Who we follow or look through; null in the bird view. */
+  viewer: BoardIcon | null
   stance: Stance
   look: { yaw: number; pitch: number; zoom: number; aimVersion: number }
   selectedId: string | null
@@ -706,7 +786,7 @@ function Scene({
   const analysis = useMemo(() => (hitter ? analyseDefence({ hitter, blockers }) : null), [hitter, blockers])
   const contact = analysis?.contact ?? hitter ?? { x: COURT_WIDTH / 2, y: NET_Y - 1 }
   const ball = toWorld(contact, contactHeight(state.net, state.contactAboveNet))
-  const eye = toWorld(viewer, eyeHeight(viewer.blockSize ?? DEFAULT_BLOCK_SIZE, stance))
+  const eye = viewer ? toWorld(viewer, eyeHeight(viewer.blockSize ?? DEFAULT_BLOCK_SIZE, stance)) : toWorld(COURT_MIDDLE, 1.7)
   // The way you were looking at the last reset (toward the ball). Kept as a direction, so moving
   // the hitter, the block or yourself doesn't turn your head.
   const aim = useRef<{ version: number; direction: Vec3 }>({ version: -1, direction: [0, 0, -1] })
@@ -723,7 +803,9 @@ function Scene({
       <directionalLight position={[4, 12, 10]} intensity={1.6} />
       {wide ? (
         <OrbitCamera
-          {...(cameraMode === 'follow' ? followPreset(viewer, aim.current.direction) : cameraPreset(cameraMode, hitter))}
+          {...(cameraMode === 'follow'
+            ? followPreset(viewer ?? COURT_MIDDLE, aim.current.direction)
+            : cameraPreset(cameraMode, hitter))}
           yaw={look.yaw}
           pitch={look.pitch}
           zoom={look.zoom}
@@ -738,7 +820,7 @@ function Scene({
       <Net net={state.net} colors={colors} />
 
       {state.icons.map(icon =>
-        icon.kind === 'ball' || (!wide && icon.id === viewer.id) || (run && icon.id === state.hitterId) ? null : (
+        icon.kind === 'ball' || (!wide && icon.id === viewer?.id) || (run && icon.id === state.hitterId) ? null : (
           <Figure
             key={icon.id}
             icon={icon}
@@ -944,10 +1026,8 @@ function followPreset(viewer: Point, looking: Vec3): CameraPreset {
  * Starting angle for each wide view (world metres; our end line is at Z = +9). The hitter's view
  * follows the hitter.
  */
-function cameraPreset(mode: Exclude<CameraMode, 'eyes' | 'follow'>, hitter: BoardIcon | undefined): CameraPreset {
+function cameraPreset(mode: BirdAngle, hitter: BoardIcon | undefined): CameraPreset {
   switch (mode) {
-    case 'behind':
-      return { from: [0, 0.7, 1], target: [0, 0.5, 3], span: { across: 11, up: 13 } }
     case 'side':
       return { from: [-1, 0.55, 0.15], target: [0, 0.5, 1.5], span: { across: 20, up: 9 } }
     case 'hitter': {
@@ -1331,38 +1411,55 @@ const OUTCOME_TITLE: Record<AttackPlan['outcome'], string> = {
   touchDrop: 'Off the block, short',
   stuff: 'Stuffed',
 }
-const HARD_TITLE: Partial<Record<AttackChoice, string>> = {
-  hardMe: 'Hard at you',
-  hardLeft: 'Hard to your left',
-  hardRight: 'Hard to your right',
+/** `who` is "you" or a defender's number. */
+const HARD_TITLE: Partial<Record<AttackChoice, (who: string) => string>> = {
+  hardMe: who => `Hard at ${who}`,
+  hardLeft: who => (who === 'you' ? 'Hard to your left' : `Hard to ${who}'s left`),
+  hardRight: who => (who === 'you' ? 'Hard to your right' : `Hard to ${who}'s right`),
+}
+const LANE_TITLE: Partial<Record<AttackChoice, string>> = {
   line: 'Hard line',
   cross: 'Hard cross',
   seam: 'Hard seam',
 }
 
-/** "Hard cross · 1.2 m left, 0.4 m back of you · 0.46 s" */
-function describeAttack(plan: AttackPlan, viewer: Point, who: string) {
+/**
+ * "Hard cross · 1.2 m left, 0.4 m back of you · 0.46 s", or of a named defender, or in court terms
+ * ("deep left") when the attack isn't about anyone.
+ */
+function describeAttack(plan: AttackPlan, about: AttackRunState['about']) {
+  const who = about?.you ? 'you' : about?.label
   const aimedAtYou = plan.choice === 'hardMe' || plan.choice === 'hardLeft' || plan.choice === 'hardRight'
   const title =
     plan.outcome !== 'hard'
       ? OUTCOME_TITLE[plan.outcome]
       : plan.overBlock && !aimedAtYou
         ? 'Hard over the block'
-        : (HARD_TITLE[plan.choice] ?? 'Hard')
+        : (HARD_TITLE[plan.choice]?.(who ?? 'you') ?? LANE_TITLE[plan.choice] ?? 'Hard')
   const { x, y } = plan.landing
-  const offset = { x: x - viewer.x, y: y - viewer.y }
+  const offset = about && { x: x - about.at.x, y: y - about.at.y }
   const where =
     y < NET_Y
       ? 'back on their side'
       : x < 0 || x > COURT_WIDTH || y > COURT_LENGTH
         ? 'out'
-        : Math.hypot(offset.x, offset.y) < 0.5
-          ? `right at ${who}`
-          : `${describeOffset(offset)} of ${who}`
+        : !offset
+          ? courtArea(plan.landing)
+          : Math.hypot(offset.x, offset.y) < 0.5
+            ? `right at ${who}`
+            : `${describeOffset(offset)} of ${who}`
   return { title, where, time: `${plan.landedAt.toFixed(2)} s` }
 }
 
-/** "Hard: at me" in the defender's eyes or follow view; "Hard: at 6" in a court view. */
+/** Where on our court, as our players facing the net would say it: "deep left", "short middle". */
+function courtArea({ x, y }: Point) {
+  const depth = y - NET_Y
+  const row = depth < ATTACK_LINE_DISTANCE ? 'short' : depth < 6 ? 'mid-court' : 'deep'
+  const side = x < COURT_WIDTH / 3 ? 'left' : x > (COURT_WIDTH * 2) / 3 ? 'right' : 'middle'
+  return `${row} ${side}`
+}
+
+/** "Hard: at me" in the defender's eyes or follow view; "Hard: at 6" in the bird view. */
 function choiceLabel(choice: AttackChoice, label: string, defender: string | null) {
   if (!defender) return label
   if (choice === 'hardMe') return `Hard: at ${defender}`
@@ -1379,7 +1476,7 @@ function PlayIcon() {
   )
 }
 
-function playerName(icon: BoardIcon, hitterId: string, viewerId: string) {
+function playerName(icon: BoardIcon, hitterId: string, viewerId: string | null) {
   if (icon.id === viewerId) return `Me (${icon.label})`
   if (icon.id === hitterId) return `Hitter ${icon.label}`
   return isBlocker(icon) ? `Blocker ${icon.label}` : `Player ${icon.label}`
